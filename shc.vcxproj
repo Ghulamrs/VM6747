@@ -31,7 +31,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
-    <TargetName>shc</TargetName>
+    <TargetName>shci</TargetName>
   </PropertyGroup>
   <!-- OutDir is left to the C++ default on purpose: this project's
        own x64\$(Configuration)\ when built alone, and the solution's

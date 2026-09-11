@@ -69,7 +69,7 @@
 		0E07A68D4E50A32CFE46C5D2 /* src/backend/X86_64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/X86_64.h; sourceTree = "<group>"; };
 		3CB073C3561B520143E5659F /* src/backend/X86_64Linux.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/X86_64Linux.h; sourceTree = "<group>"; };
 		AC7808F02D1D79E6BC3410BA /* src/backend/X86_64Windows.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/X86_64Windows.h; sourceTree = "<group>"; };
-		FABB429FB93A3709F455747A /* shc.exe */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = shc.exe; sourceTree = BUILT_PRODUCTS_DIR; };
+		FABB429FB93A3709F455747A /* shci.exe */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = shci.exe; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -141,7 +141,7 @@
 		4E5FB6E29A8BB59A6D3A4922 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				FABB429FB93A3709F455747A /* shc.exe */,
+				FABB429FB93A3709F455747A /* shci.exe */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -149,22 +149,22 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		8628CA1ABA46EA37FDA0030B /* shc.exe */ = {
+		8628CA1ABA46EA37FDA0030B /* shci.exe */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = E5C9127DDE365E8A31E85D99;
 			buildPhases = (
 				BD4C6827C61291C154A37A4E /* Sources */,
 				F1434D65F73204F06783AF71 /* Frameworks */,
-				354B0E560DCA61DDAC8D549B /* the Shalimar runtime, beside shc.exe */,
+				354B0E560DCA61DDAC8D549B /* the Shalimar runtime, beside shci.exe */,
 				427C545DCD8E02DD5A40E0F4 /* put the finished program in RStudio's directory */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = shc.exe;
-			productName = shc.exe;
-			productReference = FABB429FB93A3709F455747A /* shc.exe */;
+			name = shci.exe;
+			productName = shci.exe;
+			productReference = FABB429FB93A3709F455747A /* shci.exe */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -188,13 +188,13 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				8628CA1ABA46EA37FDA0030B /* shc.exe */,
+				8628CA1ABA46EA37FDA0030B /* shci.exe */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		354B0E560DCA61DDAC8D549B /* the Shalimar runtime, beside shc.exe */ = {
+		354B0E560DCA61DDAC8D549B /* the Shalimar runtime, beside shci.exe */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -212,7 +212,7 @@
 				"$(SRCROOT)/runtime/Shortest.h",
 				"$(SRCROOT)/runtime/Debug.h",
 			);
-			name = "the Shalimar runtime, beside shc.exe";
+			name = "the Shalimar runtime, beside shci.exe";
 			outputPaths = (
 				"$(BUILT_PRODUCTS_DIR)/lib/shmrt-arm64-darwin.a",
 				"$(BUILT_PRODUCTS_DIR)/lib/shmrt-arm64-darwin-debug.a",
@@ -281,7 +281,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = NO;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				PRODUCT_NAME = shc.exe;
+				PRODUCT_NAME = shci.exe;
 				SDKROOT = macosx;
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/src $(SRCROOT)/runtime";
 				WARNING_CFLAGS = (
@@ -307,7 +307,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = NO;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				PRODUCT_NAME = shc.exe;
+				PRODUCT_NAME = shci.exe;
 				SDKROOT = macosx;
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/src $(SRCROOT)/runtime";
 				WARNING_CFLAGS = (
@@ -333,7 +333,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = NO;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				PRODUCT_NAME = shc.exe;
+				PRODUCT_NAME = shci.exe;
 				SDKROOT = macosx;
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/src $(SRCROOT)/runtime";
 				WARNING_CFLAGS = (
@@ -359,7 +359,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = NO;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				PRODUCT_NAME = shc.exe;
+				PRODUCT_NAME = shci.exe;
 				SDKROOT = macosx;
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/src $(SRCROOT)/runtime";
 				WARNING_CFLAGS = (
