@@ -84,7 +84,7 @@ BINDIR ?= .
 # example library; each falls back to a sibling checkout on its own.
 CC1 ?= ../Compiler-C/cc1.exe
 LIBDIR ?= ../Compiler-C/examples/shalimar-library
-SHC    ?= $(BINDIR)/shc.exe
+SHC    ?= $(BINDIR)/shci.exe
 
 # **The runtime goes wherever the compiler goes, and that is not a preference.**
 # shc finds its runtime relative to its own binary - lib/ beside it, then
