@@ -16,8 +16,10 @@ HERE=$(cd "$(dirname "$0")/.." && pwd)
 WORK=${TMPDIR:-/tmp}/vm6747-windows.$$
 REMOTE='C:/Users/GRA/Documents/VM6747'
 mkdir -p "$WORK/xwin/c" "$WORK/xwin/cxx"
-cp "$HERE"/../Compiler-Ci/tests/out-tms6747/*.s "$WORK/xwin/c/" 2>/dev/null
-cp "$HERE"/../Compiler-Cppi/tests/out-tms6747/*.s "$WORK/xwin/cxx/" 2>/dev/null
+# Only real case names: macOS leaves "name 2.s" duplicates beside the files
+# it rewrites, and those are noise, not cases.
+for f in "$HERE"/../Compiler-Ci/tests/out-tms6747/*.s; do case "$(basename "$f")" in *" "*) ;; *) cp "$f" "$WORK/xwin/c/";; esac; done
+for f in "$HERE"/../Compiler-Cppi/tests/out-tms6747/*.s; do case "$(basename "$f")" in *" "*) ;; *) cp "$f" "$WORK/xwin/cxx/";; esac; done
 cat > "$WORK/xwin/run.sh" <<'REMOTE_EOF'
 cd "$(dirname "$0")"
 for d in c cxx; do for s in $d/*.s; do b=${s%.s}; ../Emulator/vm6747.exe "$s" > "$b.out" 2>&1 < /dev/null; echo $? > "$b.rc"; done; done
