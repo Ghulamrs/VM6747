@@ -23,6 +23,15 @@ typedef unsigned long long size_t;
 typedef long long          ptrdiff_t;
 typedef unsigned short     wchar_t;
 
+#elif defined(__TMS320C6X__)
+
+// ILP32 on the C6000, and TI's headers say `unsigned int`, not `unsigned
+// long` - the same width, but a different type, and in C++ a different
+// letter in every mangled name that takes a size.
+typedef unsigned int size_t;
+typedef int          ptrdiff_t;
+typedef int          wchar_t;
+
 #else
 
 // LP64 on Linux and macOS alike: long is eight bytes and matches a pointer.
