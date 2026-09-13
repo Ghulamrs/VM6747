@@ -50,6 +50,13 @@ for src in "$SRC"/*.c; do
 
     ours_out=$("$VM" "$OUT/$name.s" 2>&1 < /dev/null); ours_rc=$?
     ref_out=$("$OUT/$name.ref" 2>&1 < /dev/null);  ref_rc=$?
+    # glibc's printf spells a null %p "(nil)" and a NaN with its sign bit set
+    # "-nan"; clang's libc and the emulator, which prints canonically, say
+    # "0x0" and "nan". The reference is brought to the emulator's spelling
+    # rather than the other way round, because the emulator's is the one that
+    # is the same on every machine - and it is the reference's libc talking,
+    # not the program under test. Found on the Linux box, 2 of 425.
+    ref_out=$(printf '%s' "$ref_out" | sed 's/(nil)/0x0/g; s/-nan/nan/g')
 
     if [ "$ours_out" != "$ref_out" ] || [ "$ours_rc" != "$ref_rc" ]; then
         echo "FAIL $name - disagrees with $HOST"
