@@ -871,6 +871,11 @@ ExprPtr Parser::primary(Program *program) {
                                             : types_.get(Kind::LongLong);
 
         else if (t.wide)                 ty = types_.get(target_.wcharType());
+        // A character constant is an int (C90 6.1.3.4), and '\x80' is -128:
+        // read as an unsigned number that fits nothing short of unsigned
+        // long long, which is what it was typed as until the C6000 target
+        // put such a constant on the stack as eight bytes.
+        else if (t.isChar)               ty = types_.intType();
         else if (fits(Kind::Int))        ty = types_.intType();
         else if (fits(Kind::Long))       ty = types_.get(Kind::Long);
 

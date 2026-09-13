@@ -19,6 +19,9 @@ struct Token {
     long double dvalue = 0;
 
     bool wide = false;
+    // A character constant: an int, whatever its value - which matters when
+    // the value is negative, since read as a number it fits no signed type.
+    bool isChar = false;
     std::string text;
     std::size_t pos = 0;
 

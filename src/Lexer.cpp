@@ -123,6 +123,7 @@ std::vector<Token> Lexer::tokenize() {
             t.kind = TokenKind::Num;
             t.value = v;
             t.wide = wide;
+            t.isChar = true;
             t.pos = start;
             out.push_back(std::move(t));
             continue;
