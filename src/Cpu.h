@@ -44,6 +44,8 @@ public:
     std::string readString(uint32_t a);
     void writeBytes(uint32_t a, const void *p, uint32_t n);
     void exitWith(int code) { running_ = false; exitCode_ = code; }
+    void resume() { running_ = true; }   // to run atexit handlers after exit
+    int exitCode() const { return exitCode_; }
     void jumpTo(uint32_t target) { pc_ = target; }   // for longjmp: immediate
     // Call a function in the program from the runtime (qsort's comparator):
     // A4 and B4 as arguments, A4 back. Runs nested until it returns.
@@ -72,6 +74,7 @@ private:
     uint64_t branchAt_ = 0;
     uint32_t branchTarget_ = 0;
 
+    void step();
     void applyPending();
     void tick();                       // one idle cycle
     void executePacket();

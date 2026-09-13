@@ -46,6 +46,7 @@ struct Program {
     uint32_t textBase = 0, dataEnd = 0;
     // Symbols the assembler could not define: candidates for the runtime.
     std::map<std::string, uint32_t> natives; // name -> stub address
+    std::vector<std::pair<uint32_t, uint32_t> > initArray;   // each unit's .init_array: base, bytes
 };
 
 // Little-endian access to the flat memory, bounds-checked by the caller.

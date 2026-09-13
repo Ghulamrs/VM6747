@@ -122,6 +122,91 @@ std::string Runtime::format(Cpu &cpu, const std::string &fmt, Args &args) {
     return out;
 }
 
+// ---- what the runtime contributes as data ----------------------------------------
+// The streams as objects; the Itanium ABI's three typeinfo classes' vtables,
+// which a program's typeinfo objects point at (their address point, +8) and
+// __dynamic_cast tells apart by the word there (1: no bases, 2: one base at
+// offset 0, 3: several); std::type_info's own; and __dso_handle.
+std::string Runtime::prelude() {
+    return
+        "\t.data\n"
+        "\t.global stdin\n\t.global stdout\n\t.global stderr\n"
+        "stdin:\t.word 1\nstdout:\t.word 2\nstderr:\t.word 3\n"
+        "\t.global __dso_handle\n__dso_handle:\t.word 0\n"
+        "\t.global _ZTVN10__cxxabiv117__class_type_infoE\n"
+        "_ZTVN10__cxxabiv117__class_type_infoE:\t.word 0, 0, 1, 0, 0, 0, 0, 0\n"
+        "\t.global _ZTVN10__cxxabiv120__si_class_type_infoE\n"
+        "_ZTVN10__cxxabiv120__si_class_type_infoE:\t.word 0, 0, 2, 0, 0, 0, 0, 0\n"
+        "\t.global _ZTVN10__cxxabiv121__vmi_class_type_infoE\n"
+        "_ZTVN10__cxxabiv121__vmi_class_type_infoE:\t.word 0, 0, 3, 0, 0, 0, 0, 0\n"
+        "\t.global _ZTVSt9type_info\n"
+        "_ZTVSt9type_info:\t.word 0, 0, 0, 0, 0, 0, 0, 0\n";
+}
+
+void Runtime::runAtExit(Cpu &cpu) {
+    cpu.resume();
+    for (size_t i = atExit_.size(); i-- > 0; ) cpu.callback(atExit_[i].fn, atExit_[i].arg, 0);
+    atExit_.clear();
+}
+
+void Runtime::terminate(Cpu &cpu, const char *why) {
+    std::fflush(stdout);
+    std::fprintf(stderr, "vm6747: terminate called: %s\n", why);
+    cpu.exitWith(134);
+    // exitWith stops the run; nothing after a terminate may continue.
+    std::exit(134);
+}
+
+// ---- __dynamic_cast ------------------------------------------------------------
+// The subobjects of the complete object, walked from its typeinfo: a class
+// typeinfo is [vptr][name]; si adds [base]; vmi adds [flags][count] then
+// [base][offset<<8 | flags] per base, a virtual base's offset naming the
+// vbase_offset slot in the vtable of the subobject that holds it.
+namespace {
+struct Sub { uint32_t ti, addr; bool pub; };
+void walk(Cpu &c, uint32_t ti, uint32_t addr, bool pub, std::vector<Sub> &out, int depth) {
+    if (depth > 64) return;
+    Sub s; s.ti = ti; s.addr = addr; s.pub = pub;
+    out.push_back(s);
+    uint32_t kind = c.load32(c.load32(ti));
+    if (kind == 2) { walk(c, c.load32(ti + 8), addr, pub, out, depth + 1); return; }
+    if (kind != 3) return;
+    uint32_t count = c.load32(ti + 12);
+    for (uint32_t i = 0; i < count; i++) {
+        uint32_t bti = c.load32(ti + 16 + 8 * i);
+        int32_t of = static_cast<int32_t>(c.load32(ti + 20 + 8 * i));
+        int32_t off = of >> 8;
+        bool basePub = (of & 2) != 0, virt = (of & 1) != 0;
+        uint32_t baseAddr;
+        if (virt) { uint32_t vptr = c.load32(addr); baseAddr = addr + static_cast<int32_t>(c.load32(vptr + off)); }
+        else baseAddr = addr + off;
+        walk(c, bti, baseAddr, pub && basePub, out, depth + 1);
+    }
+}
+bool sameType(Cpu &c, uint32_t a, uint32_t b) {
+    if (a == b) return true;
+    return c.readString(c.load32(a + 4)) == c.readString(c.load32(b + 4));
+}
+}
+
+uint32_t Runtime::dynamicCast(Cpu &c, uint32_t sub, uint32_t src, uint32_t dst) {
+    if (sub == 0) return 0;
+    uint32_t vptr = c.load32(sub);
+    uint32_t complete = sub + static_cast<int32_t>(c.load32(vptr - 8));
+    uint32_t cti = c.load32(vptr - 4);
+    std::vector<Sub> subs;
+    walk(c, cti, complete, true, subs, 0);
+    // The source must be a public base of the complete object at `sub`.
+    bool srcPublic = false;
+    for (const Sub &s : subs) if (s.addr == sub && sameType(c, s.ti, src) && s.pub) srcPublic = true;
+    if (!srcPublic) return 0;
+    if (sameType(c, cti, dst)) return complete;
+    // Otherwise the unique public dst subobject; two of them is ambiguous.
+    uint32_t found = 0; int n = 0;
+    for (const Sub &s : subs) if (s.pub && sameType(c, s.ti, dst)) { if (n == 0 || s.addr != found) { found = s.addr; n++; } }
+    return n == 1 ? found : 0;
+}
+
 // ---- the library -----------------------------------------------------------------
 std::vector<std::string> Runtime::names() {
     static const char *const k[] = {
@@ -143,6 +228,15 @@ std::vector<std::string> Runtime::names() {
         "setjmp", "_setjmp", "longjmp", "time", "clock",
         "signal", "raise", "mktime", "localtime", "gmtime", "strftime", "difftime",
         "setlocale", "localeconv",
+        // the C++ ABI
+        "_Znwm", "_Znam", "_Znwj", "_Znaj", "_ZdlPv", "_ZdaPv", "_ZdlPvm", "_ZdaPvm", "_ZdlPvj", "_ZdaPvj",
+        "__cxa_guard_acquire", "__cxa_guard_release", "__cxa_guard_abort", "__cxa_atexit",
+        "__dynamic_cast", "__cxa_pure_virtual", "__cxa_deleted_virtual",
+        "__cxa_allocate_exception", "__cxa_free_exception", "__cxa_throw", "__cxa_rethrow",
+        "__cxa_begin_catch", "__cxa_end_catch", "__cxa_get_exception_ptr", "_Unwind_Resume",
+        "__gxx_personality_v0", "__cxa_bad_cast", "__cxa_bad_typeid", "_ZSt9terminatev",
+        "_ZNKSt9type_infoeqERKS_", "_ZNKSt9type_infoneERKS_", "_ZNKSt9type_info4nameEv",
+        "_ZNKSt9type_info6beforeERKS_",
         "__c6xabi_divi", "__c6xabi_divu", "__c6xabi_remi", "__c6xabi_remu",
         "__c6xabi_divlli", "__c6xabi_divull", "__c6xabi_remlli", "__c6xabi_remull",
         "__c6xabi_divf", "__c6xabi_divd", "__c6xabi_fixfu", "__c6xabi_fixdu",
@@ -292,7 +386,7 @@ bool Runtime::call(const std::string &n, Cpu &c) {
     // ---- process ----
     if (n == "exit") { std::fflush(stdout); c.exitWith(static_cast<int>(arg(c, 0))); return true; }
     if (n == "abort") { std::fflush(stdout); std::fprintf(stderr, "vm6747: abort() called\n"); c.exitWith(134); return true; }
-    if (n == "atexit") { ret(c, 0); return true; }
+    if (n == "atexit") { AtExit a; a.fn = arg(c, 0); a.arg = 0; atExit_.push_back(a); ret(c, 0); return true; }
     if (n == "time") { uint32_t p = arg(c, 0); uint32_t t = static_cast<uint32_t>(std::time(nullptr)); if (p) c.store32(p, t); ret(c, t); return true; }
     // ---- signals: a table of handlers, raise calls one ----
     if (n == "signal") {
@@ -535,6 +629,29 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         ret(c, val == 0 ? 1 : val);           // and B3 is now setjmp's return address
         return true;
     }
+    // ---- the C++ ABI ----
+    if (n == "_Znwm" || n == "_Znam" || n == "_Znwj" || n == "_Znaj") { ret(c, allocate(c, arg(c, 0))); return true; }
+    if (n == "_ZdlPv" || n == "_ZdaPv" || n == "_ZdlPvm" || n == "_ZdaPvm" || n == "_ZdlPvj" || n == "_ZdaPvj") { release(c, arg(c, 0)); return true; }
+    if (n == "__cxa_guard_acquire") { ret(c, c.load8(arg(c, 0)) == 0); return true; }
+    if (n == "__cxa_guard_release") { c.store8(arg(c, 0), 1); return true; }
+    if (n == "__cxa_guard_abort") { return true; }
+    if (n == "__cxa_atexit") { AtExit a; a.fn = arg(c, 0); a.arg = arg(c, 1); atExit_.push_back(a); ret(c, 0); return true; }
+    if (n == "__dynamic_cast") { ret(c, dynamicCast(c, arg(c, 0), arg(c, 1), arg(c, 2))); return true; }
+    if (n == "__cxa_pure_virtual") c.fault("a pure virtual function was called");
+    if (n == "__cxa_deleted_virtual") c.fault("a deleted virtual function was called");
+    if (n == "__cxa_allocate_exception") { ret(c, allocate(c, arg(c, 0) + 32)); return true; }
+    if (n == "__cxa_free_exception") { release(c, arg(c, 0)); return true; }
+    if (n == "__cxa_throw" || n == "__cxa_rethrow") terminate(c, "an exception was thrown, and this target does not unwind yet");
+    if (n == "__cxa_bad_cast") terminate(c, "bad dynamic_cast to a reference");
+    if (n == "__cxa_bad_typeid") terminate(c, "typeid of a null pointer");
+    if (n == "_ZSt9terminatev") terminate(c, "std::terminate()");
+    if (n == "__cxa_begin_catch" || n == "__cxa_end_catch" || n == "__cxa_get_exception_ptr" ||
+        n == "_Unwind_Resume" || n == "__gxx_personality_v0")
+        c.fault("'" + n + "' reached: no exception can be in flight on this target");
+    if (n == "_ZNKSt9type_infoeqERKS_") { ret(c, sameType(c, arg(c, 0), arg(c, 1))); return true; }
+    if (n == "_ZNKSt9type_infoneERKS_") { ret(c, !sameType(c, arg(c, 0), arg(c, 1))); return true; }
+    if (n == "_ZNKSt9type_info4nameEv") { ret(c, c.load32(arg(c, 0) + 4)); return true; }
+    if (n == "_ZNKSt9type_info6beforeERKS_") { ret(c, c.readString(c.load32(arg(c, 0) + 4)) < c.readString(c.load32(arg(c, 1) + 4))); return true; }
     // ---- the EABI helpers ----
     if (n == "__c6xabi_divi") { int32_t a = static_cast<int32_t>(c.reg(Cpu::A4)), b = static_cast<int32_t>(c.reg(Cpu::B4)); if (b == 0) c.fault("division by zero"); ret(c, static_cast<uint32_t>(b == -1 ? -a : a / b)); return true; }
     if (n == "__c6xabi_divu") { uint32_t a = c.reg(Cpu::A4), b = c.reg(Cpu::B4); if (b == 0) c.fault("division by zero"); ret(c, a / b); return true; }

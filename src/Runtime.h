@@ -19,6 +19,12 @@ public:
     static std::vector<std::string> names();
     bool call(const std::string &name, Cpu &cpu);
     void setHeap(uint32_t start, uint32_t end) { heap_ = start; heapEnd_ = end; }
+    // The assembly the runtime contributes: the streams, the C++ ABI's
+    // typeinfo vtables, __dso_handle.
+    static std::string prelude();
+    // After main returns or exit is called: the __cxa_atexit registrations,
+    // last first.
+    void runAtExit(Cpu &cpu);
 
 private:
     uint32_t heap_ = 0, heapEnd_ = 0;
@@ -39,6 +45,10 @@ private:
     std::vector<File> files_;
     uint32_t handlers_[32] = { 0 };
     uint32_t errno_ = 0;
+    struct AtExit { uint32_t fn, arg; };
+    std::vector<AtExit> atExit_;
+    uint32_t dynamicCast(Cpu &cpu, uint32_t sub, uint32_t src, uint32_t dst);
+    [[noreturn]] void terminate(Cpu &cpu, const char *why);
     uint32_t errnoAt(Cpu &cpu);
     void setErrno(Cpu &cpu, uint32_t v);
 };

@@ -304,15 +304,33 @@ void Cpu::executePacket() {
     for (int k = 1; k < nops; k++) tick();
 }
 
+// One step: a packet, or a native stub below the text base. 0xFC is where
+// main returns to and 0xF8 where a callback's callee does; a native name is
+// answered by the runtime and returns through B3.
+void Cpu::step() {
+    if (pc_ >= prog_.textBase) { executePacket(); return; }
+    if (pc_ == 0xFC) { exitWith(static_cast<int>(r_[A4])); return; }
+    std::string name;
+    for (std::map<std::string, uint32_t>::const_iterator n = prog_.natives.begin(); n != prog_.natives.end(); ++n)
+        if (n->second == pc_) name = n->first;
+    if (name.empty()) fault("a branch below the text base");
+    // Everything pending lands before the library runs, as it would have by
+    // the time a real callee's first instruction read anything.
+    for (const Pending &p : pending_) r_[p.reg] = p.value;
+    pending_.clear();
+    branchValid_ = false;
+    if (!rt_.call(name, *this)) fault("'" + name + "' is not provided by the runtime");
+    if (!running_) return;
+    pc_ = r_[B3];
+    cycle_++;
+}
+
 uint32_t Cpu::callback(uint32_t fn, uint32_t a4, uint32_t b4) {
     uint32_t savedPc = pc_, savedB3 = r_[B3];
     r_[A4] = a4; r_[B4] = b4;
     r_[B3] = 0xF8;                       // where the callee's return lands
     pc_ = fn;
-    while (running_ && pc_ != 0xF8) {
-        if (pc_ < prog_.textBase) fault("a native call from a callback is not supported");
-        executePacket();
-    }
+    while (running_ && pc_ != 0xF8) step();
     for (const Pending &p : pending_) r_[p.reg] = p.value;
     pending_.clear();
     uint32_t result = r_[A4];
@@ -323,26 +341,6 @@ uint32_t Cpu::callback(uint32_t fn, uint32_t a4, uint32_t b4) {
 int Cpu::run(uint32_t entry, bool trace) {
     trace_ = trace;
     pc_ = entry;
-    while (running_) {
-        if (pc_ < prog_.textBase) {
-            // A native stub, or the return from main at 0xFC.
-            if (pc_ == 0xFC) { exitWith(static_cast<int>(r_[A4])); break; }
-            std::string name;
-            for (std::map<std::string, uint32_t>::const_iterator n = prog_.natives.begin(); n != prog_.natives.end(); ++n)
-                if (n->second == pc_) name = n->first;
-            if (name.empty()) fault("a branch below the text base");
-            // Everything pending lands before the library runs, as it would
-            // have by the time a real callee's first instruction read anything.
-            for (const Pending &p : pending_) r_[p.reg] = p.value;
-            pending_.clear();
-            branchValid_ = false;
-            if (!rt_.call(name, *this)) fault("'" + name + "' is not provided by the runtime");
-            if (!running_) break;
-            pc_ = r_[B3];
-            cycle_++;
-            continue;
-        }
-        executePacket();
-    }
+    while (running_) step();
     return exitCode_;
 }

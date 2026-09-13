@@ -35,10 +35,7 @@ int main(int argc, char **argv) {
     }
     if (files.empty()) { std::fprintf(stderr, "vm6747: no input\n"); return 2; }
 
-    // What the runtime contributes as data: the three streams as objects.
-    layout.prelude =
-        "\t.data\n\t.global stdin\n\t.global stdout\n\t.global stderr\n"
-        "stdin:\t.word 1\nstdout:\t.word 2\nstderr:\t.word 3\n";
+    layout.prelude = Runtime::prelude();
 
     Program prog;
     std::string error;
@@ -78,7 +75,15 @@ int main(int argc, char **argv) {
     cpu.setReg(Cpu::B4, argvAt);
     rt.setHeap(prog.dataEnd, layout.memoryBytes / 2);
 
+    // Dynamic initialisation before main: every .init_array entry, in order.
+    for (size_t i = 0; i < prog.initArray.size(); i++)
+        for (uint32_t a = prog.initArray[i].first; a < prog.initArray[i].first + prog.initArray[i].second; a += 4) {
+            uint32_t fn = cpu.load32(a);
+            if (fn != 0) cpu.callback(fn, 0, 0);
+        }
     int status = cpu.run(m->second, trace);
+    rt.runAtExit(cpu);
+    status = cpu.exitCode();
     std::fflush(stdout);
     return status & 0xff;
 }
