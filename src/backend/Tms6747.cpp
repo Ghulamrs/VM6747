@@ -130,10 +130,11 @@ void Tms6747::addOffset(int bytes) {
 // A struct copy, word by word then halfword and byte, each through A3 with
 // the addresses formed in A0: the zero-offset forms, like every other access
 // here. from and to are A-file registers other than A0 and A3.
-void Tms6747::copyBlock(int size, const char *from, const char *to) {
+void Tms6747::copyBlock(int size, const char *from, const char *to, int align) {
     int off = 0;
     while (off < size) {
         int step = size - off >= 4 ? 4 : size - off >= 2 ? 2 : 1;
+        if (step > align) step = align;     // a struct of chars may sit anywhere
         const char *ld = step == 4 ? "LDW" : step == 2 ? "LDH" : "LDB";
         const char *st = step == 4 ? "STW" : step == 2 ? "STH" : "STB";
         regAdd(from, off, "A0");
@@ -352,7 +353,7 @@ void Tms6747::visit(const Assign &n) {
     pop("A4");                       // A4 = value again
     if (bf) { bitFieldInsert(*bf); return; }
     if (n.type()->isStructOrUnion()) {
-        copyBlock(n.type()->size(target_), "A4", "A6");
+        copyBlock(n.type()->size(target_), "A4", "A6", n.type()->align(target_));
         out_ << "\tMV\tA6, A4\n";    // the result: the target, by address
         return;
     }
@@ -619,7 +620,7 @@ void Tms6747::visit(const Return &n) {
             // A3, kept in the sret slot) and answer with that address.
             localAddr(sretSlot_, "A6");
             out_ << "\tLDW\t*A6, A6\n\tNOP\t4\n";
-            copyBlock(n.value().type()->size(target_), "A4", "A6");
+            copyBlock(n.value().type()->size(target_), "A4", "A6", n.value().type()->align(target_));
             out_ << "\tMV\tA6, A4\n";
         }
     }
@@ -672,7 +673,7 @@ void Tms6747::visit(const Call &n) {
         if (!args[i]->type()->isStructOrUnion()) continue;
         args[i]->accept(*this);               // A4 = the struct's address
         localAddr(n.argSlot(i), "A6");
-        copyBlock(args[i]->type()->size(target_), "A4", "A6");
+        copyBlock(args[i]->type()->size(target_), "A4", "A6", args[i]->type()->align(target_));
     }
 
     std::size_t regCount = static_cast<std::size_t>(abi_.intCount);
@@ -950,7 +951,7 @@ void Tms6747::emitParams(const Function &fn) {
             // Through A1, not A6: A6 is the third argument's register, still
             // to be read when an earlier struct parameter is being copied.
             localAddr(ps[i].offset, "A1");
-            copyBlock(t->size(target_), "A4", "A1");
+            copyBlock(t->size(target_), "A4", "A1", t->align(target_));
             continue;
         }
         localAddr(ps[i].offset, "A0");
