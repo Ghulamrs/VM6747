@@ -12,8 +12,8 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
-    <ProjectGuid>{9BD6163A-EA47-3807-1AE3-8877169B4D92}</ProjectGuid>
-    <RootNamespace>shc</RootNamespace>
+    <ProjectGuid>{39F445EC-2E3B-CB68-9D8C-B98B85AC2258}</ProjectGuid>
+    <RootNamespace>shci</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -50,7 +50,7 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Message>building the Shalimar runtime beside shc.exe</Message>
+      <Message>building the Shalimar runtime beside shci.exe</Message>
       <Command>if not exist "$(OutDir)lib" mkdir "$(OutDir)lib"
 if not exist "$(IntDir)rt" mkdir "$(IntDir)rt"
 if not exist "$(IntDir)rtd" mkdir "$(IntDir)rtd"
