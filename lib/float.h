@@ -52,7 +52,7 @@
 #define DBL_EPSILON     2.22044604925031308085e-16
 
 // long double. x87's 80-bit format on System V, and double everywhere else.
-#if defined(_WIN32) || defined(__APPLE__)
+#if defined(_WIN32) || defined(__APPLE__) || defined(__TMS320C6X__)
 
 #define LDBL_MANT_DIG   53
 #define LDBL_DIG        15

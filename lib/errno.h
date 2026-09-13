@@ -28,6 +28,7 @@ int *_errno(void);
 int *__error(void);
 #define errno (*__error())
 #else
+/* glibc's spelling, and the VM6747 emulator answers to the same name. */
 int *__errno_location(void);
 #define errno (*__errno_location())
 #endif

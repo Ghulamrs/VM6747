@@ -38,7 +38,8 @@
 #define INT_MAX     2147483647
 #define UINT_MAX    4294967295U
 
-#ifdef _WIN32
+/* A 32-bit long on Windows and on the C6000 (EABI: long is int-sized). */
+#if defined(_WIN32) || defined(__TMS320C6X__)
 
 // LLP64: long is four bytes here and nowhere else this compiler targets.
 #define LONG_MIN    (-LONG_MAX - 1)
