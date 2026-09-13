@@ -1,6 +1,6 @@
 // vm6747 - run C6000 assembly as cc1i and cxx1i emit it for -arch tms6747.
 //
-//   vm6747 [-t] [-m megabytes] file.s [file2.s ...] [-- args]
+//   vm6747 [-t] [-m megabytes] file.s|directory [more ...] [-- args]
 //
 // The files are assembled together, the C library and the EABI helpers are
 // provided natively, main is called with argc and argv, and the exit status
@@ -10,11 +10,58 @@
 #include "Cpu.h"
 #include "Runtime.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <dirent.h>
+#include <sys/stat.h>
+#endif
+
+// A directory named on the command line stands for every .s file in it, in
+// name order - how RStudio hands over a program of several sources: one
+// directory, one .s per source, nothing linked.
+static bool isDirectory(const std::string &path) {
+#ifdef _WIN32
+    DWORD a = GetFileAttributesA(path.c_str());
+    return a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY);
+#else
+    struct stat st;
+    return stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+#endif
+}
+static std::vector<std::string> assemblyIn(const std::string &dir) {
+    std::vector<std::string> names;
+#ifdef _WIN32
+    WIN32_FIND_DATAA f;
+    HANDLE h = FindFirstFileA((dir + "\\*.s").c_str(), &f);
+    if (h != INVALID_HANDLE_VALUE) {
+        do { names.push_back(f.cFileName); } while (FindNextFileA(h, &f));
+        FindClose(h);
+    }
+#else
+    if (DIR *d = opendir(dir.c_str())) {
+        while (struct dirent *e = readdir(d)) {
+            std::string n = e->d_name;
+            if (n.size() > 2 && n.compare(n.size() - 2, 2, ".s") == 0) names.push_back(n);
+        }
+        closedir(d);
+    }
+#endif
+    std::sort(names.begin(), names.end());
+    std::vector<std::string> out;
+    for (const std::string &n : names) {
+        if (n.find(' ') != std::string::npos) continue;      // macOS "name 2.s" duplicates
+        out.push_back(dir + (dir.empty() || dir.back() == '/' || dir.back() == '\\' ? "" : "/") + n);
+    }
+    return out;
+}
 
 int main(int argc, char **argv) {
     std::vector<std::string> files, args;
@@ -30,6 +77,12 @@ int main(int argc, char **argv) {
         if (a == "-h" || a == "--help") {
             std::printf("usage: vm6747 [-t] [-m megabytes] file.s ... [-- args]\n");
             return 0;
+        }
+        if (isDirectory(a)) {
+            std::vector<std::string> inside = assemblyIn(a);
+            if (inside.empty()) { std::fprintf(stderr, "vm6747: no .s files in %s\n", a.c_str()); return 2; }
+            for (const std::string &f : inside) files.push_back(f);
+            continue;
         }
         files.push_back(a);
     }
