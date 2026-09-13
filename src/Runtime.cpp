@@ -34,8 +34,10 @@ static uint32_t variadicAt(Cpu &c, int named) {
 }
 static void ret(Cpu &c, uint32_t v) { c.setReg(Cpu::A4, v); }
 static void retWide(Cpu &c, uint64_t v) { c.setPair(Cpu::A4, v); }
-static void retDouble(Cpu &c, double d) { uint64_t v; std::memcpy(&v, &d, 8); retWide(c, v); }
-static void retFloat(Cpu &c, float f) { uint32_t v; std::memcpy(&v, &f, 4); ret(c, v); }
+// A NaN goes back as the canonical quiet NaN, sign clear, as the CPU's own
+// arithmetic answers it - not as the host happened to produce it.
+static void retDouble(Cpu &c, double d) { uint64_t v; if (d != d) v = 0x7ff8000000000000ULL; else std::memcpy(&v, &d, 8); retWide(c, v); }
+static void retFloat(Cpu &c, float f) { uint32_t v; if (f != f) v = 0x7fc00000u; else std::memcpy(&v, &f, 4); ret(c, v); }
 
 // ---- errno: one word on the heap, handed out by address -----------------------
 uint32_t Runtime::errnoAt(Cpu &cpu) {
@@ -110,9 +112,28 @@ std::string Runtime::format(Cpu &cpu, const std::string &fmt, Args &args) {
             break;
         }
         case 'p': std::snprintf(buf, sizeof buf, "0x%x", args.word()); break;
-        case 'f': case 'F': case 'e': case 'E': case 'g': case 'G': case 'a': case 'A':
-            std::snprintf(buf, sizeof buf, (spec + conv).c_str(), args.dbl());
+        case 'f': case 'F': case 'e': case 'E': case 'g': case 'G': case 'a': case 'A': {
+            // A NaN or an infinity is spelt here, not by the host, whose
+            // spelling differs (Windows writes -nan(ind)); the program's
+            // output must not depend on where the emulator runs.
+            double v = args.dbl();
+            if (v != v || std::isinf(v)) {
+                std::string word = v != v ? "nan" : "inf";
+                if (std::isupper(static_cast<unsigned char>(conv))) for (char &ch : word) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+                if (std::signbit(v)) word = "-" + word;
+                else if (spec.find('+') != std::string::npos) word = "+" + word;
+                else if (spec.find(' ') != std::string::npos) word = " " + word;
+                std::string w = spec;                        // keep the width, drop 0 and the precision
+                std::string flags, width;
+                size_t k = 1;
+                while (k < w.size() && std::strchr("-+ #0", w[k])) { if (w[k] == '-') flags += '-'; k++; }
+                while (k < w.size() && std::isdigit(static_cast<unsigned char>(w[k]))) width += w[k++];
+                std::snprintf(buf, sizeof buf, ("%" + flags + width + "s").c_str(), word.c_str());
+                break;
+            }
+            std::snprintf(buf, sizeof buf, (spec + conv).c_str(), v);
             break;
+        }
         case 'n': { uint32_t p = args.word(); cpu.store32(p, static_cast<uint32_t>(out.size())); buf[0] = 0; break; }
         case '%': std::strcpy(buf, "%"); break;
         default: std::snprintf(buf, sizeof buf, "%s%c", spec.c_str(), conv); break;
@@ -319,6 +340,14 @@ bool Runtime::call(const std::string &n, Cpu &c) {
     // ---- files: kept in memory on the host until closed ----
     if (n == "fopen") {
         std::string path = c.readString(arg(c, 0)), mode = c.readString(arg(c, 1));
+#ifdef _WIN32
+        // A program that writes to /tmp means the scratch directory; give it
+        // this host's, so the same corpus runs here.
+        if (path.compare(0, 5, "/tmp/") == 0) {
+            const char *t = std::getenv("TEMP");
+            path = std::string(t != nullptr ? t : ".") + "\\" + path.substr(5);
+        }
+#endif
         File f; f.path = path; f.pos = 0; f.write = mode.find('w') != std::string::npos || mode.find('a') != std::string::npos;
         if (!f.write || mode.find('+') != std::string::npos || mode[0] == 'a') {
             FILE *h = std::fopen(path.c_str(), "rb");

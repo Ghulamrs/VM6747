@@ -104,9 +104,13 @@ uint32_t Cpu::address(const Instr &in, const Operand &o, int size, std::vector<P
 }
 
 static float asFloat(uint32_t v) { float f; std::memcpy(&f, &v, 4); return f; }
-static uint32_t fromFloat(float f) { uint32_t v; std::memcpy(&v, &f, 4); return v; }
+// A NaN result is the canonical quiet NaN with the sign clear, whichever
+// NaN the host's arithmetic produced: the host varies (Windows gives the
+// sign bit), and a program's output must not depend on where the emulator
+// runs.
+static uint32_t fromFloat(float f) { if (f != f) return 0x7fc00000u; uint32_t v; std::memcpy(&v, &f, 4); return v; }
 static double asDouble(uint64_t v) { double d; std::memcpy(&d, &v, 8); return d; }
-static uint64_t fromDouble(double d) { uint64_t v; std::memcpy(&v, &d, 8); return v; }
+static uint64_t fromDouble(double d) { if (d != d) return 0x7ff8000000000000ULL; uint64_t v; std::memcpy(&v, &d, 8); return v; }
 
 static int32_t truncToInt(double d) {
     if (d != d) return 0;

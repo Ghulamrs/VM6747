@@ -240,7 +240,7 @@ struct Assembler {
         int r;
         size_t colon = s.find(':');
         if (colon != std::string::npos && s[0] != '*') {
-            int hi, lo;
+            int hi = 0, lo = 0;
             if (!regNumber(s.substr(0, colon), hi) || !regNumber(s.substr(colon + 1), lo))
                 return fail(u, ln, "bad register pair '" + s + "'");
             if (hi != lo + 1 || (lo & 1)) return fail(u, ln, "a register pair is odd:even, '" + s + "' is not");
