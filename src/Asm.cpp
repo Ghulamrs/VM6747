@@ -9,7 +9,7 @@
 
 namespace {
 
-enum Section { Text, Data, Const, Bss, Init, SectionCount };
+enum Section { Text, Data, Const, Bss, Init, Eh, SectionCount };
 
 struct Sym { int section; uint32_t offset; bool defined = false; bool weak = false; };
 
@@ -28,8 +28,8 @@ struct Unit {
     std::map<std::string, Sym> locals;
     std::vector<std::string> exported;      // .global / .weak names
     std::vector<std::string> weak;
-    uint32_t size[SectionCount] = { 0, 0, 0, 0, 0 };
-    uint32_t base[SectionCount] = { 0, 0, 0, 0, 0 };
+    uint32_t size[SectionCount] = { 0, 0, 0, 0, 0, 0 };
+    uint32_t base[SectionCount] = { 0, 0, 0, 0, 0, 0 };
 };
 
 struct Assembler {
@@ -311,6 +311,7 @@ struct Assembler {
                     else if (n == ".const" || n == ".rodata" || n.compare(0, 6, ".const") == 0) sec = Const;
                     else if (n == ".bss" || n == ".far") sec = Bss;
                     else if (n == ".init_array") sec = Init;
+                    else if (n == ".vm6747.eh") sec = Eh;
                     else if (n.compare(0, 5, ".text") == 0) sec = Text;
                     else return fail(u, ln, "unknown section '" + n + "'");
                 } else if (m == ".global" || m == ".globl" || m == ".def" || m == ".ref") {
@@ -405,7 +406,7 @@ struct Assembler {
                     std::string n = ln.operands[0];
                     if (n.size() >= 2 && n[0] == '"') n = n.substr(1, n.size() - 2);
                     sec = n.compare(0, 5, ".text") == 0 ? Text : (n == ".data" || n == ".fardata") ? Data
-                        : (n == ".bss" || n == ".far") ? Bss : n == ".init_array" ? Init : Const;
+                        : (n == ".bss" || n == ".far") ? Bss : n == ".init_array" ? Init : n == ".vm6747.eh" ? Eh : Const;
                 } else if (mn == ".align") {
                     long long a = 4;
                     if (!ln.operands.empty()) evaluate(u, ln, ln.operands[0], true, a);
@@ -514,7 +515,10 @@ struct Assembler {
         }
         prog.textBase = layout.textBase;
         prog.dataEnd = alignUp(cursor, 8);
-        for (const Unit &u : units) { prog.initArray.push_back(std::make_pair(u.base[Init], u.size[Init])); }
+        for (const Unit &u : units) {
+            prog.initArray.push_back(std::make_pair(u.base[Init], u.size[Init]));
+            prog.ehTables.push_back(std::make_pair(u.base[Eh], u.size[Eh]));
+        }
         if (prog.dataEnd > layout.memoryBytes / 2) { error = "the program does not fit in memory"; return false; }
         for (Unit &u : units) if (!passTwo(u)) return false;
         for (std::map<std::string, std::pair<int, Sym> >::const_iterator g = globals.begin(); g != globals.end(); ++g) {

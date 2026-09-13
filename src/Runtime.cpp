@@ -39,6 +39,21 @@ static void retWide(Cpu &c, uint64_t v) { c.setPair(Cpu::A4, v); }
 static void retDouble(Cpu &c, double d) { uint64_t v; if (d != d) v = 0x7ff8000000000000ULL; else std::memcpy(&v, &d, 8); retWide(c, v); }
 static void retFloat(Cpu &c, float f) { uint32_t v; if (f != f) v = 0x7fc00000u; else std::memcpy(&v, &f, 4); ret(c, v); }
 
+// ---- streams: 1 is stdin, read whole on first use; 4 onward are fopen's ------
+Runtime::File *Runtime::streamFile(uint32_t s) {
+    if (s == 1) {
+        if (!stdinRead_) {
+            stdinRead_ = true;
+            char b[4096]; size_t k;
+            while ((k = std::fread(b, 1, sizeof b, stdin)) > 0) stdin_.data.append(b, k);
+            stdin_.pos = 0; stdin_.write = false;
+        }
+        return &stdin_;
+    }
+    if (s >= 4 && s - 4 < files_.size()) return &files_[s - 4];
+    return nullptr;
+}
+
 // ---- errno: one word on the heap, handed out by address -----------------------
 uint32_t Runtime::errnoAt(Cpu &cpu) {
     if (errno_ == 0) errno_ = allocate(cpu, 4);
@@ -161,7 +176,34 @@ std::string Runtime::prelude() {
         "\t.global _ZTVN10__cxxabiv121__vmi_class_type_infoE\n"
         "_ZTVN10__cxxabiv121__vmi_class_type_infoE:\t.word 0, 0, 3, 0, 0, 0, 0, 0\n"
         "\t.global _ZTVSt9type_info\n"
-        "_ZTVSt9type_info:\t.word 0, 0, 0, 0, 0, 0, 0, 0\n";
+        "_ZTVSt9type_info:\t.word 0, 0, 0, 0, 0, 0, 0, 0\n"
+        "\t.global _ZTVN10__cxxabiv123__fundamental_type_infoE\n"
+        "_ZTVN10__cxxabiv123__fundamental_type_infoE:\t.word 0, 0, 4, 0, 0, 0, 0, 0\n"
+        "\t.global _ZTVN10__cxxabiv119__pointer_type_infoE\n"
+        "_ZTVN10__cxxabiv119__pointer_type_infoE:\t.word 0, 0, 5, 0, 0, 0, 0, 0\n"
+        + fundamentalTypeInfos();
+}
+
+// The typeinfo objects the standard library carries for the fundamental
+// types, and for pointers to them, so that `throw 7` and `catch (const char
+// *)` name something: _ZTIi is [vptr][name "i"], _ZTIPKc is [vptr][name
+// "PKc"][flags][pointee _ZTIc]. Matched by name.
+std::string Runtime::fundamentalTypeInfos() {
+    static const char *const codes[] = { "v", "b", "c", "a", "h", "s", "t", "i", "j", "l", "m",
+                                         "x", "y", "n", "o", "f", "d", "e", "w", "Dn" };
+    std::string o;
+    for (const char *code : codes) {
+        std::string k = code;
+        o += "\t.global _ZTS" + k + "\n_ZTS" + k + ":\t.cstring \"" + k + "\"\n";
+        o += "\t.align 4\n\t.global _ZTI" + k + "\n_ZTI" + k + ":\t.word _ZTVN10__cxxabiv123__fundamental_type_infoE+8, _ZTS" + k + "\n";
+        for (int q = 0; q < 2; q++) {
+            std::string pk = (q ? "PK" : "P") + k;
+            o += "\t.global _ZTS" + pk + "\n_ZTS" + pk + ":\t.cstring \"" + pk + "\"\n";
+            o += "\t.align 4\n\t.global _ZTI" + pk + "\n_ZTI" + pk + ":\t.word _ZTVN10__cxxabiv119__pointer_type_infoE+8, _ZTS" + pk
+               + ", " + (q ? "1" : "0") + ", _ZTI" + k + "\n";
+        }
+    }
+    return o;
 }
 
 void Runtime::runAtExit(Cpu &cpu) {
@@ -228,6 +270,99 @@ uint32_t Runtime::dynamicCast(Cpu &c, uint32_t sub, uint32_t src, uint32_t dst) 
     return n == 1 ? found : 0;
 }
 
+// ---- exceptions ------------------------------------------------------------------
+// The compiler writes one row per call-site range into .vm6747.eh: begin,
+// end, pad, the frame's size, a cleanup flag, the handler count, then each
+// handler's typeinfo (0 for catch (...)) and selector index. A throw walks
+// the frames from the thrower - each frame's return address is at fp + 4
+// and its caller's fp at fp, the shape every function with a call keeps -
+// twice: first to find a handler, so an uncaught exception terminates
+// without unwinding, then to land on every cleanup pad on the way and on
+// the handler with its selector. Landing is a return to the pad: A15 is the
+// frame's, B15 is A15 less the frame, A4 the exception, B4 the selector,
+// and B3 the pad, which the native return then jumps to.
+void Runtime::loadEhRows(Cpu &c) {
+    if (ehLoaded_) return;
+    ehLoaded_ = true;
+    const std::vector<std::pair<uint32_t, uint32_t> > &tables = c.program().ehTables;
+    for (size_t t = 0; t < tables.size(); t++) {
+        uint32_t at = tables[t].first, end = at + tables[t].second;
+        while (at + 24 <= end) {
+            EhRow r;
+            r.begin = c.load32(at); r.end = c.load32(at + 4); r.pad = c.load32(at + 8);
+            r.frame = c.load32(at + 12); r.cleanup = c.load32(at + 16) != 0;
+            uint32_t n = c.load32(at + 20);
+            at += 24;
+            for (uint32_t k = 0; k < n && at + 8 <= end; k++) {
+                EhType ty; ty.ti = c.load32(at); ty.index = static_cast<int>(c.load32(at + 4));
+                r.types.push_back(ty);
+                at += 8;
+            }
+            ehRows_.push_back(r);
+        }
+    }
+}
+const Runtime::EhRow *Runtime::rowFor(uint32_t pc) const {
+    for (const EhRow &r : ehRows_) if (pc >= r.begin && pc < r.end) return &r;
+    return nullptr;
+}
+Runtime::Exc *Runtime::excFor(uint32_t obj) {
+    for (Exc &e : excs_) if (e.obj == obj) return &e;
+    return nullptr;
+}
+// Does a handler of catchTi take an object of thrownTi? The same type, or a
+// public base of it - found by walking the thrown object, which also gives
+// the adjusted pointer a handler for the base receives.
+bool Runtime::matches(Cpu &c, uint32_t obj, uint32_t thrownTi, uint32_t catchTi, uint32_t &adjusted) {
+    if (catchTi == 0) { adjusted = obj; return true; }          // catch (...)
+    std::vector<Sub> subs;
+    walk(c, thrownTi, obj, true, subs, 0);
+    for (const Sub &s : subs)
+        if (s.pub && sameType(c, s.ti, catchTi)) { adjusted = s.addr; return true; }
+    return false;
+}
+void Runtime::land(Cpu &c, const EhRow &row, uint32_t fp, uint32_t obj, int selector) {
+    c.setReg(Cpu::A15, fp);
+    c.setReg(Cpu::B15, fp - row.frame);
+    c.setReg(Cpu::A4, obj);
+    c.setReg(Cpu::B4, static_cast<uint32_t>(selector));
+    c.setReg(Cpu::B3, row.pad);
+}
+void Runtime::throwFrom(Cpu &c, uint32_t obj, uint32_t pc, uint32_t fp) {
+    loadEhRows(c);
+    Exc *e = excFor(obj);
+    if (e == nullptr) c.fault("__cxa_throw of something __cxa_allocate_exception did not give");
+    // Phase one: is there a handler?
+    uint32_t p = pc, f = fp;
+    e->handlerFp = 0;
+    while (f != 0) {
+        const EhRow *r = rowFor(p);
+        if (r != nullptr)
+            for (const EhType &t : r->types) {
+                uint32_t adj;
+                if (matches(c, obj, e->ti, t.ti, adj)) { e->handlerFp = f; e->selector = t.index; e->adjusted = adj; goto found; }
+            }
+        p = c.load32(f + 4); f = c.load32(f);
+    }
+    terminate(c, "an exception was not caught");
+found:
+    unwindTo(c, *e, pc, fp);
+}
+// Phase two, from the frame at (pc, fp): land on the first pad on the way
+// to the handler frame - a cleanup with selector 0, or the handler itself.
+void Runtime::unwindTo(Cpu &c, Exc &e, uint32_t pc, uint32_t fp) {
+    uint32_t p = pc, f = fp;
+    while (f != 0) {
+        const EhRow *r = rowFor(p);
+        if (r != nullptr) {
+            if (f == e.handlerFp) { land(c, *r, f, e.obj, e.selector); return; }
+            if (r->cleanup) { land(c, *r, f, e.obj, 0); return; }
+        }
+        p = c.load32(f + 4); f = c.load32(f);
+    }
+    c.fault("the unwinder ran past the handler frame");
+}
+
 // ---- the library -----------------------------------------------------------------
 std::vector<std::string> Runtime::names() {
     static const char *const k[] = {
@@ -235,6 +370,7 @@ std::vector<std::string> Runtime::names() {
         "fprintf", "vfprintf", "fputs", "fputc", "putc", "fwrite", "fflush", "fopen", "fclose",
         "fgetc", "getc", "getchar", "fgets", "fread", "ftell", "fseek", "rewind", "feof", "remove",
         "perror", "ferror", "clearerr", "__errno_location", "__assert_fail", "__assert_rtn", "_assert",
+        "sscanf", "fscanf", "ungetc",
         "exit", "abort", "atexit", "malloc", "calloc", "realloc", "free",
         "memcpy", "memmove", "memset", "memcmp", "memchr",
         "strlen", "strcpy", "strncpy", "strcat", "strncat", "strcmp", "strncmp", "strchr", "strrchr",
@@ -326,6 +462,89 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         return true;
     }
     if (n == "fflush") { std::fflush(stdout); ret(c, 0); return true; }
+    if (n == "sscanf" || n == "fscanf") {
+        // sscanf(str, fmt, ...) and fscanf(stream, fmt, ...): the first in
+        // A4, the format and the pointers on the stack. The conversions the
+        // streams' own parsing needs, over a string - a file's rest, for
+        // fscanf, which then advances by what was consumed.
+        File *fs = n == "fscanf" ? streamFile(arg(c, 0)) : nullptr;
+        if (n == "fscanf" && fs == nullptr) { ret(c, 0xffffffffu); return true; }
+        std::string in = fs != nullptr ? fs->data.substr(fs->pos) : c.readString(arg(c, 0));
+        Args a = { c, variadicAt(c, 2) };
+        std::string fmt = c.readString(a.word());
+        size_t i = 0;
+        int assigned = 0;
+        auto skipSpace = [&]() { while (i < in.size() && std::isspace(static_cast<unsigned char>(in[i]))) i++; };
+        for (size_t k = 0; k < fmt.size(); k++) {
+            char f = fmt[k];
+            if (std::isspace(static_cast<unsigned char>(f))) { skipSpace(); continue; }
+            if (f != '%') { if (i < in.size() && in[i] == f) i++; else break; continue; }
+            k++;
+            bool suppress = false;
+            if (k < fmt.size() && fmt[k] == '*') { suppress = true; k++; }
+            int width = 0;
+            while (k < fmt.size() && std::isdigit(static_cast<unsigned char>(fmt[k]))) width = width * 10 + (fmt[k++] - '0');
+            int longs = 0; bool shortInt = false;
+            while (k < fmt.size() && std::strchr("hlLjzt", fmt[k])) { if (fmt[k] == 'l' || fmt[k] == 'j') longs++; if (fmt[k] == 'L') longs = 2; if (fmt[k] == 'h') shortInt = true; k++; }
+            if (k >= fmt.size()) break;
+            char conv = fmt[k];
+            if (conv == 'n') { if (!suppress) c.store32(a.word(), static_cast<uint32_t>(i)); continue; }
+            if (conv == '%') { if (i < in.size() && in[i] == '%') i++; else break; continue; }
+            if (conv != 'c') skipSpace();
+            if (i >= in.size()) break;
+            std::string field = width > 0 ? in.substr(i, static_cast<size_t>(width)) : in.substr(i);
+            const char *start = field.c_str();
+            char *end = nullptr;
+            if (conv == 'd' || conv == 'i' || conv == 'u' || conv == 'x' || conv == 'X' || conv == 'o') {
+                int base = conv == 'd' || conv == 'u' ? 10 : conv == 'i' ? 0 : conv == 'o' ? 8 : 16;
+                long long v = conv == 'u' || conv == 'x' || conv == 'X' || conv == 'o'
+                            ? static_cast<long long>(std::strtoull(start, &end, base)) : std::strtoll(start, &end, base);
+                if (end == start) break;
+                i += static_cast<size_t>(end - start);
+                if (suppress) continue;
+                uint32_t p = a.word();
+                if (longs >= 2) c.store64(p, static_cast<uint64_t>(v));
+                else if (shortInt) c.store16(p, static_cast<uint16_t>(v));
+                else c.store32(p, static_cast<uint32_t>(v));
+                assigned++;
+            } else if (conv == 'f' || conv == 'e' || conv == 'g' || conv == 'a') {
+                double v = std::strtod(start, &end);
+                if (end == start) break;
+                i += static_cast<size_t>(end - start);
+                if (suppress) continue;
+                uint32_t p = a.word();
+                if (longs >= 1) { uint64_t b; std::memcpy(&b, &v, 8); c.store64(p, b); }
+                else { float fv = static_cast<float>(v); uint32_t b; std::memcpy(&b, &fv, 4); c.store32(p, b); }
+                assigned++;
+            } else if (conv == 's') {
+                size_t j = 0;
+                while (j < field.size() && !std::isspace(static_cast<unsigned char>(field[j]))) j++;
+                if (j == 0) break;
+                i += j;
+                if (suppress) continue;
+                uint32_t p = a.word();
+                c.writeBytes(p, field.data(), static_cast<uint32_t>(j)); c.store8(p + static_cast<uint32_t>(j), 0);
+                assigned++;
+            } else if (conv == 'c') {
+                size_t cnt = width > 0 ? static_cast<size_t>(width) : 1;
+                if (i + cnt > in.size()) break;
+                if (!suppress) { uint32_t p = a.word(); c.writeBytes(p, in.data() + i, static_cast<uint32_t>(cnt)); assigned++; }
+                i += cnt;
+            } else break;
+        }
+        if (fs != nullptr) { fs->pos += i; if (assigned == 0 && i == 0 && fs->pos >= fs->data.size()) { ret(c, 0xffffffffu); return true; } }
+        ret(c, static_cast<uint32_t>(assigned));
+        return true;
+    }
+    if (n == "ungetc") {
+        File *fs = streamFile(arg(c, 1));
+        uint32_t ch = arg(c, 0) & 0xff;
+        if (fs == nullptr || ch == 0xff) { ret(c, 0xffffffffu); return true; }
+        if (fs->pos > 0 && static_cast<unsigned char>(fs->data[fs->pos - 1]) == ch) fs->pos--;
+        else fs->data.insert(fs->pos, 1, static_cast<char>(ch));
+        ret(c, ch);
+        return true;
+    }
     if (n == "ferror" || n == "clearerr") { ret(c, 0); return true; }
     if (n == "__assert_fail" || n == "__assert_rtn" || n == "_assert") {
         // glibc's (expr, file, line, function), Darwin's (function, file, line, expr), UCRT's (expr, file, line)
@@ -370,10 +589,9 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         return true;
     }
     if (n == "fgetc" || n == "getc" || n == "getchar") {
-        uint32_t s = n == "getchar" ? 1 : arg(c, 0);
+        File *f = streamFile(n == "getchar" ? 1 : arg(c, 0));
         int ch = -1;
-        if (s == 1) ch = std::getchar();
-        else if (s >= 4 && s - 4 < files_.size()) { File &f = files_[s - 4]; if (f.pos < f.data.size()) ch = static_cast<unsigned char>(f.data[f.pos++]); }
+        if (f != nullptr && f->pos < f->data.size()) ch = static_cast<unsigned char>(f->data[f->pos++]);
         ret(c, static_cast<uint32_t>(ch));
         return true;
     }
@@ -381,10 +599,10 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         uint32_t buf = arg(c, 0), cap = arg(c, 1), s = arg(c, 2);
         std::string line;
         bool any = false;
+        File *f = streamFile(s);
         while (line.size() + 1 < cap) {
             int ch = -1;
-            if (s == 1) ch = std::getchar();
-            else if (s >= 4 && s - 4 < files_.size()) { File &f = files_[s - 4]; if (f.pos < f.data.size()) ch = static_cast<unsigned char>(f.data[f.pos++]); }
+            if (f != nullptr && f->pos < f->data.size()) ch = static_cast<unsigned char>(f->data[f->pos++]);
             if (ch < 0) break;
             any = true; line += static_cast<char>(ch);
             if (ch == '\n') break;
@@ -410,11 +628,11 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         return true;
     }
     if (n == "rewind") { uint32_t s = arg(c, 0); if (s >= 4 && s - 4 < files_.size()) files_[s - 4].pos = 0; return true; }
-    if (n == "feof") { uint32_t s = arg(c, 0); ret(c, s >= 4 && s - 4 < files_.size() ? files_[s - 4].pos >= files_[s - 4].data.size() : 0); return true; }
+    if (n == "feof") { File *f = streamFile(arg(c, 0)); ret(c, f != nullptr && f->pos >= f->data.size()); return true; }
     if (n == "remove") { ret(c, std::remove(c.readString(arg(c, 0)).c_str()) == 0 ? 0 : 0xffffffffu); return true; }
     // ---- process ----
     if (n == "exit") { std::fflush(stdout); c.exitWith(static_cast<int>(arg(c, 0))); return true; }
-    if (n == "abort") { std::fflush(stdout); std::fprintf(stderr, "vm6747: abort() called\n"); c.exitWith(134); return true; }
+    if (n == "abort") { std::fflush(stdout); c.exitWith(134); return true; }   // silently, as the real one
     if (n == "atexit") { AtExit a; a.fn = arg(c, 0); a.arg = 0; atExit_.push_back(a); ret(c, 0); return true; }
     if (n == "time") { uint32_t p = arg(c, 0); uint32_t t = static_cast<uint32_t>(std::time(nullptr)); if (p) c.store32(p, t); ret(c, t); return true; }
     // ---- signals: a table of handlers, raise calls one ----
@@ -668,15 +886,77 @@ bool Runtime::call(const std::string &n, Cpu &c) {
     if (n == "__dynamic_cast") { ret(c, dynamicCast(c, arg(c, 0), arg(c, 1), arg(c, 2))); return true; }
     if (n == "__cxa_pure_virtual") c.fault("a pure virtual function was called");
     if (n == "__cxa_deleted_virtual") c.fault("a deleted virtual function was called");
-    if (n == "__cxa_allocate_exception") { ret(c, allocate(c, arg(c, 0) + 32)); return true; }
-    if (n == "__cxa_free_exception") { release(c, arg(c, 0)); return true; }
-    if (n == "__cxa_throw" || n == "__cxa_rethrow") terminate(c, "an exception was thrown, and this target does not unwind yet");
+    if (n == "__cxa_allocate_exception") {
+        // 32 bytes of header before the object, as the Itanium layout has,
+        // though the header's contents are kept on this side.
+        uint32_t base = allocate(c, arg(c, 0) + 32);
+        Exc e; e.obj = base + 32;
+        excs_.push_back(e);
+        ret(c, e.obj);
+        return true;
+    }
+    if (n == "__cxa_free_exception") {
+        uint32_t obj = arg(c, 0);
+        for (size_t i = 0; i < excs_.size(); i++) if (excs_[i].obj == obj) { excs_.erase(excs_.begin() + static_cast<long>(i)); break; }
+        release(c, obj - 32);
+        return true;
+    }
+    if (n == "__cxa_throw") {
+        uint32_t obj = arg(c, 0);
+        Exc *e = excFor(obj);
+        if (e == nullptr) c.fault("__cxa_throw of something __cxa_allocate_exception did not give");
+        e->ti = arg(c, 1); e->dtor = arg(c, 2); e->rethrown = false;
+        // The thrower's frame is the caller's: its return address is B3, its
+        // frame pointer A15.
+        throwFrom(c, obj, c.reg(Cpu::B3), c.reg(Cpu::A15));
+        return true;
+    }
+    if (n == "__cxa_rethrow") {
+        if (caught_.empty()) terminate(c, "rethrow with no exception being handled");
+        uint32_t obj = caught_.back();
+        Exc *e = excFor(obj);
+        if (e != nullptr) e->rethrown = true;
+        throwFrom(c, obj, c.reg(Cpu::B3), c.reg(Cpu::A15));
+        return true;
+    }
+    if (n == "_Unwind_Resume") {
+        // A cleanup pad is done: carry on from this frame's caller.
+        uint32_t obj = arg(c, 0);
+        Exc *e = excFor(obj);
+        if (e == nullptr) c.fault("_Unwind_Resume of an unknown exception");
+        uint32_t fp = c.reg(Cpu::A15);
+        unwindTo(c, *e, c.load32(fp + 4), c.load32(fp));
+        return true;
+    }
+    if (n == "__cxa_begin_catch") {
+        uint32_t obj = arg(c, 0);
+        Exc *e = excFor(obj);
+        if (e == nullptr) c.fault("__cxa_begin_catch of an unknown exception");
+        e->handlers++;
+        e->rethrown = false;
+        caught_.push_back(obj);
+        ret(c, e->adjusted);
+        return true;
+    }
+    if (n == "__cxa_end_catch") {
+        if (caught_.empty()) c.fault("__cxa_end_catch with nothing caught");
+        uint32_t obj = caught_.back();
+        caught_.pop_back();
+        Exc *e = excFor(obj);
+        if (e == nullptr) return true;
+        if (--e->handlers == 0 && !e->rethrown) {
+            uint32_t dtor = e->dtor;
+            if (dtor != 0) c.callback(dtor, obj, 0);
+            for (size_t i = 0; i < excs_.size(); i++) if (excs_[i].obj == obj) { excs_.erase(excs_.begin() + static_cast<long>(i)); break; }
+            release(c, obj - 32);
+        }
+        return true;
+    }
+    if (n == "__cxa_get_exception_ptr") { Exc *e = excFor(arg(c, 0)); ret(c, e != nullptr ? e->adjusted : arg(c, 0)); return true; }
     if (n == "__cxa_bad_cast") terminate(c, "bad dynamic_cast to a reference");
     if (n == "__cxa_bad_typeid") terminate(c, "typeid of a null pointer");
     if (n == "_ZSt9terminatev") terminate(c, "std::terminate()");
-    if (n == "__cxa_begin_catch" || n == "__cxa_end_catch" || n == "__cxa_get_exception_ptr" ||
-        n == "_Unwind_Resume" || n == "__gxx_personality_v0")
-        c.fault("'" + n + "' reached: no exception can be in flight on this target");
+    if (n == "__gxx_personality_v0") c.fault("'__gxx_personality_v0' reached: the unwinder here is the runtime's own");
     if (n == "_ZNKSt9type_infoeqERKS_") { ret(c, sameType(c, arg(c, 0), arg(c, 1))); return true; }
     if (n == "_ZNKSt9type_infoneERKS_") { ret(c, !sameType(c, arg(c, 0), arg(c, 1))); return true; }
     if (n == "_ZNKSt9type_info4nameEv") { ret(c, c.load32(arg(c, 0) + 4)); return true; }

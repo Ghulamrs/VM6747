@@ -47,6 +47,7 @@ struct Program {
     // Symbols the assembler could not define: candidates for the runtime.
     std::map<std::string, uint32_t> natives; // name -> stub address
     std::vector<std::pair<uint32_t, uint32_t> > initArray;   // each unit's .init_array: base, bytes
+    std::vector<std::pair<uint32_t, uint32_t> > ehTables;    // each unit's .vm6747.eh: base, bytes
 };
 
 // Little-endian access to the flat memory, bounds-checked by the caller.

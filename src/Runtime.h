@@ -22,6 +22,7 @@ public:
     // The assembly the runtime contributes: the streams, the C++ ABI's
     // typeinfo vtables, __dso_handle.
     static std::string prelude();
+    static std::string fundamentalTypeInfos();
     // After main returns or exit is called: the __cxa_atexit registrations,
     // last first.
     void runAtExit(Cpu &cpu);
@@ -43,11 +44,36 @@ private:
     std::string format(Cpu &cpu, const std::string &fmt, Args &args);
     struct File { std::string path; std::string data; size_t pos; bool write; };
     std::vector<File> files_;
+    File stdin_; bool stdinRead_ = false;
+    File *streamFile(uint32_t stream);
     uint32_t handlers_[32] = { 0 };
     uint32_t errno_ = 0;
     struct AtExit { uint32_t fn, arg; };
     std::vector<AtExit> atExit_;
     uint32_t dynamicCast(Cpu &cpu, uint32_t sub, uint32_t src, uint32_t dst);
+
+    // Exceptions: the tables the compiler emitted, read once; the
+    // exceptions in flight or caught; and the unwinder.
+    struct EhType { uint32_t ti; int index; };
+    struct EhRow { uint32_t begin, end, pad, frame; bool cleanup; std::vector<EhType> types; };
+    std::vector<EhRow> ehRows_;
+    bool ehLoaded_ = false;
+    void loadEhRows(Cpu &cpu);
+    const EhRow *rowFor(uint32_t pc) const;
+    struct Exc {
+        uint32_t obj = 0, ti = 0, dtor = 0, adjusted = 0;
+        int handlers = 0;          // __cxa_begin_catch calls outstanding
+        bool rethrown = false;
+        uint32_t handlerFp = 0;    // phase two's destination
+        int selector = 0;
+    };
+    std::vector<Exc> excs_;        // every exception allocated and not yet freed
+    std::vector<uint32_t> caught_; // the stack of exceptions being handled
+    Exc *excFor(uint32_t obj);
+    bool matches(Cpu &cpu, uint32_t obj, uint32_t thrownTi, uint32_t catchTi, uint32_t &adjusted);
+    void throwFrom(Cpu &cpu, uint32_t obj, uint32_t pc, uint32_t fp);
+    void unwindTo(Cpu &cpu, Exc &e, uint32_t pc, uint32_t fp);
+    void land(Cpu &cpu, const EhRow &row, uint32_t fp, uint32_t obj, int selector);
     [[noreturn]] void terminate(Cpu &cpu, const char *why);
     uint32_t errnoAt(Cpu &cpu);
     void setErrno(Cpu &cpu, uint32_t v);
