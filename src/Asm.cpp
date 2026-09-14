@@ -30,6 +30,12 @@ struct Unit {
     std::vector<std::string> weak;
     uint32_t size[SectionCount] = { 0, 0, 0, 0, 0, 0 };
     uint32_t base[SectionCount] = { 0, 0, 0, 0, 0, 0 };
+    // The largest alignment a section asked for. The first pass aligns
+    // offsets within the section and the second aligns addresses, and the
+    // two agree only if the section's base is aligned at least this much:
+    // a `.align 64` in a section placed at 8 put a label 16 bytes from its
+    // bytes, and the object read as zero.
+    uint32_t align[SectionCount] = { 8, 8, 8, 8, 8, 8 };
 };
 
 struct Assembler {
@@ -326,6 +332,7 @@ struct Assembler {
                     if (!evaluate(u, ln, ln.operands[k + 1], false, size)) return false;
                     if (ln.operands.size() > k + 2 && !evaluate(u, ln, ln.operands[k + 2], false, align)) return false;
                     if (align <= 0) align = 1;
+                    if (static_cast<uint32_t>(align) > u.align[Bss]) u.align[Bss] = static_cast<uint32_t>(align);
                     u.size[Bss] = alignUp(u.size[Bss], static_cast<uint32_t>(align));
                     if (m == ".bss") {
                         Sym s; s.section = Bss; s.offset = u.size[Bss]; s.defined = true;
@@ -335,6 +342,7 @@ struct Assembler {
                 } else if (m == ".align") {
                     long long a = 4;
                     if (!ln.operands.empty() && !evaluate(u, ln, ln.operands[0], false, a)) return false;
+                    if (a > 0 && static_cast<uint32_t>(a) > u.align[sec]) u.align[sec] = static_cast<uint32_t>(a);
                     u.size[sec] = alignUp(u.size[sec], static_cast<uint32_t>(a));
                     if (!ln.label.empty()) u.locals[ln.label].offset = u.size[sec];
                 } else if (m == ".byte" || m == ".char") u.size[sec] += static_cast<uint32_t>(ln.operands.size());
@@ -508,7 +516,7 @@ struct Assembler {
         uint32_t cursor = layout.textBase;
         for (int sec = 0; sec < SectionCount; sec++) {
             for (Unit &u : units) {
-                cursor = alignUp(cursor, 8);
+                cursor = alignUp(cursor, u.align[sec]);
                 u.base[sec] = cursor;
                 cursor += u.size[sec];
             }

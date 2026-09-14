@@ -22,7 +22,8 @@ for f in "$HERE"/../Compiler-Ci/tests/out-tms6747/*.s; do case "$(basename "$f")
 for f in "$HERE"/../Compiler-Cppi/tests/out-tms6747/*.s; do case "$(basename "$f")" in *" "*) ;; *) cp "$f" "$WORK/xwin/cxx/";; esac; done
 cat > "$WORK/xwin/run.sh" <<'REMOTE_EOF'
 cd "$(dirname "$0")"
-for d in c cxx; do for s in $d/*.s; do b=${s%.s}; ../Emulator/vm6747.exe "$s" > "$b.out" 2>&1 < /dev/null; echo $? > "$b.rc"; done; done
+VM="${VM:-../Emulator/vm6747.exe}"
+for d in c cxx; do for s in $d/*.s; do b=${s%.s}; "$VM" "$s" > "$b.out" 2>&1 < /dev/null; echo $? > "$b.rc"; done; done
 REMOTE_EOF
 ( cd "$HERE/.." && tar czf "$WORK/emulator.tgz" --exclude='*.exe' --exclude='.git' --exclude='._*' Emulator )
 ( cd "$WORK" && tar czf xwin.tgz xwin )
