@@ -326,7 +326,7 @@ struct Assembler {
                     std::string n = ln.operands.empty() ? "" : ln.operands[0];
                     if (n.size() >= 2 && n[0] == '"') n = n.substr(1, n.size() - 2);
                     if (n == ".text") sec = Text;
-                    else if (n == ".data" || n == ".fardata") sec = Data;
+                    else if (n == ".data" || n == ".fardata" || n == ".neardata") sec = Data;
                     else if (n == ".const" || n == ".rodata" || n.compare(0, 6, ".const") == 0) sec = Const;
                     else if (n == ".bss" || n == ".far") sec = Bss;
                     else if (n == ".init_array") sec = Init;
@@ -429,7 +429,7 @@ struct Assembler {
                 else if (mn == ".sect") {
                     std::string n = ln.operands[0];
                     if (n.size() >= 2 && n[0] == '"') n = n.substr(1, n.size() - 2);
-                    sec = n.compare(0, 5, ".text") == 0 ? Text : (n == ".data" || n == ".fardata") ? Data
+                    sec = n.compare(0, 5, ".text") == 0 ? Text : (n == ".data" || n == ".fardata" || n == ".neardata") ? Data
                         : (n == ".bss" || n == ".far") ? Bss : n == ".init_array" ? Init
                         : n.compare(0, 13, ".c6xabi.exidx") == 0 ? Exidx : Const;
                 } else if (mn == ".align") {

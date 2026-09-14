@@ -74,12 +74,13 @@ private:
     };
     std::vector<Exc> excs_;        // every exception allocated and not yet freed
     std::vector<uint32_t> caught_; // the stack of exceptions being handled
+    uint32_t cleanupExc_ = 0;      // the exception whose cleanup pad is running: TI's cleanup_exception
     Exc *excFor(uint32_t obj);
     bool matches(Cpu &cpu, uint32_t obj, uint32_t thrownTi, uint32_t catchTi, uint32_t &adjusted);
     void throwFrom(Cpu &cpu, uint32_t obj, uint32_t pc, uint32_t fp, uint32_t sp);
     void unwindTo(Cpu &cpu, Exc &e, uint32_t pc, uint32_t fp, uint32_t sp, uint32_t from);
     uint32_t descriptors(const ExidxEntry &e);
-    void land(Cpu &cpu, uint32_t fp, uint32_t sp, uint32_t obj, uint32_t pad);
+    void land(Cpu &cpu, uint32_t fp, uint32_t sp, uint32_t obj, uint32_t pad, bool withObject);
     [[noreturn]] void terminate(Cpu &cpu, const char *why);
     uint32_t errnoAt(Cpu &cpu);
     void setErrno(Cpu &cpu, uint32_t v);

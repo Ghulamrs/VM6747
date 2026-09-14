@@ -2,6 +2,4 @@
 # reason that is the program's or the exception runtime's, not the backend's.
 # One name per line, the directory in front; a case that starts linking is a
 # failure here until its line is removed, so this file records rather than hides.
-cxx/handler-exit-end-catch   __cxa_get_exception_ptr: TI's rts has no such entry; the exception tables are emulator-private in any case (TMS6747.md)
-cxx/throw-out-of-handler     the same
 shm/uses_more                borrows cbrt by name, and TI's runtime has no cbrt

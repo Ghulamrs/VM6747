@@ -324,8 +324,8 @@ uint32_t Runtime::dynamicCast(Cpu &c, uint32_t sub, uint32_t src, uint32_t dst) 
 // in _Unwind_Resume, which carries on from the descriptor after it.
 
 // Landing is a return to the pad with A15 the frame's, B15 as the frame's
-// throwing call left it, A4 the exception and B3 the pad; the selector is
-// the pad's own business, which is why the tables name trampolines.
+// throwing call left it, B3 the pad, and for a catch A4 the exception - a
+// cleanup gets nothing, as TI's does not, and ends with __cxa_end_cleanup.
 void Runtime::loadExidx(Cpu &c) {
     if (ehLoaded_) return;
     ehLoaded_ = true;
@@ -400,10 +400,11 @@ bool Runtime::matches(Cpu &c, uint32_t obj, uint32_t thrownTi, uint32_t catchTi,
         if (s.pub && sameType(c, s.ti, catchTi)) { adjusted = s.addr; return true; }
     return false;
 }
-void Runtime::land(Cpu &c, uint32_t fp, uint32_t sp, uint32_t obj, uint32_t pad) {
+void Runtime::land(Cpu &c, uint32_t fp, uint32_t sp, uint32_t obj, uint32_t pad, bool withObject) {
     c.setReg(Cpu::A15, fp);
     c.setReg(Cpu::B15, sp);
-    c.setReg(Cpu::A4, obj);
+    if (withObject) c.setReg(Cpu::A4, obj);
+    else cleanupExc_ = obj;
     c.setReg(Cpu::B3, pad);
 }
 // One descriptor at `at`: its kind and range, the pad, a catch's type, and
@@ -463,10 +464,10 @@ void Runtime::unwindTo(Cpu &c, Exc &e, uint32_t pc, uint32_t fp, uint32_t sp, ui
         for (uint32_t at = from != 0 ? from : descriptors(*x); readDescriptor(c, at, x->func, d); at = d.next) {
             if (d.kind == 0 && p >= d.begin && p < d.end) {
                 e.cleanupPc = p; e.cleanupNext = d.next;
-                land(c, f, s, e.obj, d.pad);
+                land(c, f, s, e.obj, d.pad, false);
                 return;
             }
-            if (d.kind == 2 && f == e.barrierFp && at == e.barrierDesc) { land(c, f, s, e.obj, d.pad); return; }
+            if (d.kind == 2 && f == e.barrierFp && at == e.barrierDesc) { land(c, f, s, e.obj, d.pad, true); return; }
         }
         from = 0;
         if (f == e.barrierFp) c.fault("the handler frame's descriptors ran out before the barrier");
@@ -504,7 +505,7 @@ std::vector<std::string> Runtime::names() {
         "__cxa_guard_acquire", "__cxa_guard_release", "__cxa_guard_abort", "__cxa_atexit",
         "__dynamic_cast", "__cxa_pure_virtual", "__cxa_deleted_virtual",
         "__cxa_allocate_exception", "__cxa_free_exception", "__cxa_throw", "__cxa_rethrow",
-        "__cxa_begin_catch", "__cxa_end_catch", "__cxa_get_exception_ptr", "_Unwind_Resume",
+        "__cxa_begin_catch", "__cxa_end_catch", "__cxa_get_exception_ptr", "_Unwind_Resume", "__cxa_end_cleanup",
         "__gxx_personality_v0", "__cxa_bad_cast", "__cxa_bad_typeid", "_ZSt9terminatev",
         "_ZNKSt9type_infoeqERKS_", "_ZNKSt9type_infoneERKS_", "_ZNKSt9type_info4nameEv",
         "_ZNKSt9type_info6beforeERKS_",
@@ -1040,10 +1041,12 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         throwFrom(c, obj, c.reg(Cpu::B3), c.reg(Cpu::A15), c.reg(Cpu::B15));
         return true;
     }
-    if (n == "_Unwind_Resume") {
+    if (n == "_Unwind_Resume" || n == "__cxa_end_cleanup") {
         // A cleanup pad is done: carry on with the descriptor after its own,
         // in the frame the pad ran in - A15's, with B15 as the pad left it.
-        uint32_t obj = arg(c, 0);
+        // TI's entry takes nothing and resumes the exception the landing
+        // recorded; the Itanium one is given it.
+        uint32_t obj = n[0] == '_' && n[1] == 'U' ? arg(c, 0) : cleanupExc_;
         Exc *e = excFor(obj);
         if (e == nullptr) c.fault("_Unwind_Resume of an unknown exception");
         if (e->cleanupNext == 0) c.fault("_Unwind_Resume from a pad no cleanup descriptor named");
