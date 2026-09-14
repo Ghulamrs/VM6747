@@ -121,10 +121,15 @@ std::string Runtime::format(Cpu &cpu, const std::string &fmt, Args &args) {
         }
         case 'c': std::snprintf(buf, sizeof buf, spec.append("c").c_str(), static_cast<int>(args.word())); break;
         case 's': {
+            // Sized to the string: a 2000-byte line from a Shalimar program
+            // was cut at 512 here, the one conversion whose width the
+            // program chooses.
             uint32_t p = args.word();
             std::string s = p == 0 ? "(null)" : cpu.readString(p);
-            std::snprintf(buf, sizeof buf, spec.append("s").c_str(), s.c_str());
-            break;
+            std::vector<char> big(s.size() + 512);
+            std::snprintf(big.data(), big.size(), spec.append("s").c_str(), s.c_str());
+            out += big.data();
+            continue;
         }
         case 'p': std::snprintf(buf, sizeof buf, "0x%x", args.word()); break;
         case 'f': case 'F': case 'e': case 'E': case 'g': case 'G': case 'a': case 'A': {
@@ -417,7 +422,8 @@ std::vector<std::string> Runtime::names() {
         "isalnum", "isalpha", "iscntrl", "isdigit", "isgraph", "islower", "isprint", "ispunct",
         "isspace", "isupper", "isxdigit", "tolower", "toupper",
         "sqrt", "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sinh", "cosh", "tanh",
-        "exp", "log", "log10", "pow", "fabs", "floor", "ceil", "fmod", "ldexp", "frexp", "modf",
+        "exp", "log", "log10", "pow", "fabs", "floor", "ceil", "fmod", "ldexp", "frexp", "modf", "trunc", "round",
+        "log2", "cbrt", "hypot", "exp2", "log1p", "expm1",
         "sqrtf", "fabsf", "floorf", "ceilf",
         "setjmp", "_setjmp", "longjmp", "time", "clock",
         "signal", "raise", "mktime", "localtime", "gmtime", "strftime", "difftime",
@@ -885,10 +891,11 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         static const M1 m1[] = { { "sqrt", std::sqrt }, { "sin", std::sin }, { "cos", std::cos }, { "tan", std::tan },
             { "asin", std::asin }, { "acos", std::acos }, { "atan", std::atan }, { "sinh", std::sinh }, { "cosh", std::cosh },
             { "tanh", std::tanh }, { "exp", std::exp }, { "log", std::log }, { "log10", std::log10 }, { "fabs", std::fabs },
-            { "floor", std::floor }, { "ceil", std::ceil } };
+            { "floor", std::floor }, { "ceil", std::ceil }, { "trunc", std::trunc }, { "round", std::round },
+            { "log2", std::log2 }, { "cbrt", std::cbrt }, { "exp2", std::exp2 }, { "log1p", std::log1p }, { "expm1", std::expm1 } };
         for (const M1 &m : m1) if (n == m.name) { retDouble(c, m.f(argDouble(c, 0))); return true; }
         struct M2 { const char *name; double (*f)(double, double); };
-        static const M2 m2[] = { { "atan2", std::atan2 }, { "pow", std::pow }, { "fmod", std::fmod } };
+        static const M2 m2[] = { { "atan2", std::atan2 }, { "pow", std::pow }, { "fmod", std::fmod }, { "hypot", std::hypot } };
         for (const M2 &m : m2) if (n == m.name) { retDouble(c, m.f(argDouble(c, 0), argDouble(c, 1))); return true; }
         if (n == "ldexp") { retDouble(c, std::ldexp(argDouble(c, 0), static_cast<int>(arg(c, 1)))); return true; }
         if (n == "frexp") { int e = 0; double r = std::frexp(argDouble(c, 0), &e); c.store32(arg(c, 1), static_cast<uint32_t>(e)); retDouble(c, r); return true; }
