@@ -410,7 +410,10 @@ void Runtime::land(Cpu &c, uint32_t fp, uint32_t sp, uint32_t obj, uint32_t pad,
 // One descriptor at `at`: its kind and range, the pad, a catch's type, and
 // where the next one starts. False at the list's end.
 namespace {
-struct Descriptor { int kind; uint32_t begin, end, pad, rtti, next; };
+// Kind 0 a cleanup (the pad), 2 a catch (the pad, the type), 1 an
+// exception specification (a count of allowed types, then those, then a
+// pad when the count's top bit says so; this line writes a count of 0).
+struct Descriptor { int kind; uint32_t begin, end, pad, rtti, count, next; };
 bool readDescriptor(Cpu &c, uint32_t at, uint32_t func, Descriptor &d) {
     if (at == 0 || c.load32(at) == 0) return false;
     uint32_t len = c.load16(at), off = c.load16(at + 2);
@@ -419,7 +422,9 @@ bool readDescriptor(Cpu &c, uint32_t at, uint32_t func, Descriptor &d) {
     d.end = d.begin + (len & ~1u);
     d.pad = c.load32(at + 4);
     d.rtti = d.kind == 2 ? c.load32(at + 8) : 0;
-    d.next = at + (d.kind == 2 ? 12 : 8);
+    d.count = d.kind == 1 ? c.load32(at + 4) : 0;
+    d.next = d.kind == 1 ? at + 8 + 4 * (d.count & 0x7fffffffu) + ((d.count & 0x80000000u) != 0 ? 4 : 0)
+           : at + (d.kind == 2 ? 12 : 8);
     return true;
 }
 }
@@ -436,8 +441,12 @@ void Runtime::throwFrom(Cpu &c, uint32_t obj, uint32_t pc, uint32_t fp, uint32_t
         if (x == nullptr) break;
         Descriptor d;
         for (uint32_t at = descriptors(*x); readDescriptor(c, at, x->func, d); at = d.next) {
-            if (d.kind == 1) c.fault("an exception specification descriptor, which this runtime does not read");
-            if (d.kind != 2 || p < d.begin || p >= d.end) continue;
+            if (p < d.begin || p >= d.end) continue;
+            // An exception specification allowing nothing is a barrier too:
+            // the cleanups below it run, then unexpected() ends the program.
+            if (d.kind == 1 && (d.count & 0x7fffffffu) != 0) c.fault("an exception specification that allows types, which this line never writes");
+            if (d.kind == 1) { e->barrierFp = f; e->barrierDesc = at; goto found; }
+            if (d.kind != 2) continue;
             if (d.rtti == 0xfffffffeu) terminate(c, nullptr);      // the scope's word: end, as abort would
             uint32_t adj = obj;                                    // what catch (...) receives
             if (d.rtti == 0xffffffffu || matches(c, obj, e->ti, d.rtti, adj)) {
@@ -467,7 +476,11 @@ void Runtime::unwindTo(Cpu &c, Exc &e, uint32_t pc, uint32_t fp, uint32_t sp, ui
                 land(c, f, s, e.obj, d.pad, false);
                 return;
             }
-            if (d.kind == 2 && f == e.barrierFp && at == e.barrierDesc) { land(c, f, s, e.obj, d.pad, true); return; }
+            if (f == e.barrierFp && at == e.barrierDesc) {
+                if (d.kind == 1) terminate(c, nullptr);                // the specification's unexpected()
+                land(c, f, s, e.obj, d.pad, true);
+                return;
+            }
         }
         from = 0;
         if (f == e.barrierFp) c.fault("the handler frame's descriptors ran out before the barrier");
