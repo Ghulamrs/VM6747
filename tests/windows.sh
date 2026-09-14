@@ -38,7 +38,7 @@ for d in c cxx; do
     for s in "$WORK"/xwin/$d/*.s; do
         [ -f "$s" ] || continue
         b=$(basename "$s" .s)
-        "$HERE/vm6747.exe" "$s" > "$WORK/xwin/$d/$b.mac" 2>&1 < /dev/null; mrc=$?
+        "$VM" "$s" > "$WORK/xwin/$d/$b.mac" 2>&1 < /dev/null; mrc=$?
         wrc=$(cat "$WORK/win/xwin/$d/$b.rc")
         tr -d '\r' < "$WORK/win/xwin/$d/$b.out" > "$WORK/win/xwin/$d/$b.lf"
         if [ "$mrc" = "$wrc" ] && cmp -s "$WORK/xwin/$d/$b.mac" "$WORK/win/xwin/$d/$b.lf"; then same=$((same + 1))

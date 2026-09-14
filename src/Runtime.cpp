@@ -181,6 +181,8 @@ std::string Runtime::prelude() {
         "_ZTVN10__cxxabiv123__fundamental_type_infoE:\t.word 0, 0, 4, 0, 0, 0, 0, 0\n"
         "\t.global _ZTVN10__cxxabiv119__pointer_type_infoE\n"
         "_ZTVN10__cxxabiv119__pointer_type_infoE:\t.word 0, 0, 5, 0, 0, 0, 0, 0\n"
+        "\t.global _ZTVN10__cxxabiv116__enum_type_infoE\n"
+        "_ZTVN10__cxxabiv116__enum_type_infoE:\t.word 0, 0, 6, 0, 0, 0, 0, 0\n"
         + fundamentalTypeInfos();
 }
 
