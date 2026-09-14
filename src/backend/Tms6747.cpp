@@ -66,6 +66,7 @@ void Tms6747Emitter::beginFunction(const std::string &name) {
     raw("\t.global\t" + symbol(name));
     raw(symbol(name) + ":");
     defined_.insert(name);
+    usesSavedArgRegs_ = false;
     prologueMark_ = text_.size();
 }
 
@@ -73,14 +74,22 @@ void Tms6747Emitter::beginFunction(const std::string &name) {
 // each, the whole a multiple of eight so that B15 stays 8-aligned and every
 // LDDW/STDW lands on an aligned pair.
 void Tms6747Emitter::endFunction(int slots) {
-    const int frame = 8 + 8 * slots;
+    static const char *const kept[] = { "A10", "B10", "A12", "B12" };
+    const int saved = 8 + 8 * slots;                  // where the four kept registers go
+    const int frame = saved + (usesSavedArgRegs_ ? 16 : 0);
     std::string prologue;
     prologue += "\tMVKL\t" + std::to_string(frame) + ", A3\n";
     prologue += "\tMVKH\t" + std::to_string(frame) + ", A3\n";
     prologue += "\tSUB\tB15, A3, B15\n";
     prologue += "\tSTW\tB3, *B15\n";
+    if (usesSavedArgRegs_)
+        for (int k = 0; k < 4; k++)
+            prologue += "\tSTW\t" + std::string(kept[k]) + ", *+B15(" + std::to_string(saved + 4 * k) + ")\n";
     text_.insert(prologueMark_, prologue);
 
+    if (usesSavedArgRegs_)
+        for (int k = 0; k < 4; k++)
+            instruction("LDW\t*+B15(" + std::to_string(saved + 4 * k) + "), " + kept[k]);
     instruction("LDW\t*B15, B3");
     instruction("NOP\t4");
     constant("A3", frame);
@@ -111,12 +120,14 @@ void Tms6747Emitter::loadSlot(Slot kind, int slot) {
 
 void Tms6747Emitter::setArg(Slot kind, int index) {
     if (index == 0) return;
+    if (index >= 6) usesSavedArgRegs_ = true;
     const std::string reg = argRegister(index);
     instruction("MV\tA4, " + reg);
     if (kind != Slot::Int) instruction("MV\tA5, " + pairOf(reg).substr(0, pairOf(reg).find(':')));
 }
 
 void Tms6747Emitter::loadSlotIntoArg(Slot kind, int slot, int index) {
+    if (index >= 6) usesSavedArgRegs_ = true;
     slotAddress(slot, "A3");
     loadAt(kind, "A3", argRegister(index));
 }

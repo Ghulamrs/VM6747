@@ -67,6 +67,9 @@ private:
     // The TI assembler wants an undefined name declared: what was called,
     // less what this file defines, is `.ref`ed when the module ends.
     std::set<std::string> called_, defined_;
+    // A10, B10, A12 and B12 carry arguments seven to ten and are the
+    // callee's to keep: a function that loads them saves them in its frame.
+    bool usesSavedArgRegs_ = false;
 
     // A constant into a register, MVKL then MVKH - the only way to a 32-bit value.
     void constant(const std::string &reg, int32_t value);
