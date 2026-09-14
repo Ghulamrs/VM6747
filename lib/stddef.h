@@ -27,10 +27,11 @@ typedef unsigned short     wchar_t;
 
 // ILP32 on the C6000, and TI's headers say `unsigned int`, not `unsigned
 // long` - the same width, but a different type, and in C++ a different
-// letter in every mangled name that takes a size.
-typedef unsigned int size_t;
-typedef int          ptrdiff_t;
-typedef int          wchar_t;
+// letter in every mangled name that takes a size. wchar_t is two bytes and
+// unsigned, measured with cl6x: WCHAR_MIN 0, WCHAR_MAX 65535, L"ab" six.
+typedef unsigned int   size_t;
+typedef int            ptrdiff_t;
+typedef unsigned short wchar_t;
 
 #else
 
