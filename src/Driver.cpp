@@ -53,7 +53,7 @@ void Driver::usage() const {
         "  -o <path>          where the result goes\n"
         "  -S                 stop after writing assembly\n"
         "  -c                 stop after assembling\n"
-        "  --target=<name>    arm64-darwin | x86_64-linux | x86_64-windows\n"
+        "  --target=<name>    arm64-darwin | x86_64-linux | x86_64-windows | tms6747\n"
         "  --runtime=<path>   the runtime archive to link against\n"
         "  --with=<path>      a library holding what 'uses' declared;\n"
         "                     repeatable, linked in the order given\n"

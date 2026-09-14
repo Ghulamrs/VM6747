@@ -54,7 +54,8 @@ SOURCES := \
   src/backend/Arm64Darwin.cpp \
   src/backend/X86_64.cpp \
   src/backend/X86_64Linux.cpp \
-  src/backend/X86_64Windows.cpp
+  src/backend/X86_64Windows.cpp \
+  src/backend/Tms6747.cpp
 
 # The runtime is built twice from the same sources. The release archive has
 # no debugger code in it at all; the debug one is the same program plus a
@@ -98,6 +99,22 @@ DEBUG_RUNTIME := $(LIBDIR)/shmrt-$(TARGET)-debug.a
 
 all: $(SHC) $(RUNTIME) $(DEBUG_RUNTIME)
 
+# **The runtime for the C6000 is assembly, not an archive**: there is no
+# assembler for it on any machine here, so cxx1i compiles each runtime
+# source to C6000 text and the VM6747 emulator takes the directory whole
+# beside a Shalimar program - `vm6747 prog.s lib/shmrt-tms6747`. Built by
+# `make tms6747`, since it needs cxx1i, which `make` alone must not: the
+# host runtime and the compiler build without the C++ clone being there.
+CXX1 ?= $(BINDIR)/cxx1i.exe
+TMS_RUNTIME_DIR := $(LIBDIR)/shmrt-tms6747
+TMS_RUNTIME := $(patsubst runtime/%.cpp,$(TMS_RUNTIME_DIR)/%.s,$(RUNTIME_SOURCES))
+
+tms6747: $(SHC) $(TMS_RUNTIME)
+
+$(TMS_RUNTIME_DIR)/%.s: runtime/%.cpp $(CXX1)
+	@mkdir -p $(TMS_RUNTIME_DIR)
+	$(CXX1) -S -arch tms6747 -nologo $< -o $@
+
 # shc.exe on every machine, not only Windows. The three programs in this family
 # - RStudio, cc1 and shc - carry one name each wherever they are, and a suffix
 # that changes by platform is one more thing every script has to know.
@@ -125,6 +142,10 @@ $(DEBUG_RUNTIME): $(DEBUG_RUNTIME_OBJECTS)
 
 test: all
 	SHC="$(abspath $(SHC))" ./tests/run.sh
+# The fourth target's corpus on the emulator, with the runtime cxx1i built.
+test-tms6747: tms6747
+	SHC="$(abspath $(SHC))" VM="$(abspath $(BINDIR))/vm6747.exe" \
+	    RUNTIME="$(abspath $(TMS_RUNTIME_DIR))" ./tests/tms6747.sh
 # The examples too, because they were not built by anything and rotted: eight
 # of the twelve stopped compiling when `uses` landed and nothing said so. They
 # are documentation people are pointed at, so a broken one is worse than a
