@@ -80,6 +80,7 @@ if errorlevel 1 exit /b 1</Command>
     <ClCompile Include="src\backend\Arm64Darwin.cpp" />
     <ClCompile Include="src\backend\Emitter.cpp" />
     <ClCompile Include="src\backend\Spelling.cpp" />
+    <ClCompile Include="src\backend\Tms6747.cpp" />
     <ClCompile Include="src\backend\X86_64.cpp" />
     <ClCompile Include="src\backend\X86_64Linux.cpp" />
     <ClCompile Include="src\backend\X86_64Windows.cpp" />

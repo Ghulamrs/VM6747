@@ -22,6 +22,7 @@
 		A45DC5B1C4209FF72F679396 /* src/backend/Arm64Darwin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1D379CB68B7B096E7C1D1F03 /* src/backend/Arm64Darwin.cpp */; };
 		3AB5913BD32D2FBD22B61831 /* src/backend/Emitter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA842397EEE08645CBF0A4B6 /* src/backend/Emitter.cpp */; };
 		C85450FD793973D2CE9E3222 /* src/backend/Spelling.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 97F09AFC0AA38A8A04DE9345 /* src/backend/Spelling.cpp */; };
+		4AC536ECE1F6545D7D8F1067 /* src/backend/Tms6747.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7BBF83D8D6B8A7FC4D6DF50F /* src/backend/Tms6747.cpp */; };
 		C6488B664BB11BF747289EF9 /* src/backend/X86_64.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AE87171411E45DCD7C2A1A7C /* src/backend/X86_64.cpp */; };
 		A669587D3E94EE6CB1249BB8 /* src/backend/X86_64Linux.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F08BD4D08CCA81D827656938 /* src/backend/X86_64Linux.cpp */; };
 		025E27BE7A159BDA1B6FCF2B /* src/backend/X86_64Windows.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4680FEDE33A9AE4FA966E075 /* src/backend/X86_64Windows.cpp */; };
@@ -44,6 +45,7 @@
 		1D379CB68B7B096E7C1D1F03 /* src/backend/Arm64Darwin.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/backend/Arm64Darwin.cpp; sourceTree = "<group>"; };
 		FA842397EEE08645CBF0A4B6 /* src/backend/Emitter.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/backend/Emitter.cpp; sourceTree = "<group>"; };
 		97F09AFC0AA38A8A04DE9345 /* src/backend/Spelling.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/backend/Spelling.cpp; sourceTree = "<group>"; };
+		7BBF83D8D6B8A7FC4D6DF50F /* src/backend/Tms6747.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/backend/Tms6747.cpp; sourceTree = "<group>"; };
 		AE87171411E45DCD7C2A1A7C /* src/backend/X86_64.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/backend/X86_64.cpp; sourceTree = "<group>"; };
 		F08BD4D08CCA81D827656938 /* src/backend/X86_64Linux.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/backend/X86_64Linux.cpp; sourceTree = "<group>"; };
 		4680FEDE33A9AE4FA966E075 /* src/backend/X86_64Windows.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/backend/X86_64Windows.cpp; sourceTree = "<group>"; };
@@ -66,6 +68,7 @@
 		5D0A9371C09C368710D78D49 /* src/backend/Arm64Darwin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/Arm64Darwin.h; sourceTree = "<group>"; };
 		990A15B1715DDF27A8CEB533 /* src/backend/Emitter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/Emitter.h; sourceTree = "<group>"; };
 		7BB42B4202968E6326734CC6 /* src/backend/Spelling.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/Spelling.h; sourceTree = "<group>"; };
+		2EA34AE75A9BDBDDB96DCFF1 /* src/backend/Tms6747.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/Tms6747.h; sourceTree = "<group>"; };
 		75BC19544D91766F79E7FF3B /* src/backend/X86_64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/X86_64.h; sourceTree = "<group>"; };
 		2E28904CB2FC6961A2D0F42E /* src/backend/X86_64Linux.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/X86_64Linux.h; sourceTree = "<group>"; };
 		A26C2E36CB65E5A3BDE3B768 /* src/backend/X86_64Windows.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/X86_64Windows.h; sourceTree = "<group>"; };
@@ -109,6 +112,7 @@
 				1D379CB68B7B096E7C1D1F03 /* src/backend/Arm64Darwin.cpp */,
 				FA842397EEE08645CBF0A4B6 /* src/backend/Emitter.cpp */,
 				97F09AFC0AA38A8A04DE9345 /* src/backend/Spelling.cpp */,
+				7BBF83D8D6B8A7FC4D6DF50F /* src/backend/Tms6747.cpp */,
 				AE87171411E45DCD7C2A1A7C /* src/backend/X86_64.cpp */,
 				F08BD4D08CCA81D827656938 /* src/backend/X86_64Linux.cpp */,
 				4680FEDE33A9AE4FA966E075 /* src/backend/X86_64Windows.cpp */,
@@ -131,6 +135,7 @@
 				5D0A9371C09C368710D78D49 /* src/backend/Arm64Darwin.h */,
 				990A15B1715DDF27A8CEB533 /* src/backend/Emitter.h */,
 				7BB42B4202968E6326734CC6 /* src/backend/Spelling.h */,
+				2EA34AE75A9BDBDDB96DCFF1 /* src/backend/Tms6747.h */,
 				75BC19544D91766F79E7FF3B /* src/backend/X86_64.h */,
 				2E28904CB2FC6961A2D0F42E /* src/backend/X86_64Linux.h */,
 				A26C2E36CB65E5A3BDE3B768 /* src/backend/X86_64Windows.h */,
@@ -258,6 +263,7 @@
 				A45DC5B1C4209FF72F679396 /* src/backend/Arm64Darwin.cpp in Sources */,
 				3AB5913BD32D2FBD22B61831 /* src/backend/Emitter.cpp in Sources */,
 				C85450FD793973D2CE9E3222 /* src/backend/Spelling.cpp in Sources */,
+				4AC536ECE1F6545D7D8F1067 /* src/backend/Tms6747.cpp in Sources */,
 				C6488B664BB11BF747289EF9 /* src/backend/X86_64.cpp in Sources */,
 				A669587D3E94EE6CB1249BB8 /* src/backend/X86_64Linux.cpp in Sources */,
 				025E27BE7A159BDA1B6FCF2B /* src/backend/X86_64Windows.cpp in Sources */,
