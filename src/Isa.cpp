@@ -42,6 +42,57 @@ static bool isPair(const Operand &o) { return o.kind == Operand::Reg && o.reg2 >
 static bool isImm(const Operand &o) { return o.kind == Operand::Imm; }
 static bool isMem(const Operand &o) { return o.kind == Operand::Mem; }
 
+
+static bool fits(long long v, long long lo, long long hi) { return v >= lo && v <= hi; }
+
+// The constant fields, as asm6x enforces them (probed 2026-09-14 with one
+// form per line): scst5 first for the .L/.S forms, ucst5 second for .D's,
+// ucst5 shift counts and fields, scst16 for MVK/ADDK, NOP 1-9, and a memory
+// offset of ucst5 units of the access - ucst15 from B14 or B15.
+static bool isaRanges(const Instr &in, std::string &why) {
+    const IsaEntry *e = isaLookup(in.mnem);
+    const std::vector<Operand> &o = in.ops;
+    size_t n = o.size();
+    bool ok = true;
+    switch (e->op) {
+    case Op::ADD: case Op::SUB: case Op::ADDU: case Op::SUBU:
+        if (isImm(o[0])) ok = fits(o[0].imm, -16, 15);
+        else if (isImm(o[1])) ok = fits(o[1].imm, 0, 31);
+        break;
+    case Op::AND: case Op::OR: case Op::XOR: case Op::CMPEQ: case Op::CMPLT: case Op::CMPGT:
+        for (size_t i = 0; i < 2; i++) if (isImm(o[i])) ok = ok && fits(o[i].imm, -16, 15);
+        break;
+    case Op::CMPLTU: case Op::CMPGTU:
+        for (size_t i = 0; i < 2; i++) if (isImm(o[i])) ok = ok && fits(o[i].imm, 0, 31);
+        break;
+    case Op::SHL: case Op::SHR: case Op::SHRU: case Op::ADDAW: case Op::ADDAH: case Op::ADDAB: case Op::SUBAW:
+        if (isImm(o[1])) ok = fits(o[1].imm, 0, 31);
+        break;
+    case Op::EXT: case Op::EXTU: case Op::SET: case Op::CLR:
+        if (n == 4) ok = fits(o[1].imm, 0, 31) && fits(o[2].imm, 0, 31);
+        break;
+    case Op::MVK: case Op::ADDK: ok = fits(o[0].imm, -32768, 32767); break;
+    case Op::MVKL: case Op::MVKH: ok = fits(o[0].imm, -2147483648LL, 4294967295LL); break;
+    case Op::NOP: if (n == 1) ok = fits(o[0].imm, 1, 9); break;
+    default: break;
+    }
+    if (!ok) { why = "a constant of '" + in.mnem + "' is out of range"; return false; }
+    for (const Operand &m : o) {
+        if (!isMem(m) || m.offReg >= 0) continue;
+        long long width = e->op == Op::LDB || e->op == Op::LDBU || e->op == Op::STB ? 1
+                        : e->op == Op::LDH || e->op == Op::LDHU || e->op == Op::STH ? 2
+                        : e->op == Op::LDDW || e->op == Op::STDW || e->op == Op::LDNDW || e->op == Op::STNDW ? 8 : 4;
+        long long off = m.off < 0 ? -m.off : m.off;
+        long long units = m.base == 30 || m.base == 31 ? 32767 : 31;
+        if (off % width != 0 || off > units * width) {
+            why = "the offset of '" + in.mnem + "' is not " + std::to_string(width) + "-byte units within " +
+                  std::to_string(units) + " of the base";
+            return false;
+        }
+    }
+    return true;
+}
+
 bool isaCheck(const Instr &in, std::string &why) {
     const IsaEntry *e = isaLookup(in.mnem);
     if (e == nullptr) { why = "unknown instruction '" + in.mnem + "'"; return false; }
@@ -95,5 +146,5 @@ bool isaCheck(const Instr &in, std::string &why) {
         break;
     }
     if (!ok) { why = "'" + m + "' does not take these operands"; return false; }
-    return true;
+    return isaRanges(in, why);
 }
