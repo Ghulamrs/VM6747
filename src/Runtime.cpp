@@ -304,16 +304,23 @@ uint32_t Runtime::dynamicCast(Cpu &c, uint32_t sub, uint32_t src, uint32_t dst) 
 }
 
 // ---- exceptions ------------------------------------------------------------------
-// The compiler writes one row per call-site range into .vm6747.eh: begin,
-// end, pad, the frame's size, a cleanup flag, the handler count, then each
-// handler's typeinfo (0 for catch (...)) and selector index. A throw walks
-// the frames from the thrower - each through its function's index entry -
-// twice: first to find a handler, so an uncaught exception terminates
-// without unwinding, then to land on every cleanup pad on the way and on
-// the handler with its selector. Landing is a return to the pad: A15 is the
-// frame's, B15 is A15 less the frame, A4 the exception, B4 the selector,
-// and B3 the pad, which the native return then jumps to.
-void Runtime::loadEhRows(Cpu &c) {
+// The tables are TI's (lib/src/tdeh_pr_common.cpp): the index gives a
+// function's compact unwind word, or the address of its table - the word,
+// then scope descriptors, then a zero. A descriptor is two halves, the
+// range's length and its offset in the function (+2), whose low bits tell a
+// cleanup (0) from a catch (2); then the pad, and a catch's type.
+
+// A throw walks the frames twice, as TI's runtime does: phase one scans
+// each frame's catch descriptors for one whose type takes the exception -
+// the barrier, remembered as the frame and the descriptor - and an uncaught
+// exception terminates with nothing unwound; phase two scans again, landing
+// on every cleanup on the way and on the barrier's pad. A cleanup pad ends
+// in _Unwind_Resume, which carries on from the descriptor after it.
+
+// Landing is a return to the pad with A15 the frame's, B15 as the frame's
+// throwing call left it, A4 the exception and B3 the pad; the selector is
+// the pad's own business, which is why the tables name trampolines.
+void Runtime::loadExidx(Cpu &c) {
     if (ehLoaded_) return;
     ehLoaded_ = true;
     const std::vector<std::pair<uint32_t, uint32_t> > &index = c.program().exidxTables;
@@ -323,44 +330,33 @@ void Runtime::loadEhRows(Cpu &c) {
             exidx_.push_back(e);
         }
     std::sort(exidx_.begin(), exidx_.end(), [](const ExidxEntry &a, const ExidxEntry &b) { return a.func < b.func; });
-    const std::vector<std::pair<uint32_t, uint32_t> > &tables = c.program().ehTables;
-    for (size_t t = 0; t < tables.size(); t++) {
-        uint32_t at = tables[t].first, end = at + tables[t].second;
-        while (at + 24 <= end) {
-            EhRow r;
-            r.begin = c.load32(at); r.end = c.load32(at + 4); r.pad = c.load32(at + 8);
-            r.frame = c.load32(at + 12); r.cleanup = c.load32(at + 16) != 0;
-            uint32_t n = c.load32(at + 20);
-            at += 24;
-            for (uint32_t k = 0; k < n && at + 8 <= end; k++) {
-                EhType ty; ty.ti = c.load32(at); ty.index = static_cast<int>(c.load32(at + 4));
-                r.types.push_back(ty);
-                at += 8;
-            }
-            ehRows_.push_back(r);
-        }
-    }
 }
-const Runtime::EhRow *Runtime::rowFor(uint32_t pc) const {
-    for (const EhRow &r : ehRows_) if (pc >= r.begin && pc < r.end) return &r;
-    return nullptr;
-}
-// The frame above (pc, fp), read the way TI's unwinder would: the index
-// entry for pc, compact form pr3 with SP restored from A15, then the saved
-// registers a word each below A15 in the bitmask's order - A15 first, B3
-// after the B-file registers - which is where this frame's B3 and the
-// caller's A15 are. False when pc has no entry, which ends the walk.
-bool Runtime::callerOf(Cpu &c, uint32_t pc, uint32_t fp, uint32_t &callerPc, uint32_t &callerFp) {
+const Runtime::ExidxEntry *Runtime::entryFor(uint32_t pc) const {
     const ExidxEntry *e = nullptr;
     for (const ExidxEntry &x : exidx_) { if (x.func > pc) break; e = &x; }
-    if (e == nullptr || (e->word >> 24) != 0x83 || (e->word >> 17 & 0x7f) != 0x7f) return false;
-    uint32_t mask = e->word >> 4 & 0x1fff;
+    return e;
+}
+// The frame above (pc, fp), read the way TI's unwinder would: the unwind
+// word - inline, or the first of the table - compact form pr3 with SP
+// restored from A15, then the saved registers a word each below A15 in the
+// bitmask's order, A15 first and B3 after the B-file registers. False when
+// pc has no entry, which ends the walk.
+bool Runtime::callerOf(Cpu &c, uint32_t pc, uint32_t fp, uint32_t &callerPc, uint32_t &callerFp) {
+    const ExidxEntry *e = entryFor(pc);
+    if (e == nullptr) return false;
+    uint32_t word = (e->word & 0x80000000u) != 0 ? e->word : c.load32(e->word);
+    if ((word >> 24) != 0x83 || (word >> 17 & 0x7f) != 0x7f) return false;
+    uint32_t mask = word >> 4 & 0x1fff;
     if ((mask & 1u << 12) == 0 || (mask & 1u << 5) == 0) return false;    // A15 and B3 saved
     int before = 0;
     for (int bit = 12; bit > 5; bit--) if (mask & 1u << bit) before++;   // A15, B15-B10
     callerFp = c.load32(fp);
     callerPc = c.load32(fp - 4 * static_cast<uint32_t>(before));
     return true;
+}
+// Where a function's descriptors begin, or 0 for an inline entry.
+uint32_t Runtime::descriptors(const ExidxEntry &e) {
+    return (e.word & 0x80000000u) != 0 ? 0 : e.word + 4;
 }
 Runtime::Exc *Runtime::excFor(uint32_t obj) {
     for (Exc &e : excs_) if (e.obj == obj) return &e;
@@ -398,43 +394,77 @@ bool Runtime::matches(Cpu &c, uint32_t obj, uint32_t thrownTi, uint32_t catchTi,
         if (s.pub && sameType(c, s.ti, catchTi)) { adjusted = s.addr; return true; }
     return false;
 }
-void Runtime::land(Cpu &c, const EhRow &row, uint32_t fp, uint32_t obj, int selector) {
+void Runtime::land(Cpu &c, uint32_t fp, uint32_t sp, uint32_t obj, uint32_t pad) {
     c.setReg(Cpu::A15, fp);
-    c.setReg(Cpu::B15, fp - row.frame);
+    c.setReg(Cpu::B15, sp);
     c.setReg(Cpu::A4, obj);
-    c.setReg(Cpu::B4, static_cast<uint32_t>(selector));
-    c.setReg(Cpu::B3, row.pad);
+    c.setReg(Cpu::B3, pad);
 }
-void Runtime::throwFrom(Cpu &c, uint32_t obj, uint32_t pc, uint32_t fp) {
-    loadEhRows(c);
+// One descriptor at `at`: its kind and range, the pad, a catch's type, and
+// where the next one starts. False at the list's end.
+namespace {
+struct Descriptor { int kind; uint32_t begin, end, pad, rtti, next; };
+bool readDescriptor(Cpu &c, uint32_t at, uint32_t func, Descriptor &d) {
+    if (at == 0 || c.load32(at) == 0) return false;
+    uint32_t len = c.load16(at), off = c.load16(at + 2);
+    d.kind = static_cast<int>(((len & 1) << 1) | (off & 1));
+    d.begin = func + (off & ~1u);
+    d.end = d.begin + (len & ~1u);
+    d.pad = c.load32(at + 4);
+    d.rtti = d.kind == 2 ? c.load32(at + 8) : 0;
+    d.next = at + (d.kind == 2 ? 12 : 8);
+    return true;
+}
+}
+void Runtime::throwFrom(Cpu &c, uint32_t obj, uint32_t pc, uint32_t fp, uint32_t sp) {
+    loadExidx(c);
     Exc *e = excFor(obj);
     if (e == nullptr) c.fault("__cxa_throw of something __cxa_allocate_exception did not give");
-    // Phase one: is there a handler?
+    // Phase one: the first catch descriptor in a frame's list whose range
+    // holds the return address and whose type takes the exception.
     uint32_t p = pc, f = fp;
-    e->handlerFp = 0;
+    e->barrierFp = 0;
     while (f != 0) {
-        const EhRow *r = rowFor(p);
-        if (r != nullptr)
-            for (const EhType &t : r->types) {
-                uint32_t adj;
-                if (matches(c, obj, e->ti, t.ti, adj)) { e->handlerFp = f; e->selector = t.index; e->adjusted = adj; goto found; }
+        const ExidxEntry *x = entryFor(p);
+        if (x == nullptr) break;
+        Descriptor d;
+        for (uint32_t at = descriptors(*x); readDescriptor(c, at, x->func, d); at = d.next) {
+            if (d.kind == 1) c.fault("an exception specification descriptor, which this runtime does not read");
+            if (d.kind != 2 || p < d.begin || p >= d.end) continue;
+            if (d.rtti == 0xfffffffeu) terminate(c, "an exception reached a scope that terminates");
+            uint32_t adj = obj;                                    // what catch (...) receives
+            if (d.rtti == 0xffffffffu || matches(c, obj, e->ti, d.rtti, adj)) {
+                e->barrierFp = f; e->barrierDesc = at; e->adjusted = adj;
+                goto found;
             }
+        }
         if (!callerOf(c, p, f, p, f)) break;
     }
     terminate(c, "an exception was not caught");
 found:
-    unwindTo(c, *e, pc, fp);
+    unwindTo(c, *e, pc, fp, sp, 0);
 }
-// Phase two, from the frame at (pc, fp): land on the first pad on the way
-// to the handler frame - a cleanup with selector 0, or the handler itself.
-void Runtime::unwindTo(Cpu &c, Exc &e, uint32_t pc, uint32_t fp) {
-    uint32_t p = pc, f = fp;
+// Phase two, from the frame at (pc, fp, sp) and, when resuming after a
+// cleanup, from the descriptor `from`: land on the first cleanup whose
+// range holds pc, or on the barrier; otherwise on to the caller, whose SP
+// is this frame's A15.
+void Runtime::unwindTo(Cpu &c, Exc &e, uint32_t pc, uint32_t fp, uint32_t sp, uint32_t from) {
+    uint32_t p = pc, f = fp, s = sp;
     while (f != 0) {
-        const EhRow *r = rowFor(p);
-        if (r != nullptr) {
-            if (f == e.handlerFp) { land(c, *r, f, e.obj, e.selector); return; }
-            if (r->cleanup) { land(c, *r, f, e.obj, 0); return; }
+        const ExidxEntry *x = entryFor(p);
+        if (x == nullptr) break;
+        Descriptor d;
+        for (uint32_t at = from != 0 ? from : descriptors(*x); readDescriptor(c, at, x->func, d); at = d.next) {
+            if (d.kind == 0 && p >= d.begin && p < d.end) {
+                e.cleanupPc = p; e.cleanupNext = d.next;
+                land(c, f, s, e.obj, d.pad);
+                return;
+            }
+            if (d.kind == 2 && f == e.barrierFp && at == e.barrierDesc) { land(c, f, s, e.obj, d.pad); return; }
         }
+        from = 0;
+        if (f == e.barrierFp) c.fault("the handler frame's descriptors ran out before the barrier");
+        s = f;
         if (!callerOf(c, p, f, p, f)) break;
     }
     c.fault("the unwinder ran past the handler frame");
@@ -992,8 +1022,8 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         if (e == nullptr) c.fault("__cxa_throw of something __cxa_allocate_exception did not give");
         e->ti = arg(c, 1); e->dtor = arg(c, 2); e->rethrown = false;
         // The thrower's frame is the caller's: its return address is B3, its
-        // frame pointer A15.
-        throwFrom(c, obj, c.reg(Cpu::B3), c.reg(Cpu::A15));
+        // frame pointer A15, its stack pointer B15.
+        throwFrom(c, obj, c.reg(Cpu::B3), c.reg(Cpu::A15), c.reg(Cpu::B15));
         return true;
     }
     if (n == "__cxa_rethrow") {
@@ -1001,18 +1031,17 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         uint32_t obj = caught_.back();
         Exc *e = excFor(obj);
         if (e != nullptr) e->rethrown = true;
-        throwFrom(c, obj, c.reg(Cpu::B3), c.reg(Cpu::A15));
+        throwFrom(c, obj, c.reg(Cpu::B3), c.reg(Cpu::A15), c.reg(Cpu::B15));
         return true;
     }
     if (n == "_Unwind_Resume") {
-        // A cleanup pad is done: carry on from this frame's caller.
+        // A cleanup pad is done: carry on with the descriptor after its own,
+        // in the frame the pad ran in - A15's, with B15 as the pad left it.
         uint32_t obj = arg(c, 0);
         Exc *e = excFor(obj);
         if (e == nullptr) c.fault("_Unwind_Resume of an unknown exception");
-        // The pad's function is B3's, its frame A15's; carry on above it.
-        uint32_t pc, fp;
-        if (!callerOf(c, c.reg(Cpu::B3), c.reg(Cpu::A15), pc, fp)) c.fault("_Unwind_Resume from a frame without an index entry");
-        unwindTo(c, *e, pc, fp);
+        if (e->cleanupNext == 0) c.fault("_Unwind_Resume from a pad no cleanup descriptor named");
+        unwindTo(c, *e, e->cleanupPc, c.reg(Cpu::A15), c.reg(Cpu::B15), e->cleanupNext);
         return true;
     }
     if (n == "__cxa_begin_catch") {

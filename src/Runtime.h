@@ -53,33 +53,31 @@ private:
     std::vector<AtExit> atExit_;
     uint32_t dynamicCast(Cpu &cpu, uint32_t sub, uint32_t src, uint32_t dst);
 
-    // Exceptions: the tables the compiler emitted, read once; the
-    // exceptions in flight or caught; and the unwinder.
-    struct EhType { uint32_t ti; int index; };
-    struct EhRow { uint32_t begin, end, pad, frame; bool cleanup; std::vector<EhType> types; };
-    std::vector<EhRow> ehRows_;
-    // TI's exception index, one entry per function: its address and the
-    // frame's compact unwind word, sorted so a return address finds its own.
+    // Exceptions: TI's index, one entry per function - its address and the
+    // frame's compact unwind word, or the address of its table - sorted so
+    // a return address finds its own; the exceptions in flight or caught;
+    // and the unwinder, which reads the tables as TI's personality would.
     struct ExidxEntry { uint32_t func, word; };
     std::vector<ExidxEntry> exidx_;
     bool ehLoaded_ = false;
-    void loadEhRows(Cpu &cpu);
-    const EhRow *rowFor(uint32_t pc) const;
+    void loadExidx(Cpu &cpu);
+    const ExidxEntry *entryFor(uint32_t pc) const;
     bool callerOf(Cpu &cpu, uint32_t pc, uint32_t fp, uint32_t &callerPc, uint32_t &callerFp);
     struct Exc {
         uint32_t obj = 0, ti = 0, dtor = 0, adjusted = 0;
         int handlers = 0;          // __cxa_begin_catch calls outstanding
         bool rethrown = false;
-        uint32_t handlerFp = 0;    // phase two's destination
-        int selector = 0;
+        uint32_t barrierFp = 0, barrierDesc = 0;    // phase two's destination: the frame and the descriptor
+        uint32_t cleanupPc = 0, cleanupNext = 0;    // where a cleanup pad's _Unwind_Resume carries on
     };
     std::vector<Exc> excs_;        // every exception allocated and not yet freed
     std::vector<uint32_t> caught_; // the stack of exceptions being handled
     Exc *excFor(uint32_t obj);
     bool matches(Cpu &cpu, uint32_t obj, uint32_t thrownTi, uint32_t catchTi, uint32_t &adjusted);
-    void throwFrom(Cpu &cpu, uint32_t obj, uint32_t pc, uint32_t fp);
-    void unwindTo(Cpu &cpu, Exc &e, uint32_t pc, uint32_t fp);
-    void land(Cpu &cpu, const EhRow &row, uint32_t fp, uint32_t obj, int selector);
+    void throwFrom(Cpu &cpu, uint32_t obj, uint32_t pc, uint32_t fp, uint32_t sp);
+    void unwindTo(Cpu &cpu, Exc &e, uint32_t pc, uint32_t fp, uint32_t sp, uint32_t from);
+    uint32_t descriptors(const ExidxEntry &e);
+    void land(Cpu &cpu, uint32_t fp, uint32_t sp, uint32_t obj, uint32_t pad);
     [[noreturn]] void terminate(Cpu &cpu, const char *why);
     uint32_t errnoAt(Cpu &cpu);
     void setErrno(Cpu &cpu, uint32_t v);
