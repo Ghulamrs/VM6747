@@ -16,6 +16,10 @@ Cpu::Cpu(Program &prog, Runtime &rt) : prog_(prog), rt_(rt) {
 void Cpu::check(uint32_t a, int size, bool aligned) {
     if (a + size > prog_.memory.size() || a + size < a)
         fault("memory access at " + std::to_string(a) + " is outside memory");
+    // Nothing lives below the text - the C6747 has nothing at 0 either - so
+    // a null pointer, and a small offset from one, faults here as there.
+    if (a < prog_.textBase)
+        fault("memory access at " + std::to_string(a) + " is through a null pointer");
     if (aligned && (a % size) != 0)
         fault("a " + std::to_string(size) + "-byte access at " + std::to_string(a) + " is not aligned");
 }
