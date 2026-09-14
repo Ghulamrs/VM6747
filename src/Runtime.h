@@ -46,6 +46,7 @@ private:
     std::vector<File> files_;
     File stdin_; bool stdinRead_ = false;
     File *streamFile(uint32_t stream);
+    uint32_t streamNumber(Cpu &cpu, uint32_t stream);   // &_ftable[n] -> 1, 2, 3
     uint32_t handlers_[32] = { 0 };
     uint32_t errno_ = 0;
     struct AtExit { uint32_t fn, arg; };

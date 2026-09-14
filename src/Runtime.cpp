@@ -40,6 +40,16 @@ static void retDouble(Cpu &c, double d) { uint64_t v; if (d != d) v = 0x7ff80000
 static void retFloat(Cpu &c, float f) { uint32_t v; if (f != f) v = 0x7fc00000u; else std::memcpy(&v, &f, 4); ret(c, v); }
 
 // ---- streams: 1 is stdin, read whole on first use; 4 onward are fopen's ------
+// A program built with lib/stdio.h's C6000 branch names them as TI does,
+// `&_ftable[n]` with TI's 24-byte FILE; those addresses read as 1, 2, 3.
+uint32_t Runtime::streamNumber(Cpu &c, uint32_t s) {
+    std::map<std::string, uint32_t>::const_iterator t = c.program().symbols.find("_ftable");
+    if (t != c.program().symbols.end() && s >= t->second && s < t->second + 3 * 24 &&
+        (s - t->second) % 24 == 0)
+        return 1 + (s - t->second) / 24;
+    return s;
+}
+
 Runtime::File *Runtime::streamFile(uint32_t s) {
     if (s == 1) {
         if (!stdinRead_) {
@@ -173,6 +183,7 @@ std::string Runtime::prelude() {
         "\t.data\n"
         "\t.global stdin\n\t.global stdout\n\t.global stderr\n"
         "stdin:\t.word 1\nstdout:\t.word 2\nstderr:\t.word 3\n"
+        "\t.global _ftable\n\t.align 8\n_ftable:\t.space 480\n"
         "\t.global __dso_handle\n__dso_handle:\t.word 0\n"
         "\t.global _ZTVN10__cxxabiv117__class_type_infoE\n"
         "_ZTVN10__cxxabiv117__class_type_infoE:\t.word 0, 0, 1, 0, 0, 0, 0, 0\n"
@@ -411,7 +422,7 @@ std::vector<std::string> Runtime::names() {
         "putchar", "puts", "printf", "vprintf", "sprintf", "vsprintf", "snprintf", "vsnprintf",
         "fprintf", "vfprintf", "fputs", "fputc", "putc", "fwrite", "fflush", "fopen", "fclose",
         "fgetc", "getc", "getchar", "fgets", "fread", "ftell", "fseek", "rewind", "feof", "remove",
-        "perror", "ferror", "clearerr", "__errno_location", "__assert_fail", "__assert_rtn", "_assert",
+        "perror", "ferror", "clearerr", "__errno_location", "__c6xabi_errno_addr", "__assert_fail", "__assert_rtn", "_assert", "__c6xabi_abort_msg",
         "sscanf", "fscanf", "ungetc",
         "exit", "abort", "atexit", "malloc", "calloc", "realloc", "free",
         "memcpy", "memmove", "memset", "memcmp", "memchr",
@@ -422,7 +433,7 @@ std::vector<std::string> Runtime::names() {
         "isalnum", "isalpha", "iscntrl", "isdigit", "isgraph", "islower", "isprint", "ispunct",
         "isspace", "isupper", "isxdigit", "tolower", "toupper",
         "sqrt", "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sinh", "cosh", "tanh",
-        "exp", "log", "log10", "pow", "fabs", "floor", "ceil", "fmod", "ldexp", "frexp", "modf", "trunc", "round",
+        "exp", "log", "log10", "pow", "fabs", "floor", "ceil", "fmod", "ldexp", "frexp", "modf", "trunc", "round", "__c6xabi_trunc", "__c6xabi_nround",
         "log2", "cbrt", "hypot", "exp2", "log1p", "expm1",
         "sqrtf", "fabsf", "floorf", "ceilf",
         "setjmp", "_setjmp", "longjmp", "time", "clock",
@@ -482,7 +493,7 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         return true;
     }
     if (n == "fprintf" || n == "vfprintf") {
-        uint32_t stream = arg(c, 0);
+        uint32_t stream = streamNumber(c, arg(c, 0));
         Args a = n[0] == 'v' ? Args{ c, arg(c, 2) } : Args{ c, variadicAt(c, 2) };
         std::string fmt = c.readString(n[0] == 'v' ? arg(c, 1) : a.word());
         std::string s = format(c, fmt, a);
@@ -493,7 +504,7 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         return true;
     }
     if (n == "fputs" || n == "fputc" || n == "putc" || n == "fwrite") {
-        uint32_t stream = n == "fwrite" ? arg(c, 3) : arg(c, 1);
+        uint32_t stream = streamNumber(c, n == "fwrite" ? arg(c, 3) : arg(c, 1));
         std::string s;
         if (n == "fputs") s = c.readString(arg(c, 0));
         else if (n == "fwrite") { uint32_t k = arg(c, 1) * arg(c, 2); for (uint32_t i = 0; i < k; i++) s += static_cast<char>(c.load8(arg(c, 0) + i)); }
@@ -510,7 +521,7 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         // A4, the format and the pointers on the stack. The conversions the
         // streams' own parsing needs, over a string - a file's rest, for
         // fscanf, which then advances by what was consumed.
-        File *fs = n == "fscanf" ? streamFile(arg(c, 0)) : nullptr;
+        File *fs = n == "fscanf" ? streamFile(streamNumber(c, arg(c, 0))) : nullptr;
         if (n == "fscanf" && fs == nullptr) { ret(c, 0xffffffffu); return true; }
         std::string in = fs != nullptr ? fs->data.substr(fs->pos) : c.readString(arg(c, 0));
         Args a = { c, variadicAt(c, 2) };
@@ -580,7 +591,7 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         return true;
     }
     if (n == "ungetc") {
-        File *fs = streamFile(arg(c, 1));
+        File *fs = streamFile(streamNumber(c, arg(c, 1)));
         uint32_t ch = arg(c, 0) & 0xff;
         if (fs == nullptr || ch == 0xff) { ret(c, 0xffffffffu); return true; }
         if (fs->pos > 0 && static_cast<unsigned char>(fs->data[fs->pos - 1]) == ch) fs->pos--;
@@ -597,7 +608,13 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         c.exitWith(134);
         return true;
     }
-    if (n == "__errno_location") { ret(c, errnoAt(c)); return true; }
+    if (n == "__errno_location" || n == "__c6xabi_errno_addr") { ret(c, errnoAt(c)); return true; }
+    if (n == "__c6xabi_abort_msg") {                // TI's assert: the whole message, built by the macro
+        std::fflush(stdout);
+        std::fputs(c.readString(arg(c, 0)).c_str(), stderr);
+        c.exitWith(134);
+        return true;
+    }
     if (n == "perror") { std::string s = c.readString(arg(c, 0)); std::fprintf(stderr, "%s: error\n", s.c_str()); return true; }
     // ---- files: kept in memory on the host until closed ----
     if (n == "fopen") {
@@ -632,14 +649,14 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         return true;
     }
     if (n == "fgetc" || n == "getc" || n == "getchar") {
-        File *f = streamFile(n == "getchar" ? 1 : arg(c, 0));
+        File *f = streamFile(n == "getchar" ? 1 : streamNumber(c, arg(c, 0)));
         int ch = -1;
         if (f != nullptr && f->pos < f->data.size()) ch = static_cast<unsigned char>(f->data[f->pos++]);
         ret(c, static_cast<uint32_t>(ch));
         return true;
     }
     if (n == "fgets") {
-        uint32_t buf = arg(c, 0), cap = arg(c, 1), s = arg(c, 2);
+        uint32_t buf = arg(c, 0), cap = arg(c, 1), s = streamNumber(c, arg(c, 2));
         std::string line;
         bool any = false;
         File *f = streamFile(s);
@@ -671,7 +688,7 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         return true;
     }
     if (n == "rewind") { uint32_t s = arg(c, 0); if (s >= 4 && s - 4 < files_.size()) files_[s - 4].pos = 0; return true; }
-    if (n == "feof") { File *f = streamFile(arg(c, 0)); ret(c, f != nullptr && f->pos >= f->data.size()); return true; }
+    if (n == "feof") { File *f = streamFile(streamNumber(c, arg(c, 0))); ret(c, f != nullptr && f->pos >= f->data.size()); return true; }
     if (n == "remove") { ret(c, std::remove(c.readString(arg(c, 0)).c_str()) == 0 ? 0 : 0xffffffffu); return true; }
     // ---- process ----
     if (n == "exit") { std::fflush(stdout); c.exitWith(static_cast<int>(arg(c, 0))); return true; }
@@ -891,7 +908,7 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         static const M1 m1[] = { { "sqrt", std::sqrt }, { "sin", std::sin }, { "cos", std::cos }, { "tan", std::tan },
             { "asin", std::asin }, { "acos", std::acos }, { "atan", std::atan }, { "sinh", std::sinh }, { "cosh", std::cosh },
             { "tanh", std::tanh }, { "exp", std::exp }, { "log", std::log }, { "log10", std::log10 }, { "fabs", std::fabs },
-            { "floor", std::floor }, { "ceil", std::ceil }, { "trunc", std::trunc }, { "round", std::round },
+            { "floor", std::floor }, { "ceil", std::ceil }, { "trunc", std::trunc }, { "round", std::round }, { "__c6xabi_trunc", std::trunc }, { "__c6xabi_nround", std::round },
             { "log2", std::log2 }, { "cbrt", std::cbrt }, { "exp2", std::exp2 }, { "log1p", std::log1p }, { "expm1", std::expm1 } };
         for (const M1 &m : m1) if (n == m.name) { retDouble(c, m.f(argDouble(c, 0))); return true; }
         struct M2 { const char *name; double (*f)(double, double); };
