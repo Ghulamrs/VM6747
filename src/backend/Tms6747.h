@@ -20,7 +20,12 @@ namespace shalimar {
 // overflow block, whose address travels in B1. A3 addresses, A0/A1 predicate.
 class Tms6747Emitter : public Emitter {
 public:
-    std::string symbol(const std::string &name) const override { return name; }
+    // A borrowed C99 name as TI's runtime spells it; the emulator answers to both.
+    std::string symbol(const std::string &name) const override {
+        if (name == "trunc") return "__c6xabi_trunc";
+        if (name == "round") return "__c6xabi_nround";
+        return name;
+    }
 
     void beginModule(const std::string &sourceName) override;
     void endModule() override;
