@@ -126,10 +126,37 @@ static bool msInRegister(int size) {
 }
 
 static const char *narrower(const char *reg64, int bytes) {
-    bool isA = std::strcmp(reg64, "%rax") == 0;
-    if (bytes >= 4) return isA ? "%eax" : "%edx";
-    if (bytes >= 2) return isA ? "%ax"  : "%dx";
-    return isA ? "%al" : "%dl";
+    static const char *const names[][4] = {
+        { "%rax", "%eax", "%ax", "%al" }, { "%rdx", "%edx", "%dx", "%dl" },
+        { "%rcx", "%ecx", "%cx", "%cl" }, { "%rsi", "%esi", "%si", "%sil" },
+        { "%rdi", "%edi", "%di", "%dil" }, { "%r8", "%r8d", "%r8w", "%r8b" },
+        { "%r9", "%r9d", "%r9w", "%r9b" }, { "%r10", "%r10d", "%r10w", "%r10b" },
+        { "%r11", "%r11d", "%r11w", "%r11b" },
+    };
+    int k = bytes >= 4 ? 1 : bytes >= 2 ? 2 : 3;
+    for (const char *const *n : names) if (std::strcmp(reg64, n[0]) == 0) return n[k];
+    return names[1][k];   // what every caller other than %rax meant before the table
+}
+
+void X86_64Linux::storeTailFromReg(const char *reg64, long long off, const char *base, int left) {
+    int done = 0, shifted = 0;
+    if (left - done >= 4) { a_->ins("movl", reg(narrower(reg64, 4)), mem(off + done, base)); done += 4; }
+    if (left - done >= 2) {
+        if (done != shifted) { a_->ins("shr", imm((done - shifted) * 8), reg(reg64)); shifted = done; }
+        a_->ins("movw", reg(narrower(reg64, 2)), mem(off + done, base)); done += 2;
+    }
+    if (left - done >= 1) {
+        if (done != shifted) a_->ins("shr", imm((done - shifted) * 8), reg(reg64));
+        a_->ins("movb", reg(narrower(reg64, 1)), mem(off + done, base));
+    }
+}
+
+void X86_64Linux::loadTailToReg(const char *reg64, long long off, const char *base, int left) {
+    a_->ins("movzbl", mem(off + left - 1, base), reg(narrower(reg64, 4)));
+    for (int i = left - 2; i >= 0; i--) {
+        a_->ins("shl", imm(8), reg(reg64));
+        a_->ins("orb", mem(off + i, base), reg(narrower(reg64, 1)));
+    }
 }
 
 void X86_64Linux::msAggregateToRax(const Type *t, int slot) {
@@ -888,10 +915,8 @@ void X86_64Linux::visit(const Call &n) {
         for (int k = slots; k-- > 0; ) {
             int off = k * 8;
             int left = size - off;
-            if (left >= 8)      a_->ins("mov", mem(off, "%rcx"), reg("%rax"));
-            else if (left >= 4) a_->ins("movl", mem(off, "%rcx"), reg("%eax"));
-            else if (left >= 2) a_->ins("movzwl", mem(off, "%rcx"), reg("%eax"));
-            else                a_->ins("movzbl", mem(off, "%rcx"), reg("%eax"));
+            if (left >= 8) a_->ins("mov", mem(off, "%rcx"), reg("%rax"));
+            else           loadTailToReg("%rax", off, "%rcx", left);
             push();
         }
         if (padBelow[i]) { a_->ins("sub", immText("8"), reg("%rsp")); depth_++; }
@@ -938,9 +963,7 @@ void X86_64Linux::visit(const Call &n) {
                 a_->ins("mov", mem(off, "%rax"), reg(abi_.intRegs[slot[i][k]]));
             } else {
 
-                if (left >= 4)      a_->ins("movl", mem(off, "%rax"), reg("%r11d"));
-                else if (left >= 2) a_->ins("movzwl", mem(off, "%rax"), reg("%r11d"));
-                else                a_->ins("movzbl", mem(off, "%rax"), reg("%r11d"));
+                loadTailToReg("%r11", off, "%rax", left);
                 a_->ins("mov", reg("%r11"), reg(abi_.intRegs[slot[i][k]]));
             }
         }
@@ -996,10 +1019,8 @@ void X86_64Linux::visit(const Call &n) {
                 a_->ins(left >= 8 ? "movsd" : "movss", reg(sret[nextSse++]), mem(off, "%rbp"));
             } else {
                 const char *r = ret[nextInt++];
-                if (left >= 8)      a_->ins("mov", reg(r), mem(off, "%rbp"));
-                else if (left >= 4) a_->ins("movl", reg(narrower(r, 4)), mem(off, "%rbp"));
-                else if (left >= 2) a_->ins("movw", reg(narrower(r, 2)), mem(off, "%rbp"));
-                else                a_->ins("movb", reg(narrower(r, 1)), mem(off, "%rbp"));
+                if (left >= 8) a_->ins("mov", reg(r), mem(off, "%rbp"));
+                else           storeTailFromReg(r, off, "%rbp", left);
             }
         }
         a_->ins("lea", mem((-base), "%rbp"), reg("%rax"));
@@ -1159,11 +1180,7 @@ void X86_64Linux::visit(const Return &n) {
             } else if (left >= 8) {
                 a_->ins("mov", mem(off, "%rcx"), reg(ret[nextInt++]));
             } else {
-                const char *r = ret[nextInt++];
-                const char *e = narrower(r, 4);
-                if (left >= 4)      a_->ins("movl", mem(off, "%rcx"), reg(e));
-                else if (left >= 2) a_->ins("movzwl", mem(off, "%rcx"), reg(e));
-                else                a_->ins("movzbl", mem(off, "%rcx"), reg(e));
+                loadTailToReg(ret[nextInt++], off, "%rcx", left);
             }
         }
     }
@@ -1285,15 +1302,9 @@ void X86_64Linux::emit(const Function &fn) {
                 if (left >= 8) {
                     a_->ins("mov", mem(from, "%rbp"), reg("%rax"));
                     a_->ins("movq", reg("%rax"), mem(to, "%rbp"));
-                } else if (left >= 4) {
-                    a_->ins("movl", mem(from, "%rbp"), reg("%eax"));
-                    a_->ins("movl", reg("%eax"), mem(to, "%rbp"));
-                } else if (left >= 2) {
-                    a_->ins("movzwl", mem(from, "%rbp"), reg("%eax"));
-                    a_->ins("movw", reg("%ax"), mem(to, "%rbp"));
                 } else {
-                    a_->ins("movzbl", mem(from, "%rbp"), reg("%eax"));
-                    a_->ins("movb", reg("%al"), mem(to, "%rbp"));
+                    loadTailToReg("%rax", from, "%rbp", left);
+                    storeTailFromReg("%rax", to, "%rbp", left);
                 }
             }
             stackAt += slots * 8;
@@ -1310,10 +1321,8 @@ void X86_64Linux::emit(const Function &fn) {
                     a_->ins(left >= 8 ? "movsd" : "movss", reg(abi_.sseRegs[takeSlot(true, ints, sses)]), mem(off, "%rbp"));
                 } else {
                     a_->ins("mov", reg(abi_.intRegs[takeSlot(false, ints, sses)]), reg("%rax"));
-                    if (left >= 8)      a_->ins("movq", reg("%rax"), mem(off, "%rbp"));
-                    else if (left >= 4) a_->ins("movl", reg("%eax"), mem(off, "%rbp"));
-                    else if (left >= 2) a_->ins("movw", reg("%ax"), mem(off, "%rbp"));
-                    else                a_->ins("movb", reg("%al"), mem(off, "%rbp"));
+                    if (left >= 8) a_->ins("movq", reg("%rax"), mem(off, "%rbp"));
+                    else           storeTailFromReg("%rax", off, "%rbp", left);
                 }
             }
             continue;

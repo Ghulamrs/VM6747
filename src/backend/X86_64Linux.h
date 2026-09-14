@@ -118,6 +118,11 @@ private:
     void bitFieldInsert(const MemberAccess &m);
 
     void copyBlock(int size);
+    // The last lane of an aggregate is composed, never approximated: exactly
+    // `left` bytes, never one past the object, where a single widened move
+    // took the largest power of two and lost a 3-byte struct's third byte.
+    void storeTailFromReg(const char *reg64, long long off, const char *base, int left);   // clobbers reg64
+    void loadTailToReg(const char *reg64, long long off, const char *base, int left);
 
     void canonicalise(const Type *t);
     void genFloatBinary(const Binary &n);

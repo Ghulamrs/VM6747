@@ -109,7 +109,7 @@ const Rule kRules[] = {
 
     { "add", "add", 0 }, { "sub", "sub", 0 }, { "imul", "imul", 0 },
     { "idiv", "idiv", 0 }, { "div", "div", 0 }, { "neg", "neg", 0 },
-    { "and", "and", 0 }, { "or", "or", 0 }, { "xor", "xor", 0 },
+    { "and", "and", 0 }, { "or", "or", 0 }, { "orb", "or", 1 }, { "xor", "xor", 0 },
     { "shl", "shl", 0 }, { "shr", "shr", 0 }, { "sar", "sar", 0 },
     { "cmp", "cmp", 0 }, { "cdq", "cdq", 0 }, { "cqo", "cqo", 0 },
     { "addl", "add", 4 }, { "cmpl", "cmp", 4 }, { "testb", "test", 1 },

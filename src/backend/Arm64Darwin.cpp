@@ -133,14 +133,25 @@ Arm64Darwin::AggPlan Arm64Darwin::planFor(const Type *t) const {
     return p;
 }
 
+// The last word of an aggregate is stored in exactly its bytes - a word, a
+// halfword and a byte as needed, each brought down with lsr - where one
+// store of the largest power of two lost a 3-byte struct's third byte.
 void Arm64Darwin::storeWord(const char *xreg, const char *base, int k, int size) {
     int off = k * 8;
     int left = size - off;
     std::string w = std::string("w") + (xreg + 1);
-    if (left >= 8)      out_ << "  str "  << xreg << ", [" << base << ", #" << off << "]\n";
-    else if (left >= 4) out_ << "  str "  << w    << ", [" << base << ", #" << off << "]\n";
-    else if (left >= 2) out_ << "  strh " << w    << ", [" << base << ", #" << off << "]\n";
-    else                out_ << "  strb " << w    << ", [" << base << ", #" << off << "]\n";
+    if (left >= 8) { out_ << "  str "  << xreg << ", [" << base << ", #" << off << "]\n"; return; }
+    int done = 0;
+    if (left - done >= 4) { out_ << "  str "  << w << ", [" << base << ", #" << off << "]\n"; done += 4; }
+    if (left - done >= 2) {
+        if (done > 0) out_ << "  lsr x10, " << xreg << ", #" << (done * 8) << "\n";
+        out_ << "  strh " << (done > 0 ? "w10" : w) << ", [" << base << ", #" << (off + done) << "]\n";
+        done += 2;
+    }
+    if (left - done >= 1) {
+        if (done > 0) out_ << "  lsr x10, " << xreg << ", #" << (done * 8) << "\n";
+        out_ << "  strb " << (done > 0 ? "w10" : w) << ", [" << base << ", #" << (off + done) << "]\n";
+    }
 }
 
 void Arm64Darwin::genAddr(const Expr &e) {
