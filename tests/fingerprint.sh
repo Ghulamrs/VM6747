@@ -73,10 +73,13 @@ fi
 # Every spelling the compiler can write, named as it will appear in the
 # fingerprint. The Windows target twice, because MASM and the GNU form of the
 # same target are different text and a change can move one without the other.
+# tms6747 since 2026-09-14: the one target the differential suites run only
+# on an emulator gets the text check the other three always had.
 SPELLINGS="x86_64-linux:
 x86_64-windows:
 x86_64-windows:-masm=gnu
-arm64-darwin:"
+arm64-darwin:
+tms6747:"
 
 rm -rf "$WORK"
 mkdir -p "$WORK"
