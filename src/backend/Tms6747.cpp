@@ -1,6 +1,8 @@
 #include "Tms6747.h"
 
+#include <cstdio>
 #include <cstring>
+#include <vector>
 
 namespace shalimar {
 
@@ -23,6 +25,11 @@ void Tms6747Emitter::endModule() {
     }
     for (const std::string &name : called_)
         if (!defined_.count(name)) raw("\t.ref\t" + symbol(name));
+    // The personality routine the index entries name by number.
+    if (!currentFunction_.empty()) {
+        raw("\t.global\t__c6xabi_unwind_cpp_pr3");
+        raw("\t.symdepend\t\"__c6xabi_unwind_cpp_pr3\", \".c6xabi.exidx:.text\"");
+    }
     blank();
 }
 
@@ -66,36 +73,66 @@ void Tms6747Emitter::beginFunction(const std::string &name) {
     raw("\t.global\t" + symbol(name));
     raw(symbol(name) + ":");
     defined_.insert(name);
+    currentFunction_ = symbol(name);
     usesSavedArgRegs_ = false;
     prologueMark_ = text_.size();
 }
 
-// The frame: the return address at *B15, the slots above it, eight bytes
-// each, the whole a multiple of eight so that B15 stays 8-aligned and every
-// LDDW/STDW lands on an aligned pair.
+// The frame: the word at B15 is the callee's, as the ABI has it; the slots
+// from B15 + 8, eight bytes each; the saved registers at the top, one word
+// each downward from the caller's B15 in the order TI's unwinder pops them.
+
+// B12, B10, B3, A12, A10 when the body loads the argument registers, B3
+// alone otherwise; the area is a multiple of eight so B15 stays 8-aligned.
+static std::vector<std::string> savedRegs(bool argRegs) {
+    std::vector<std::string> r;
+    if (argRegs) { r.push_back("B12"); r.push_back("B10"); }
+    r.push_back("B3");
+    if (argRegs) { r.push_back("A12"); r.push_back("A10"); }
+    return r;
+}
 void Tms6747Emitter::endFunction(int slots) {
-    static const char *const kept[] = { "A10", "B10", "A12", "B12" };
-    const int saved = 8 + 8 * slots;                  // where the four kept registers go
-    const int frame = saved + (usesSavedArgRegs_ ? 16 : 0);
+    const std::vector<std::string> saved = savedRegs(usesSavedArgRegs_);
+    const int below = 8 + 8 * slots;                       // the callee's word and the slots
+    const int frame = below + (static_cast<int>(saved.size()) * 4 + 7) / 8 * 8;
     std::string prologue;
     prologue += "\tMVKL\t" + std::to_string(frame) + ", A3\n";
     prologue += "\tMVKH\t" + std::to_string(frame) + ", A3\n";
     prologue += "\tSUB\tB15, A3, B15\n";
-    prologue += "\tSTW\tB3, *B15\n";
-    if (usesSavedArgRegs_)
-        for (int k = 0; k < 4; k++)
-            prologue += "\tSTW\t" + std::string(kept[k]) + ", *+B15(" + std::to_string(saved + 4 * k) + ")\n";
+    for (size_t k = 0; k < saved.size(); k++)
+        prologue += "\tSTW\t" + saved[k] + ", *+B15(" + std::to_string(frame - 4 * static_cast<int>(k)) + ")\n";
     text_.insert(prologueMark_, prologue);
 
-    if (usesSavedArgRegs_)
-        for (int k = 0; k < 4; k++)
-            instruction("LDW\t*+B15(" + std::to_string(saved + 4 * k) + "), " + kept[k]);
-    instruction("LDW\t*B15, B3");
+    for (size_t k = 0; k < saved.size(); k++)
+        instruction("LDW\t*+B15(" + std::to_string(frame - 4 * static_cast<int>(k)) + "), " + saved[k]);
     instruction("NOP\t4");
     constant("A3", frame);
     instruction("ADD\tB15, A3, B15");
     instruction("B\tB3");
     instruction("NOP\t5");
+    indexEntry(below / 8, usesSavedArgRegs_);
+}
+
+// TI's exception index entry for the function just ended, in the compact
+// form (lib/src/tdeh_pr_c6000.cpp): personality 3, the SP increment in
+// doublewords up to the saved registers, their bitmask, B3 the return.
+void Tms6747Emitter::indexEntry(int increment, bool argRegs) {
+    static const struct { const char *reg; int bit; } bits[] = {
+        { "B12", 8 }, { "B10", 6 }, { "B3", 5 }, { "A12", 2 }, { "A10", 0 } };
+    unsigned mask = 0;
+    for (const std::string &r : savedRegs(argRegs))
+        for (size_t k = 0; k < sizeof bits / sizeof bits[0]; k++)
+            if (r == bits[k].reg) mask |= 1u << bits[k].bit;
+    // The increment has seven bits, and 0x7f means something else; a
+    // function with more slots than that gets an entry that says so.
+    char word[16];
+    if (increment > 0x7e) std::snprintf(word, sizeof word, "1");     // CANTUNWIND
+    else std::snprintf(word, sizeof word, "0x%08x", 0x83000000u | static_cast<unsigned>(increment) << 17 | mask << 4 | 7u);
+    raw("\t.sect\t\".c6xabi.exidx:.text\"");
+    raw("\t.align\t4");
+    raw("\t.ulong\t$EXIDX_FUNC(" + currentFunction_ + ")");
+    raw("\t.ulong\t" + std::string(word));
+    raw("\t.text");
 }
 
 void Tms6747Emitter::loadIntConstant(int32_t value) {

@@ -13,8 +13,8 @@ namespace shalimar {
 // VM6747/TMS6747.md.
 //
 // The accumulator is A4, a real or a wide value the pair A5:A4. Slots are
-// eight bytes at B15 + 8 + 8*slot, the saved return address at *B15; no
-// frame pointer, since nothing here pushes. Arguments are positional, as the
+// eight bytes at B15 + 8 + 8*slot, the saved registers at the frame's top,
+// the word at B15 the callee's; no frame pointer, since nothing here pushes. Arguments are positional, as the
 // EABI has them - A4, B4, A6, B6, A8, B8, A10, B10, A12, B12, one register
 // (or pair) per argument whatever its kind - and past ten the compiler's own
 // overflow block, whose address travels in B1. A3 addresses, A0/A1 predicate.
@@ -75,6 +75,8 @@ private:
     // A10, B10, A12 and B12 carry arguments seven to ten and are the
     // callee's to keep: a function that loads them saves them in its frame.
     bool usesSavedArgRegs_ = false;
+    std::string currentFunction_;
+    void indexEntry(int increment, bool argRegs);
 
     // A constant into a register, MVKL then MVKH - the only way to a 32-bit value.
     void constant(const std::string &reg, int32_t value);
