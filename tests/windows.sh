@@ -15,6 +15,7 @@ set -u
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 WORK=${TMPDIR:-/tmp}/vm6747-windows.$$
 REMOTE='C:/Users/GRA/Documents/VM6747'
+VM="${VM:-$HERE/vm6747.exe}"
 mkdir -p "$WORK/xwin/c" "$WORK/xwin/cxx" "$WORK/xwin/shm" "$WORK/xwin/shmrt"
 # Only real case names: macOS leaves "name 2.s" duplicates beside the files
 # it rewrites, and those are noise, not cases.
