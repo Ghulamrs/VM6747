@@ -76,11 +76,12 @@ private:
     // A10, B10, A12 and B12 carry arguments seven to ten and are the
     // callee's to keep: a function that loads them saves them in its frame.
     bool usesSavedArgRegs_ = false;
+    bool usesSavedPairRegs_ = false;   // A11/B11/A13/B13, which a real in A10-B12 writes
     std::string currentFunction_;
     std::string slotBase_;       // the symbol for this function's slot 0, below A15
     int outgoingBytes_ = 0;      // the widest set of arguments this function passes on the stack
     int incomingBytes_ = 0;      // the arguments it has taken from its own caller's, so far
-    void indexEntry(bool argRegs);
+    void indexEntry(bool argRegs, bool pairRegs);
 
     // A constant into a register, MVKL then MVKH - the only way to a 32-bit value.
     void constant(const std::string &reg, int32_t value);

@@ -6,7 +6,7 @@
 
 namespace shalimar {
 
-static const int kSaveBytes = 24;   // under A15 whatever is saved, so a slot's address does not wait on the body
+static const int kSaveBytes = 40;   // under A15 whatever is saved, so a slot's address does not wait on the body
 
 void Tms6747Emitter::beginModule(const std::string &sourceName) {
     raw("; " + sourceName);
@@ -84,6 +84,7 @@ void Tms6747Emitter::beginFunction(const std::string &name) {
     currentFunction_ = symbol(name);
     slotBase_ = "shmbase$" + symbol(name);
     usesSavedArgRegs_ = false;
+    usesSavedPairRegs_ = false;
     outgoingBytes_ = 0;
     incomingBytes_ = 0;
     prologueMark_ = text_.size();
@@ -92,20 +93,26 @@ void Tms6747Emitter::beginFunction(const std::string &name) {
 // The frame, the shape cc1i and cxx1i keep: A15 points at the caller's B15
 // word and holds the caller's A15; below it, in the order TI's unwinder
 // pops them, B12, B10, B3, A12, A10 when the body loads the argument
-// registers and B3 alone otherwise, in 24 bytes whatever is saved; then
+// registers and B3 alone otherwise, in 40 bytes whatever is saved; then
 // the slots, eight bytes each; then the outgoing arguments past the
 // registers, from B15 + 4 as the ABI has them, the word at B15 the callee's.
 
-static std::vector<std::string> savedRegs(bool argRegs) {
+static std::vector<std::string> savedRegs(bool argRegs, bool pairRegs) {
     std::vector<std::string> r;
     r.push_back("A15");
-    if (argRegs) { r.push_back("B12"); r.push_back("B10"); }
+    if (pairRegs) r.push_back("B13");
+    if (argRegs) r.push_back("B12");
+    if (pairRegs) r.push_back("B11");
+    if (argRegs) r.push_back("B10");
     r.push_back("B3");
-    if (argRegs) { r.push_back("A12"); r.push_back("A10"); }
+    if (pairRegs) r.push_back("A13");
+    if (argRegs) r.push_back("A12");
+    if (pairRegs) r.push_back("A11");
+    if (argRegs) r.push_back("A10");
     return r;
 }
 void Tms6747Emitter::endFunction(int slots) {
-    const std::vector<std::string> saved = savedRegs(usesSavedArgRegs_);
+    const std::vector<std::string> saved = savedRegs(usesSavedArgRegs_, usesSavedPairRegs_);
     const int outgoing = (4 + outgoingBytes_ + 7) / 8 * 8;   // the callee's word, then the arguments
     const int frame = kSaveBytes + 8 * slots + outgoing;
     std::string prologue;
@@ -126,17 +133,18 @@ void Tms6747Emitter::endFunction(int slots) {
     instruction("NOP\t4");
     instruction("B\tB3");
     instruction("NOP\t5");
-    indexEntry(usesSavedArgRegs_);
+    indexEntry(usesSavedArgRegs_, usesSavedPairRegs_);
 }
 
 // TI's exception index entry for the function just ended, in the compact
 // form (lib/src/tdeh_pr_c6000.cpp): personality 3, SP restored from A15
 // (0x7f), the bitmask of the registers saved, B3 the return register.
-void Tms6747Emitter::indexEntry(bool argRegs) {
+void Tms6747Emitter::indexEntry(bool argRegs, bool pairRegs) {
     static const struct { const char *reg; int bit; } bits[] = {
-        { "A15", 12 }, { "B12", 8 }, { "B10", 6 }, { "B3", 5 }, { "A12", 2 }, { "A10", 0 } };
+        { "A15", 12 }, { "B13", 9 }, { "B12", 8 }, { "B11", 7 }, { "B10", 6 }, { "B3", 5 },
+        { "A13", 3 }, { "A12", 2 }, { "A11", 1 }, { "A10", 0 } };
     unsigned mask = 0;
-    for (const std::string &r : savedRegs(argRegs))
+    for (const std::string &r : savedRegs(argRegs, pairRegs))
         for (size_t k = 0; k < sizeof bits / sizeof bits[0]; k++)
             if (r == bits[k].reg) mask |= 1u << bits[k].bit;
     char word[16];
@@ -171,6 +179,7 @@ void Tms6747Emitter::loadSlot(Slot kind, int slot) {
 void Tms6747Emitter::setArg(Slot kind, int index) {
     if (index == 0) return;
     if (index >= 6) usesSavedArgRegs_ = true;
+    if (index >= 6 && kind != Slot::Int) usesSavedPairRegs_ = true;   // the pair's partner is callee-saved too
     const std::string reg = argRegister(index);
     instruction("MV\tA4, " + reg);
     if (kind != Slot::Int) instruction("MV\tA5, " + pairOf(reg).substr(0, pairOf(reg).find(':')));
@@ -178,6 +187,7 @@ void Tms6747Emitter::setArg(Slot kind, int index) {
 
 void Tms6747Emitter::loadSlotIntoArg(Slot kind, int slot, int index) {
     if (index >= 6) usesSavedArgRegs_ = true;
+    if (index >= 6 && kind != Slot::Int) usesSavedPairRegs_ = true;
     slotAddress(slot, "A3");
     loadAt(kind, "A3", argRegister(index));
 }
