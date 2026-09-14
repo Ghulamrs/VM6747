@@ -223,13 +223,14 @@ struct Assembler {
 
     bool lookup(const Unit &u, const std::string &name, uint32_t &addr) {
         std::map<std::string, Sym>::const_iterator l = u.locals.find(name);
-        if (l != u.locals.end() && l->second.defined) {
-            addr = units[&u - &units[0]].base[l->second.section] + l->second.offset;
+        if (l != u.locals.end() && l->second.defined) {          // a .set value has no section
+            addr = l->second.section < 0 ? l->second.offset : units[&u - &units[0]].base[l->second.section] + l->second.offset;
             return true;
         }
         std::map<std::string, std::pair<int, Sym> >::const_iterator g = globals.find(name);
         if (g != globals.end()) {
-            addr = units[g->second.first].base[g->second.second.section] + g->second.second.offset;
+            const Sym &gs = g->second.second;
+            addr = gs.section < 0 ? gs.offset : units[g->second.first].base[gs.section] + gs.offset;
             return true;
         }
         std::map<std::string, uint32_t>::const_iterator n = natives.find(name);
@@ -372,11 +373,13 @@ struct Assembler {
                         u.size[sec] += static_cast<uint32_t>(bytes.size()) + (m == ".cstring" ? 1 : 0);
                     }
                 } else if (m == ".set" || m == ".equ") {
-                    if (ln.operands.size() != 2) return fail(u, ln, m + " needs a name and a value");
+                    // `.set name, value`, or TI's `name .set value` with the name in the label column.
+                    std::string name = ln.operands.size() == 2 ? ln.operands[0] : ln.label;
+                    if (name.empty() || ln.operands.empty() || ln.operands.size() > 2) return fail(u, ln, m + " needs a name and a value");
                     long long v;
-                    if (!evaluate(u, ln, ln.operands[1], false, v)) return false;
+                    if (!evaluate(u, ln, ln.operands.back(), false, v)) return false;
                     Sym s; s.section = -1; s.offset = static_cast<uint32_t>(v); s.defined = true;
-                    u.locals[ln.operands[0]] = s;
+                    u.locals[name] = s;
                 } else if (m == ".end" || m == ".file" || m == ".clink" || m == ".nocmp" || m == ".symdepend" ||
                            m == ".compiler_opts" || m == ".asg" || m == ".retain" ||
                            m == ".ident" || m == ".p2align" || m == ".size" || m == ".type") {
