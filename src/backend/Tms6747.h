@@ -12,12 +12,13 @@ namespace shalimar {
 // runtime, compiled by cxx1i, sit beside a Shalimar program. See
 // VM6747/TMS6747.md.
 //
-// The accumulator is A4, a real or a wide value the pair A5:A4. Slots are
-// eight bytes at B15 + 8 + 8*slot, the saved registers at the frame's top,
-// the word at B15 the callee's; no frame pointer, since nothing here pushes. Arguments are positional, as the
-// EABI has them - A4, B4, A6, B6, A8, B8, A10, B10, A12, B12, one register
-// (or pair) per argument whatever its kind - and past ten the compiler's own
-// overflow block, whose address travels in B1. A3 addresses, A0/A1 predicate.
+// The accumulator is A4, a real or a wide value the pair A5:A4. A15 is the
+// frame pointer, at the caller's B15 word; the slots are eight bytes each
+// below the saved registers, rising from A15 - base + 8*slot. Arguments are
+// positional, as the EABI has them - A4, B4, A6, B6, A8, B8, A10, B10,
+// A12, B12, one register (or pair) per argument whatever its kind - and
+// past ten on the stack from B15 + 4, as the EABI has them too. A3
+// addresses, A0/A1 predicate.
 class Tms6747Emitter : public Emitter {
 public:
     // A borrowed C99 name as TI's runtime spells it; the emulator answers to both.
@@ -44,7 +45,7 @@ public:
     bool positionalArguments() const override { return true; }
     int intArgCapacity() const override { return 10; }
     int realArgCapacity() const override { return 10; }
-    void setOverflowBlock(int slot) override;
+    void setOverflowBlock(int slot, const std::vector<Slot> &kinds) override;
     void spillOverflowArgument(Slot kind, int index, int slot) override;
     void spillArgument(Slot kind, int registerIndex, int slot) override;
     void call(const std::string &name) override;
@@ -76,11 +77,14 @@ private:
     // callee's to keep: a function that loads them saves them in its frame.
     bool usesSavedArgRegs_ = false;
     std::string currentFunction_;
-    void indexEntry(int increment, bool argRegs);
+    std::string slotBase_;       // the symbol for this function's slot 0, below A15
+    int outgoingBytes_ = 0;      // the widest set of arguments this function passes on the stack
+    int incomingBytes_ = 0;      // the arguments it has taken from its own caller's, so far
+    void indexEntry(bool argRegs);
 
     // A constant into a register, MVKL then MVKH - the only way to a 32-bit value.
     void constant(const std::string &reg, int32_t value);
-    // The address of a slot into `reg`: B15 + 8 + 8*slot.
+    // The address of a slot into `reg`: A15 - base + 8*slot.
     void slotAddress(int slot, const std::string &reg);
     // A load or store of `kind` at *reg, into or from the accumulator or a given register.
     void loadAt(Slot kind, const std::string &addrReg, const std::string &reg);

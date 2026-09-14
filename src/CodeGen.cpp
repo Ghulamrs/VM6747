@@ -481,7 +481,12 @@ void CodeGen::generateCall(Call &node) {
             emitter_.loadSlotIntoArg(places[i].kind, slots[i], places[i].index);
         }
     }
-    if (overflowCount > 0) emitter_.setOverflowBlock(blockBase);
+    if (overflowCount > 0) {
+        std::vector<Slot> overflowKinds;
+        for (const Place &place : places)
+            if (place.overflow) overflowKinds.push_back(place.kind);
+        emitter_.setOverflowBlock(blockBase, overflowKinds);
+    }
 
     // A foreign function keeps the name its own compiler gave it. mangle()
     // would make it shmf_, which marks a function this compiler wrote.

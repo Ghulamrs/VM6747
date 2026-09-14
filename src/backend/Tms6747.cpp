@@ -6,6 +6,8 @@
 
 namespace shalimar {
 
+static const int kSaveBytes = 24;   // under A15 whatever is saved, so a slot's address does not wait on the body
+
 void Tms6747Emitter::beginModule(const std::string &sourceName) {
     raw("; " + sourceName);
     raw("\t.text");
@@ -38,9 +40,15 @@ void Tms6747Emitter::constant(const std::string &reg, int32_t value) {
     instruction("MVKH\t" + std::to_string(value) + ", " + reg);
 }
 
+// The slots rise from the bottom of the frame, so a block of them reads
+// as an array; how far below A15 that is - the save area and every slot -
+// is known only when the function ends, and is a symbol the assembler
+// resolves: slot k is at A15 - base + 8k.
 void Tms6747Emitter::slotAddress(int slot, const std::string &reg) {
-    constant(reg, 8 + 8 * slot);
-    instruction("ADD\tB15, " + reg + ", " + reg);
+    const std::string off = std::to_string(8 * slot) + " - " + slotBase_;
+    instruction("MVKL\t" + off + ", " + reg);
+    instruction("MVKH\t" + off + ", " + reg);
+    instruction("ADD\tA15, " + reg + ", " + reg);
 }
 
 std::string Tms6747Emitter::pairOf(const std::string &reg) {
@@ -74,18 +82,23 @@ void Tms6747Emitter::beginFunction(const std::string &name) {
     raw(symbol(name) + ":");
     defined_.insert(name);
     currentFunction_ = symbol(name);
+    slotBase_ = "shmbase$" + symbol(name);
     usesSavedArgRegs_ = false;
+    outgoingBytes_ = 0;
+    incomingBytes_ = 0;
     prologueMark_ = text_.size();
 }
 
-// The frame: the word at B15 is the callee's, as the ABI has it; the slots
-// from B15 + 8, eight bytes each; the saved registers at the top, one word
-// each downward from the caller's B15 in the order TI's unwinder pops them.
+// The frame, the shape cc1i and cxx1i keep: A15 points at the caller's B15
+// word and holds the caller's A15; below it, in the order TI's unwinder
+// pops them, B12, B10, B3, A12, A10 when the body loads the argument
+// registers and B3 alone otherwise, in 24 bytes whatever is saved; then
+// the slots, eight bytes each; then the outgoing arguments past the
+// registers, from B15 + 4 as the ABI has them, the word at B15 the callee's.
 
-// B12, B10, B3, A12, A10 when the body loads the argument registers, B3
-// alone otherwise; the area is a multiple of eight so B15 stays 8-aligned.
 static std::vector<std::string> savedRegs(bool argRegs) {
     std::vector<std::string> r;
+    r.push_back("A15");
     if (argRegs) { r.push_back("B12"); r.push_back("B10"); }
     r.push_back("B3");
     if (argRegs) { r.push_back("A12"); r.push_back("A10"); }
@@ -93,41 +106,41 @@ static std::vector<std::string> savedRegs(bool argRegs) {
 }
 void Tms6747Emitter::endFunction(int slots) {
     const std::vector<std::string> saved = savedRegs(usesSavedArgRegs_);
-    const int below = 8 + 8 * slots;                       // the callee's word and the slots
-    const int frame = below + (static_cast<int>(saved.size()) * 4 + 7) / 8 * 8;
+    const int outgoing = (4 + outgoingBytes_ + 7) / 8 * 8;   // the callee's word, then the arguments
+    const int frame = kSaveBytes + 8 * slots + outgoing;
     std::string prologue;
+    prologue += slotBase_ + "\t.set\t" + std::to_string(kSaveBytes + 8 * slots) + "\n";   // before its uses
+    prologue += "\tSTW\tA15, *B15\n";
+    prologue += "\tMV\tB15, A15\n";
+    for (size_t k = 1; k < saved.size(); k++)
+        prologue += "\tSTW\t" + saved[k] + ", *-A15(" + std::to_string(4 * k) + ")\n";
     prologue += "\tMVKL\t" + std::to_string(frame) + ", A3\n";
     prologue += "\tMVKH\t" + std::to_string(frame) + ", A3\n";
     prologue += "\tSUB\tB15, A3, B15\n";
-    for (size_t k = 0; k < saved.size(); k++)
-        prologue += "\tSTW\t" + saved[k] + ", *+B15(" + std::to_string(frame - 4 * static_cast<int>(k)) + ")\n";
     text_.insert(prologueMark_, prologue);
 
-    for (size_t k = 0; k < saved.size(); k++)
-        instruction("LDW\t*+B15(" + std::to_string(frame - 4 * static_cast<int>(k)) + "), " + saved[k]);
+    for (size_t k = 1; k < saved.size(); k++)
+        instruction("LDW\t*-A15(" + std::to_string(4 * k) + "), " + saved[k]);
+    instruction("MV\tA15, B15");
+    instruction("LDW\t*A15, A15");
     instruction("NOP\t4");
-    constant("A3", frame);
-    instruction("ADD\tB15, A3, B15");
     instruction("B\tB3");
     instruction("NOP\t5");
-    indexEntry(below / 8, usesSavedArgRegs_);
+    indexEntry(usesSavedArgRegs_);
 }
 
 // TI's exception index entry for the function just ended, in the compact
-// form (lib/src/tdeh_pr_c6000.cpp): personality 3, the SP increment in
-// doublewords up to the saved registers, their bitmask, B3 the return.
-void Tms6747Emitter::indexEntry(int increment, bool argRegs) {
+// form (lib/src/tdeh_pr_c6000.cpp): personality 3, SP restored from A15
+// (0x7f), the bitmask of the registers saved, B3 the return register.
+void Tms6747Emitter::indexEntry(bool argRegs) {
     static const struct { const char *reg; int bit; } bits[] = {
-        { "B12", 8 }, { "B10", 6 }, { "B3", 5 }, { "A12", 2 }, { "A10", 0 } };
+        { "A15", 12 }, { "B12", 8 }, { "B10", 6 }, { "B3", 5 }, { "A12", 2 }, { "A10", 0 } };
     unsigned mask = 0;
     for (const std::string &r : savedRegs(argRegs))
         for (size_t k = 0; k < sizeof bits / sizeof bits[0]; k++)
             if (r == bits[k].reg) mask |= 1u << bits[k].bit;
-    // The increment has seven bits, and 0x7f means something else; a
-    // function with more slots than that gets an entry that says so.
     char word[16];
-    if (increment > 0x7e) std::snprintf(word, sizeof word, "1");     // CANTUNWIND
-    else std::snprintf(word, sizeof word, "0x%08x", 0x83000000u | static_cast<unsigned>(increment) << 17 | mask << 4 | 7u);
+    std::snprintf(word, sizeof word, "0x%08x", 0x83000000u | 0x7fu << 17 | mask << 4 | 7u);
     raw("\t.sect\t\".c6xabi.exidx:.text\"");
     raw("\t.align\t4");
     raw("\t.ulong\t$EXIDX_FUNC(" + currentFunction_ + ")");
@@ -174,17 +187,39 @@ void Tms6747Emitter::spillArgument(Slot kind, int registerIndex, int slot) {
     storeAt(kind, "A3", argRegister(registerIndex));
 }
 
-// The overflow block: the caller's slots holding the arguments past ten,
-// their address handed over in B1 - a convention between functions this
-// compiler writes; no runtime function takes that many.
-void Tms6747Emitter::setOverflowBlock(int slot) {
-    slotAddress(slot, "B1");
+// The arguments past the ten registers go where the ABI puts them: from
+// the caller's B15 + 4 upward, a word for an int or a pointer, a real in
+// eight bytes at an 8-aligned offset. Both sides count the same way.
+static int argumentOffset(int &bytes, Slot kind) {
+    int at = 4 + bytes;
+    if (kind == Slot::Real) at = (at + 7) / 8 * 8;     // the offset from B15 is what aligns
+    bytes = at - 4 + (kind == Slot::Real ? 8 : 4);
+    return at;
+}
+// Through A0-A3 only: the argument registers are already loaded.
+void Tms6747Emitter::setOverflowBlock(int slot, const std::vector<Slot> &kinds) {
+    int bytes = 0;
+    for (size_t i = 0; i < kinds.size(); i++) {
+        const int at = argumentOffset(bytes, kinds[i]);
+        slotAddress(slot + static_cast<int>(i), "A3");
+        loadAt(kinds[i], "A3", "A0");
+        constant("A2", at);
+        instruction("ADD\tB15, A2, A2");
+        if (kinds[i] == Slot::Real) instruction("STDW\tA1:A0, *A2");
+        else                        instruction("STW\tA0, *A2");
+    }
+    if (bytes > outgoingBytes_) outgoingBytes_ = bytes;
 }
 
 void Tms6747Emitter::spillOverflowArgument(Slot kind, int index, int slot) {
-    constant("A6", 8 * index);
-    instruction("ADD\tB1, A6, A6");
-    loadAt(kind, "A6", "A8");
+    (void)index;                                   // they arrive in order
+    const int at = argumentOffset(incomingBytes_, kind);
+    constant("A6", at);
+    instruction("ADD\tA15, A6, A6");
+    if (kind == Slot::Real) instruction("LDDW\t*A6, A9:A8");
+    else                    instruction("LDW\t*A6, A8");
+    instruction("NOP\t4");
+    if (kind == Slot::Wide) instruction("ZERO\tA9");
     slotAddress(slot, "A3");
     storeAt(kind, "A3", "A8");
 }

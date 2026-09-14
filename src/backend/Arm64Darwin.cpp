@@ -130,7 +130,7 @@ void Arm64DarwinEmitter::spillArgument(Slot kind, int registerIndex, int slot) {
                 ", " + slotAddress(slot, byteWidth(kind)));
 }
 
-void Arm64DarwinEmitter::setOverflowBlock(int slot) {
+void Arm64DarwinEmitter::setOverflowBlock(int slot, const std::vector<Slot> &) {
     const int offset = 8 * slot;
     if (offset <= 4095) {
         instruction("add\tx9, sp, #" + std::to_string(offset));

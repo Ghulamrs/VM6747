@@ -117,7 +117,7 @@ void X86_64Emitter::loadSlotIntoArg(Slot kind, int slot, int index) {
                                  spelling_.reg(argRegister(kind, index), width)));
 }
 
-void X86_64Emitter::setOverflowBlock(int slot) {
+void X86_64Emitter::setOverflowBlock(int slot, const std::vector<Slot> &) {
     instruction(spelling_.loadAddress(slotOperand(slot, 8),
                                       spelling_.reg(overflowPointer, 8)));
 }

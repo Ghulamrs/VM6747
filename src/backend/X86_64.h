@@ -38,7 +38,7 @@ public:
     bool positionalArguments() const override { return abi_.positional; }
     int intArgCapacity() const override { return abi_.intArgCount; }
     int realArgCapacity() const override { return abi_.sseArgCount; }
-    void setOverflowBlock(int slot) override;
+    void setOverflowBlock(int slot, const std::vector<Slot> &kinds) override;
     void spillOverflowArgument(Slot kind, int index, int slot) override;
     void spillArgument(Slot kind, int registerIndex, int slot) override;
     void call(const std::string &name) override;

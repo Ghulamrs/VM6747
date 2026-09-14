@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace shalimar {
 
@@ -36,7 +37,11 @@ public:
     virtual int intArgCapacity() const = 0;
     virtual int realArgCapacity() const = 0;
 
-    virtual void setOverflowBlock(int slot) = 0;
+    // The arguments past the registers, in the block of slots from `slot` on,
+    // one each in order, with their kinds: a target that hands over the
+    // block's address ignores the kinds, one that lays them out as its ABI
+    // does needs them.
+    virtual void setOverflowBlock(int slot, const std::vector<Slot> &kinds) = 0;
     virtual void spillOverflowArgument(Slot kind, int index, int slot) = 0;
 
     virtual void spillArgument(Slot kind, int registerIndex, int slot) = 0;

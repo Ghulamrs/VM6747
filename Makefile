@@ -144,7 +144,7 @@ test: all
 	SHC="$(abspath $(SHC))" ./tests/run.sh
 # The fourth target's corpus on the emulator, with the runtime cxx1i built.
 test-tms6747: tms6747
-	SHC="$(abspath $(SHC))" VM="$(abspath $(BINDIR))/vm6747.exe" \
+	SHC="$(abspath $(SHC))" VM="$(abspath $(BINDIR))/vm6747.exe" CC1="$(abspath $(BINDIR))/cc1i.exe" \
 	    RUNTIME="$(abspath $(TMS_RUNTIME_DIR))" ./tests/tms6747.sh
 # The examples too, because they were not built by anything and rotted: eight
 # of the twelve stopped compiling when `uses` landed and nothing said so. They
