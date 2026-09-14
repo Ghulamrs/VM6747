@@ -27,6 +27,10 @@ int *_errno(void);
 #elif defined(__APPLE__)
 int *__error(void);
 #define errno (*__error())
+#elif defined(__TMS320C6X__)
+/* TI's spelling under the EABI, and the VM6747 emulator answers to it. */
+int *__c6xabi_errno_addr(void);
+#define errno (*__c6xabi_errno_addr())
 #else
 /* glibc's spelling, and the VM6747 emulator answers to the same name. */
 int *__errno_location(void);
