@@ -49,6 +49,8 @@ private:
     uint32_t streamNumber(Cpu &cpu, uint32_t stream);   // &_ftable[n] -> 1, 2, 3
     uint32_t handlers_[32] = { 0 };
     uint32_t errno_ = 0;
+    bool closed_[3] = { false, false, false };   // close(0..2): what a closed standard stream swallows
+    FILE *host(int fd) const;                    // stdout or stderr for fd 1 or 2, null once closed
     struct AtExit { uint32_t fn, arg; };
     std::vector<AtExit> atExit_;
     uint32_t dynamicCast(Cpu &cpu, uint32_t sub, uint32_t src, uint32_t dst);

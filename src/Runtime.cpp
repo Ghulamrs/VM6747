@@ -231,9 +231,15 @@ void Runtime::runAtExit(Cpu &cpu) {
     atExit_.clear();
 }
 
+FILE *Runtime::host(int fd) const {
+    if (fd < 1 || fd > 2 || closed_[fd]) return nullptr;
+    return fd == 1 ? stdout : stderr;
+}
+// With no reason given it ends as abort does, silently: what a terminate
+// scope in the tables asks for, and what the hosts' pads do.
 void Runtime::terminate(Cpu &cpu, const char *why) {
     std::fflush(stdout);
-    std::fprintf(stderr, "vm6747: terminate called: %s\n", why);
+    if (why != nullptr) std::fprintf(stderr, "vm6747: terminate called: %s\n", why);
     cpu.exitWith(134);
     // exitWith stops the run; nothing after a terminate may continue.
     std::exit(134);
@@ -431,7 +437,7 @@ void Runtime::throwFrom(Cpu &c, uint32_t obj, uint32_t pc, uint32_t fp, uint32_t
         for (uint32_t at = descriptors(*x); readDescriptor(c, at, x->func, d); at = d.next) {
             if (d.kind == 1) c.fault("an exception specification descriptor, which this runtime does not read");
             if (d.kind != 2 || p < d.begin || p >= d.end) continue;
-            if (d.rtti == 0xfffffffeu) terminate(c, "an exception reached a scope that terminates");
+            if (d.rtti == 0xfffffffeu) terminate(c, nullptr);      // the scope's word: end, as abort would
             uint32_t adj = obj;                                    // what catch (...) receives
             if (d.rtti == 0xffffffffu || matches(c, obj, e->ti, d.rtti, adj)) {
                 e->barrierFp = f; e->barrierDesc = at; e->adjusted = adj;
@@ -478,7 +484,7 @@ std::vector<std::string> Runtime::names() {
         "fgetc", "getc", "getchar", "fgets", "fread", "ftell", "fseek", "rewind", "feof", "remove",
         "perror", "ferror", "clearerr", "__errno_location", "__c6xabi_errno_addr", "__assert_fail", "__assert_rtn", "_assert", "__c6xabi_abort_msg",
         "sscanf", "fscanf", "ungetc",
-        "exit", "abort", "atexit", "malloc", "calloc", "realloc", "free",
+        "exit", "abort", "atexit", "close", "malloc", "calloc", "realloc", "free",
         "memcpy", "memmove", "memset", "memcmp", "memchr",
         "strlen", "strcpy", "strncpy", "strcat", "strncat", "strcmp", "strncmp", "strchr", "strrchr",
         "strstr", "strpbrk", "strspn", "strcspn", "strtok", "strerror", "strdup",
@@ -513,20 +519,21 @@ std::vector<std::string> Runtime::names() {
 
 bool Runtime::call(const std::string &n, Cpu &c) {
     // ---- output ----
-    if (n == "putchar") { std::putchar(static_cast<int>(arg(c, 0))); ret(c, arg(c, 0) & 0xff); return true; }
-    if (n == "puts") { std::fputs(c.readString(arg(c, 0)).c_str(), stdout); std::putchar('\n'); ret(c, 1); return true; }
+    if (n == "putchar") { if (host(1)) std::putchar(static_cast<int>(arg(c, 0))); ret(c, arg(c, 0) & 0xff); return true; }
+    if (n == "puts") { if (host(1)) { std::fputs(c.readString(arg(c, 0)).c_str(), stdout); std::putchar('\n'); } ret(c, 1); return true; }
+    if (n == "close") { uint32_t fd = arg(c, 0); if (fd <= 2) closed_[fd] = true; ret(c, fd <= 2 ? 0 : static_cast<uint32_t>(-1)); return true; }
     if (n == "printf") {
         Args a = { c, variadicAt(c, 1) };
         std::string fmt = c.readString(a.word());
         std::string s = format(c, fmt, a);
-        std::fwrite(s.data(), 1, s.size(), stdout);
+        if (host(1)) std::fwrite(s.data(), 1, s.size(), stdout);
         ret(c, static_cast<uint32_t>(s.size()));
         return true;
     }
     if (n == "vprintf") {
         Args a = { c, arg(c, 1) };
         std::string s = format(c, c.readString(arg(c, 0)), a);
-        std::fwrite(s.data(), 1, s.size(), stdout);
+        if (host(1)) std::fwrite(s.data(), 1, s.size(), stdout);
         ret(c, static_cast<uint32_t>(s.size()));
         return true;
     }
@@ -551,8 +558,8 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         Args a = n[0] == 'v' ? Args{ c, arg(c, 2) } : Args{ c, variadicAt(c, 2) };
         std::string fmt = c.readString(n[0] == 'v' ? arg(c, 1) : a.word());
         std::string s = format(c, fmt, a);
-        FILE *f = stream == 2 ? stdout : stream == 3 ? stderr : nullptr;
-        if (f == nullptr && stream >= 4 && stream - 4 < files_.size()) { files_[stream - 4].data += s; }
+        FILE *f = stream == 2 || stream == 3 ? host(static_cast<int>(stream) - 1) : nullptr;
+        if (stream >= 4 && stream - 4 < files_.size()) { files_[stream - 4].data += s; }
         else if (f != nullptr) std::fwrite(s.data(), 1, s.size(), f);
         ret(c, static_cast<uint32_t>(s.size()));
         return true;
@@ -563,8 +570,7 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         if (n == "fputs") s = c.readString(arg(c, 0));
         else if (n == "fwrite") { uint32_t k = arg(c, 1) * arg(c, 2); for (uint32_t i = 0; i < k; i++) s += static_cast<char>(c.load8(arg(c, 0) + i)); }
         else s = std::string(1, static_cast<char>(arg(c, 0)));
-        if (stream == 2) std::fwrite(s.data(), 1, s.size(), stdout);
-        else if (stream == 3) std::fwrite(s.data(), 1, s.size(), stderr);
+        if (stream == 2 || stream == 3) { if (host(static_cast<int>(stream) - 1)) std::fwrite(s.data(), 1, s.size(), host(static_cast<int>(stream) - 1)); }
         else if (stream >= 4 && stream - 4 < files_.size()) files_[stream - 4].data += s;
         ret(c, n == "fwrite" ? arg(c, 2) : n == "fputs" ? 1 : (arg(c, 0) & 0xff));
         return true;
