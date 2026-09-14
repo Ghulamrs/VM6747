@@ -2,6 +2,8 @@
 
 #include "Emitter.h"
 
+#include <set>
+
 namespace shalimar {
 
 // The TMS320C6747 (C6000) as the Shalimar compiler's fourth target: C6000
@@ -62,6 +64,9 @@ private:
     size_t prologueMark_ = 0;
     int returns_ = 0;
     int globalSlots_ = 0;
+    // The TI assembler wants an undefined name declared: what was called,
+    // less what this file defines, is `.ref`ed when the module ends.
+    std::set<std::string> called_, defined_;
 
     // A constant into a register, MVKL then MVKH - the only way to a 32-bit value.
     void constant(const std::string &reg, int32_t value);

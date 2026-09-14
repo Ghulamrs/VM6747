@@ -21,6 +21,8 @@ void Tms6747Emitter::endModule() {
         raw("\t.sect\t\".const\"");
         text_ += data_;
     }
+    for (const std::string &name : called_)
+        if (!defined_.count(name)) raw("\t.ref\t" + symbol(name));
     blank();
 }
 
@@ -63,6 +65,7 @@ void Tms6747Emitter::beginFunction(const std::string &name) {
     blank();
     raw("\t.global\t" + symbol(name));
     raw(symbol(name) + ":");
+    defined_.insert(name);
     prologueMark_ = text_.size();
 }
 
@@ -145,6 +148,7 @@ void Tms6747Emitter::call(const std::string &name) {
     instruction("B\t" + symbol(name));
     instruction("NOP\t5");
     raw(back + ":");
+    called_.insert(name);
 }
 
 void Tms6747Emitter::loadSlotAddress(int slot) {
