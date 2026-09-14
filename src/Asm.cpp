@@ -9,7 +9,7 @@
 
 namespace {
 
-enum Section { Text, Data, Const, Bss, Init, Eh, SectionCount };
+enum Section { Text, Data, Const, Bss, Init, Eh, Exidx, SectionCount };
 
 struct Sym { int section; uint32_t offset; bool defined = false; bool weak = false; };
 
@@ -28,14 +28,14 @@ struct Unit {
     std::map<std::string, Sym> locals;
     std::vector<std::string> exported;      // .global / .weak names
     std::vector<std::string> weak;
-    uint32_t size[SectionCount] = { 0, 0, 0, 0, 0, 0 };
-    uint32_t base[SectionCount] = { 0, 0, 0, 0, 0, 0 };
+    uint32_t size[SectionCount] = { 0, 0, 0, 0, 0, 0, 0 };
+    uint32_t base[SectionCount] = { 0, 0, 0, 0, 0, 0, 0 };
     // The largest alignment a section asked for. The first pass aligns
     // offsets within the section and the second aligns addresses, and the
     // two agree only if the section's base is aligned at least this much:
     // a `.align 64` in a section placed at 8 put a label 16 bytes from its
     // bytes, and the object read as zero.
-    uint32_t align[SectionCount] = { 8, 8, 8, 8, 8, 8 };
+    uint32_t align[SectionCount] = { 8, 8, 8, 8, 8, 8, 8 };
 };
 
 struct Assembler {
@@ -174,6 +174,18 @@ struct Assembler {
         return false;
     }
     // Evaluate in pass two; in pass one only the shape is checked.
+    // TI's relocation operators - $EXIDX_FUNC(f), $EXIDX_EXTAB("t"),
+    // $EXTAB_LP(l), $EXTAB_RTTI(t), $EXTAB_SCOPE(l) - are the symbol's
+    // address here, where nothing is relative: the name inside, unquoted.
+    static std::string tiOperator(const std::string &term) {
+        if (term.empty() || term[0] != '$' || term.back() != ')') return term;
+        size_t open = term.find('(');
+        if (open == std::string::npos) return term;
+        std::string inner = term.substr(open + 1, term.size() - open - 2);
+        if (inner.size() >= 2 && inner[0] == '"' && inner.back() == '"') inner = inner.substr(1, inner.size() - 2);
+        return inner;
+    }
+
     bool evaluate(const Unit &u, const Line &ln, const std::string &expr,
                   bool resolve, long long &value, bool *hadSymbol = nullptr) {
         std::string s = trim(expr);
@@ -189,7 +201,7 @@ struct Assembler {
             size_t j = i;
             if (s[j] == '\'') { j = s.find('\'', j + 1); j = j == std::string::npos ? s.size() : j + 1; }
             else while (j < s.size() && s[j] != '+' && s[j] != '-' && !std::isspace(static_cast<unsigned char>(s[j]))) j++;
-            std::string term = s.substr(i, j - i);
+            std::string term = tiOperator(s.substr(i, j - i));
             long long v;
             if (number(term, v)) {
                 value += sign * v;
@@ -318,6 +330,8 @@ struct Assembler {
                     else if (n == ".bss" || n == ".far") sec = Bss;
                     else if (n == ".init_array") sec = Init;
                     else if (n == ".vm6747.eh") sec = Eh;
+                    else if (n.compare(0, 13, ".c6xabi.exidx") == 0) sec = Exidx;
+                    else if (n.compare(0, 13, ".c6xabi.extab") == 0) sec = Const;
                     else if (n.compare(0, 5, ".text") == 0) sec = Text;
                     else return fail(u, ln, "unknown section '" + n + "'");
                 } else if (m == ".global" || m == ".globl" || m == ".def" || m == ".ref") {
@@ -346,8 +360,8 @@ struct Assembler {
                     u.size[sec] = alignUp(u.size[sec], static_cast<uint32_t>(a));
                     if (!ln.label.empty()) u.locals[ln.label].offset = u.size[sec];
                 } else if (m == ".byte" || m == ".char") u.size[sec] += static_cast<uint32_t>(ln.operands.size());
-                else if (m == ".short" || m == ".half") u.size[sec] += 2 * static_cast<uint32_t>(ln.operands.size());
-                else if (m == ".word" || m == ".long" || m == ".int") u.size[sec] += 4 * static_cast<uint32_t>(ln.operands.size());
+                else if (m == ".short" || m == ".half" || m == ".uhalf") u.size[sec] += 2 * static_cast<uint32_t>(ln.operands.size());
+                else if (m == ".word" || m == ".long" || m == ".int" || m == ".ulong") u.size[sec] += 4 * static_cast<uint32_t>(ln.operands.size());
                 else if (m == ".space" || m == ".bes") {
                     long long n;
                     if (ln.operands.empty() || !evaluate(u, ln, ln.operands[0], false, n)) return fail(u, ln, m + " needs a count");
@@ -364,7 +378,7 @@ struct Assembler {
                     if (!evaluate(u, ln, ln.operands[1], false, v)) return false;
                     Sym s; s.section = -1; s.offset = static_cast<uint32_t>(v); s.defined = true;
                     u.locals[ln.operands[0]] = s;
-                } else if (m == ".end" || m == ".file" || m == ".clink" || m == ".nocmp" ||
+                } else if (m == ".end" || m == ".file" || m == ".clink" || m == ".nocmp" || m == ".symdepend" ||
                            m == ".compiler_opts" || m == ".asg" || m == ".retain" ||
                            m == ".ident" || m == ".p2align" || m == ".size" || m == ".type") {
                     // nothing
@@ -414,14 +428,15 @@ struct Assembler {
                     std::string n = ln.operands[0];
                     if (n.size() >= 2 && n[0] == '"') n = n.substr(1, n.size() - 2);
                     sec = n.compare(0, 5, ".text") == 0 ? Text : (n == ".data" || n == ".fardata") ? Data
-                        : (n == ".bss" || n == ".far") ? Bss : n == ".init_array" ? Init : n == ".vm6747.eh" ? Eh : Const;
+                        : (n == ".bss" || n == ".far") ? Bss : n == ".init_array" ? Init : n == ".vm6747.eh" ? Eh
+                        : n.compare(0, 13, ".c6xabi.exidx") == 0 ? Exidx : Const;
                 } else if (mn == ".align") {
                     long long a = 4;
                     if (!ln.operands.empty()) evaluate(u, ln, ln.operands[0], true, a);
                     at[sec] = alignUp(at[sec], static_cast<uint32_t>(a));
-                } else if (mn == ".byte" || mn == ".char" || mn == ".short" || mn == ".half" ||
-                           mn == ".word" || mn == ".long" || mn == ".int") {
-                    int w = (mn == ".byte" || mn == ".char") ? 1 : (mn == ".short" || mn == ".half") ? 2 : 4;
+                } else if (mn == ".byte" || mn == ".char" || mn == ".short" || mn == ".half" || mn == ".uhalf" ||
+                           mn == ".word" || mn == ".long" || mn == ".int" || mn == ".ulong") {
+                    int w = (mn == ".byte" || mn == ".char") ? 1 : (mn == ".short" || mn == ".half" || mn == ".uhalf") ? 2 : 4;
                     for (const std::string &o : ln.operands) {
                         long long v;
                         if (!evaluate(u, ln, o, true, v)) return false;
@@ -526,6 +541,7 @@ struct Assembler {
         for (const Unit &u : units) {
             prog.initArray.push_back(std::make_pair(u.base[Init], u.size[Init]));
             prog.ehTables.push_back(std::make_pair(u.base[Eh], u.size[Eh]));
+            prog.exidxTables.push_back(std::make_pair(u.base[Exidx], u.size[Exidx]));
         }
         if (prog.dataEnd > layout.memoryBytes / 2) { error = "the program does not fit in memory"; return false; }
         for (Unit &u : units) if (!passTwo(u)) return false;

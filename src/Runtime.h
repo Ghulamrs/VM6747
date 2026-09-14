@@ -58,9 +58,14 @@ private:
     struct EhType { uint32_t ti; int index; };
     struct EhRow { uint32_t begin, end, pad, frame; bool cleanup; std::vector<EhType> types; };
     std::vector<EhRow> ehRows_;
+    // TI's exception index, one entry per function: its address and the
+    // frame's compact unwind word, sorted so a return address finds its own.
+    struct ExidxEntry { uint32_t func, word; };
+    std::vector<ExidxEntry> exidx_;
     bool ehLoaded_ = false;
     void loadEhRows(Cpu &cpu);
     const EhRow *rowFor(uint32_t pc) const;
+    bool callerOf(Cpu &cpu, uint32_t pc, uint32_t fp, uint32_t &callerPc, uint32_t &callerFp);
     struct Exc {
         uint32_t obj = 0, ti = 0, dtor = 0, adjusted = 0;
         int handlers = 0;          // __cxa_begin_catch calls outstanding

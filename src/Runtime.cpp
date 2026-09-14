@@ -1,6 +1,7 @@
 #include "Runtime.h"
 #include "Cpu.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
@@ -306,8 +307,7 @@ uint32_t Runtime::dynamicCast(Cpu &c, uint32_t sub, uint32_t src, uint32_t dst) 
 // The compiler writes one row per call-site range into .vm6747.eh: begin,
 // end, pad, the frame's size, a cleanup flag, the handler count, then each
 // handler's typeinfo (0 for catch (...)) and selector index. A throw walks
-// the frames from the thrower - each frame's return address is at fp + 4
-// and its caller's fp at fp, the shape every function with a call keeps -
+// the frames from the thrower - each through its function's index entry -
 // twice: first to find a handler, so an uncaught exception terminates
 // without unwinding, then to land on every cleanup pad on the way and on
 // the handler with its selector. Landing is a return to the pad: A15 is the
@@ -316,6 +316,13 @@ uint32_t Runtime::dynamicCast(Cpu &c, uint32_t sub, uint32_t src, uint32_t dst) 
 void Runtime::loadEhRows(Cpu &c) {
     if (ehLoaded_) return;
     ehLoaded_ = true;
+    const std::vector<std::pair<uint32_t, uint32_t> > &index = c.program().exidxTables;
+    for (size_t t = 0; t < index.size(); t++)
+        for (uint32_t at = index[t].first; at + 8 <= index[t].first + index[t].second; at += 8) {
+            ExidxEntry e; e.func = c.load32(at); e.word = c.load32(at + 4);
+            exidx_.push_back(e);
+        }
+    std::sort(exidx_.begin(), exidx_.end(), [](const ExidxEntry &a, const ExidxEntry &b) { return a.func < b.func; });
     const std::vector<std::pair<uint32_t, uint32_t> > &tables = c.program().ehTables;
     for (size_t t = 0; t < tables.size(); t++) {
         uint32_t at = tables[t].first, end = at + tables[t].second;
@@ -337,6 +344,23 @@ void Runtime::loadEhRows(Cpu &c) {
 const Runtime::EhRow *Runtime::rowFor(uint32_t pc) const {
     for (const EhRow &r : ehRows_) if (pc >= r.begin && pc < r.end) return &r;
     return nullptr;
+}
+// The frame above (pc, fp), read the way TI's unwinder would: the index
+// entry for pc, compact form pr3 with SP restored from A15, then the saved
+// registers a word each below A15 in the bitmask's order - A15 first, B3
+// after the B-file registers - which is where this frame's B3 and the
+// caller's A15 are. False when pc has no entry, which ends the walk.
+bool Runtime::callerOf(Cpu &c, uint32_t pc, uint32_t fp, uint32_t &callerPc, uint32_t &callerFp) {
+    const ExidxEntry *e = nullptr;
+    for (const ExidxEntry &x : exidx_) { if (x.func > pc) break; e = &x; }
+    if (e == nullptr || (e->word >> 24) != 0x83 || (e->word >> 17 & 0x7f) != 0x7f) return false;
+    uint32_t mask = e->word >> 4 & 0x1fff;
+    if ((mask & 1u << 12) == 0 || (mask & 1u << 5) == 0) return false;    // A15 and B3 saved
+    int before = 0;
+    for (int bit = 12; bit > 5; bit--) if (mask & 1u << bit) before++;   // A15, B15-B10
+    callerFp = c.load32(fp);
+    callerPc = c.load32(fp - 4 * static_cast<uint32_t>(before));
+    return true;
 }
 Runtime::Exc *Runtime::excFor(uint32_t obj) {
     for (Exc &e : excs_) if (e.obj == obj) return &e;
@@ -395,7 +419,7 @@ void Runtime::throwFrom(Cpu &c, uint32_t obj, uint32_t pc, uint32_t fp) {
                 uint32_t adj;
                 if (matches(c, obj, e->ti, t.ti, adj)) { e->handlerFp = f; e->selector = t.index; e->adjusted = adj; goto found; }
             }
-        p = c.load32(f + 4); f = c.load32(f);
+        if (!callerOf(c, p, f, p, f)) break;
     }
     terminate(c, "an exception was not caught");
 found:
@@ -411,7 +435,7 @@ void Runtime::unwindTo(Cpu &c, Exc &e, uint32_t pc, uint32_t fp) {
             if (f == e.handlerFp) { land(c, *r, f, e.obj, e.selector); return; }
             if (r->cleanup) { land(c, *r, f, e.obj, 0); return; }
         }
-        p = c.load32(f + 4); f = c.load32(f);
+        if (!callerOf(c, p, f, p, f)) break;
     }
     c.fault("the unwinder ran past the handler frame");
 }
@@ -985,8 +1009,10 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         uint32_t obj = arg(c, 0);
         Exc *e = excFor(obj);
         if (e == nullptr) c.fault("_Unwind_Resume of an unknown exception");
-        uint32_t fp = c.reg(Cpu::A15);
-        unwindTo(c, *e, c.load32(fp + 4), c.load32(fp));
+        // The pad's function is B3's, its frame A15's; carry on above it.
+        uint32_t pc, fp;
+        if (!callerOf(c, c.reg(Cpu::B3), c.reg(Cpu::A15), pc, fp)) c.fault("_Unwind_Resume from a frame without an index entry");
+        unwindTo(c, *e, pc, fp);
         return true;
     }
     if (n == "__cxa_begin_catch") {

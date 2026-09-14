@@ -48,6 +48,7 @@ struct Program {
     std::map<std::string, uint32_t> natives; // name -> stub address
     std::vector<std::pair<uint32_t, uint32_t> > initArray;   // each unit's .init_array: base, bytes
     std::vector<std::pair<uint32_t, uint32_t> > ehTables;    // each unit's .vm6747.eh: base, bytes
+    std::vector<std::pair<uint32_t, uint32_t> > exidxTables; // each unit's .c6xabi.exidx: base, bytes
 };
 
 // Little-endian access to the flat memory, bounds-checked by the caller.
