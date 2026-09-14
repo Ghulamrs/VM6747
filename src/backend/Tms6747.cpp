@@ -189,7 +189,7 @@ void Tms6747::spAdjust(int delta) {
     }
 }
 
-static const int kSaveBytes = 24;   // under A15 whatever is saved, so a local's address does not wait on the body
+static const int kSaveBytes = 40;   // under A15 whatever is saved, so a local's address does not wait on the body
 
 // dst = A15 - kSaveBytes - off, past the saved registers; the stack
 // parameters lie at A15 + 4 on. dst is an A-file register.
@@ -863,26 +863,18 @@ void Tms6747::visit(const Call &n) {
     }
     int onStack = static_cast<int>(args.size() - inRegs);
 
-    // The area under the call: the reserved word, then the stack arguments,
-    // a word each and a double at the next 8-byte boundary. Opened even for a
-    // call with none, so that a value an enclosing expression has pushed is
-    // not what sits at *B15 during the call.
+    // The area under the call: the reserved word, then the stack arguments
+    // each where stackArg puts it. Opened even for a call with none, so a
+    // value an enclosing expression pushed is not what sits at *B15.
     std::vector<int> at(onStack);
     int end = 4;
-    for (int k = 0; k < onStack; k++) {
-        const Type *t = args[inRegs + k]->type();
-        bool wide = isWide(t) || inPairWide(t);
-        if (wide) end = align8(end);
-        at[k] = end;
-        end += wide ? 8 : 4;
-    }
+    for (int k = 0; k < onStack; k++) at[k] = stackArg(args[inRegs + k]->type(), end);
     int area = align8(end);
     spAdjust(-area);
     for (int k = 0; k < onStack; k++) {
-        const Type *t = args[inRegs + k]->type();
         genArg(n, inRegs + k);
         regAdd("B15", at[k], "B0");
-        out_ << (isWide(t) || inPairWide(t) ? "\tSTDW\tA5:A4, *B0\n" : "\tSTW\tA4, *B0\n");
+        out_ << stackArgAccess(args[inRegs + k]->type(), true, "B0");
     }
 
     if (n.callee() != nullptr) {
@@ -901,6 +893,8 @@ void Tms6747::visit(const Call &n) {
         for (std::size_t i = inRegs - 1; i-- > 0; ) popValue(args[i]->type(), abi_.intRegs[i]);
     }
     if (inRegs > 6) usesSavedArgRegs_ = true;  // A10, B10, A12, B12 are callee-saved
+    for (std::size_t i = 6; i < inRegs; i++)   // and so are the partners a 64-bit argument writes
+        if (isWide(args[i]->type()) || inPairWide(args[i]->type())) usesSavedPairRegs_ = true;
     if (n.callee() != nullptr) pop("B1");
     if (sret) localAddr(n.resultSlot(), "A3");    // where the result goes
 
@@ -918,12 +912,31 @@ void Tms6747::visit(const Call &n) {
 // variadic function's unnamed arguments begin.
 int Tms6747::stackParamOffset(const std::vector<Param> &ps, std::size_t i) {
     int end = 4;
-    for (std::size_t k = firstStack_; k <= i; k++) {
-        if (k < ps.size() && (isWide(ps[k].type) || inPairWide(ps[k].type))) end = align8(end);
-        if (k == i) return end;
-        end += (isWide(ps[k].type) || inPairWide(ps[k].type)) ? 8 : 4;
-    }
-    return end;
+    for (std::size_t k = firstStack_; k < i; k++) stackArg(ps[k].type, end);
+    return i < ps.size() ? stackArg(ps[i].type, end) : end;
+}
+// Where the next stack argument of type t sits, as cl6x places it: a scalar
+// at its own alignment in its own size (a char and a short pack), a struct of
+// 8 bytes or less in a word or an 8-aligned doubleword, a larger one a word.
+int Tms6747::stackArg(const Type *t, int &end) {
+    int size, align;
+    if (isWide(t) || inPairWide(t)) { size = 8; align = 8; }
+    else if (t->isStructOrUnion() || t->isArray()) { size = 4; align = 4; }
+    else { size = t->size(target_); align = size; }
+    end = (end + align - 1) / align * align;
+    const int at = end;
+    end += size;
+    return at;
+}
+// The load or store of a stack argument of type t at *reg, in its own size.
+std::string Tms6747::stackArgAccess(const Type *t, bool store, const char *reg) {
+    if (isWide(t) || inPairWide(t)) return std::string(store ? "\tSTDW\tA5:A4, *" : "\tLDDW\t*") + reg + (store ? "\n" : ", A5:A4\n\tNOP\t4\n");
+    int sz = t->isStructOrUnion() || t->isArray() ? 4 : t->size(target_);
+    bool sign = !t->isStructOrUnion() && !t->isArray() && t->isSigned(target_);
+    const char *op = store ? (sz == 1 ? "STB" : sz == 2 ? "STH" : "STW")
+                           : (sz == 1 ? (sign ? "LDB" : "LDBU") : sz == 2 ? (sign ? "LDH" : "LDHU") : "LDW");
+    if (store) return std::string("\t") + op + "\tA4, *" + reg + "\n";
+    return std::string("\t") + op + "\t*" + reg + ", A4\n\tNOP\t4\n";
 }
 
 // Argument i into A4: its value, or for a struct the address of its copy.
@@ -1041,6 +1054,13 @@ void Tms6747::emitGlobal(const Global &g, Segment seg) {
         out_ << "\t.bss\t" << g.name << ", " << size << ", " << align << "\n";
         return;
     }
+    // **A scalar goes where TI's code can reach it through DP**: `.neardata`
+    // or `.rodata`, as cl6x places every scalar; an aggregate stays in
+    // `.data`/`.const`, which TI reaches by absolute address (measured).
+    const bool scalar = !g.type->isStructOrUnion() && !g.type->isArray();
+    const bool constant = seg == Segment::Const || seg == Segment::ConstRelocated;
+    if (scalar) out_ << (constant ? "\t.sect\t\".rodata\"\n" : "\t.sect\t\".neardata\", RW\n");
+    else        out_ << (constant ? "\t.sect\t\".const\"\n" : "\t.data\n");
 
     if (align > 1) out_ << "\t.align\t" << align << "\n";
     out_ << g.name << ":\n";
@@ -1089,22 +1109,10 @@ void Tms6747::emitData(const Program &program) {
         }
     }
 
-    struct Bucket { Segment seg; const char *open; };
-    const Bucket order[] = {
-        { Segment::Const,          "\t.sect\t\".const\"\n" },
-        { Segment::ConstRelocated, "\t.sect\t\".const\"\n" },
-        { Segment::Data,           "\t.data\n" },
-        { Segment::Bss,            nullptr },
-    };
-    for (const Bucket &b : order) {
-        bool opened = inConst && b.seg != Segment::Data;   // .const is open already
-        for (const Global &g : program.globals) {
-            if (segmentFor(g) != b.seg) continue;
-            if (!opened && b.open != nullptr) out_ << b.open;
-            opened = true;
-            emitGlobal(g, b.seg);
-        }
-    }
+    const Segment order[] = { Segment::Const, Segment::ConstRelocated, Segment::Data, Segment::Bss };
+    for (Segment seg : order)
+        for (const Global &g : program.globals)
+            if (segmentFor(g) == seg) emitGlobal(g, seg);   // each names its own section
 }
 
 // Parameters arrive in the argument registers and, from the eleventh, on the
@@ -1129,7 +1137,7 @@ void Tms6747::emitParams(const Function &fn) {
             // The caller's B15 was A15; its stack arguments start one word
             // above that.
             regAdd("A15", stackParamOffset(ps, i), "A0");
-            out_ << (isWide(t) || inPairWide(t) ? "\tLDDW\t*A0, A5:A4\n\tNOP\t4\n" : "\tLDW\t*A0, A4\n\tNOP\t4\n");
+            out_ << stackArgAccess(t, false, "A0");
         }
         if (inPair(t)) {
             // The value itself, into the parameter's slot, in its own bytes.
@@ -1157,9 +1165,15 @@ void Tms6747::emitParams(const Function &fn) {
 std::vector<std::string> Tms6747::savedRegs() const {
     std::vector<std::string> r;
     r.push_back("A15");
-    if (usesSavedArgRegs_) { r.push_back("B12"); r.push_back("B10"); }
+    if (usesSavedPairRegs_) r.push_back("B13");
+    if (usesSavedArgRegs_) r.push_back("B12");
+    if (usesSavedPairRegs_) r.push_back("B11");
+    if (usesSavedArgRegs_) r.push_back("B10");
     if (hasCall_) r.push_back("B3");
-    if (usesSavedArgRegs_) { r.push_back("A12"); r.push_back("A10"); }
+    if (usesSavedPairRegs_) r.push_back("A13");
+    if (usesSavedArgRegs_) r.push_back("A12");
+    if (usesSavedPairRegs_) r.push_back("A11");
+    if (usesSavedArgRegs_) r.push_back("A10");
     return r;
 }
 // The frame as the second word of TI's exception index entry (tdeh_pr_c6000):
@@ -1167,7 +1181,8 @@ std::vector<std::string> Tms6747::savedRegs() const {
 // A15, B15-B10, B3, A14-A10 from bit 12 down, and B3 the return register.
 unsigned Tms6747::unwindWord(bool needFrame) const {
     static const struct { const char *reg; int bit; } bits[] = {
-        { "A15", 12 }, { "B12", 8 }, { "B10", 6 }, { "B3", 5 }, { "A12", 2 }, { "A10", 0 } };
+        { "A15", 12 }, { "B13", 9 }, { "B12", 8 }, { "B11", 7 }, { "B10", 6 }, { "B3", 5 },
+        { "A13", 3 }, { "A12", 2 }, { "A11", 1 }, { "A10", 0 } };
     unsigned mask = 0;
     if (needFrame)
         for (const std::string &r : savedRegs())
@@ -1183,6 +1198,7 @@ void Tms6747::emitFunction(const Function &fn) {
     returnLabel_ = "L.return." + fn.name();
     hasCall_ = false;
     usesSavedArgRegs_ = false;
+    usesSavedPairRegs_ = false;
 
     sretSlot_ = fn.sretSlot();
 
@@ -1195,7 +1211,7 @@ void Tms6747::emitFunction(const Function &fn) {
         std::size_t named = fn.params().size();
         std::size_t last = named > 0 ? named - 1 : 0;
         if (last < firstStack_) firstStack_ = last;
-        vaStart_ = stackParamOffset(fn.params(), named);
+        vaStart_ = (stackParamOffset(fn.params(), named) + 3) / 4 * 4;   // a word past a packed char
     }
 
     // The body goes first, into its own text, because what it does decides the
