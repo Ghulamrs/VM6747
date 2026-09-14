@@ -250,6 +250,20 @@ bool sameType(Cpu &c, uint32_t a, uint32_t b) {
     if (a == b) return true;
     return c.readString(c.load32(a + 4)) == c.readString(c.load32(b + 4));
 }
+// Is `target` a public base of the class `ti` describes - asked of the types
+// alone, for a null pointer that has no object to walk.
+bool publicBase(Cpu &c, uint32_t ti, uint32_t target, int depth) {
+    if (depth > 64) return false;
+    if (sameType(c, ti, target)) return true;
+    uint32_t kind = c.load32(c.load32(ti));
+    if (kind == 2) return publicBase(c, c.load32(ti + 8), target, depth + 1);
+    if (kind != 3) return false;
+    uint32_t count = c.load32(ti + 12);
+    for (uint32_t i = 0; i < count; i++)
+        if ((c.load32(ti + 20 + 8 * i) & 2) != 0 && publicBase(c, c.load32(ti + 16 + 8 * i), target, depth + 1))
+            return true;
+    return false;
+}
 }
 
 uint32_t Runtime::dynamicCast(Cpu &c, uint32_t sub, uint32_t src, uint32_t dst) {
@@ -315,6 +329,27 @@ Runtime::Exc *Runtime::excFor(uint32_t obj) {
 // the adjusted pointer a handler for the base receives.
 bool Runtime::matches(Cpu &c, uint32_t obj, uint32_t thrownTi, uint32_t catchTi, uint32_t &adjusted) {
     if (catchTi == 0) { adjusted = obj; return true; }          // catch (...)
+    // A pointer thrown - the type_info's vtable says so - is matched by
+    // [except.handle]/3: the same pointee, a more qualified one, void, or a
+    // public base of a class pointee. What the handler receives is the
+    // pointer itself, adjusted to the base, which is what __cxa_begin_catch
+    // returns for a pointer on the real runtimes.
+    const uint32_t thrownKind = c.load32(c.load32(thrownTi)), catchKind = c.load32(c.load32(catchTi));
+    if (thrownKind == 5 && catchKind == 5) {
+        const uint32_t tFlags = c.load32(thrownTi + 8), cFlags = c.load32(catchTi + 8);
+        if ((tFlags & ~cFlags) != 0) return false;             // const may be added, not dropped
+        const uint32_t tPointee = c.load32(thrownTi + 12), cPointee = c.load32(catchTi + 12);
+        const uint32_t value = c.load32(obj);
+        if (c.readString(c.load32(cPointee + 4)) == "v") { adjusted = value; return true; }
+        if (sameType(c, tPointee, cPointee)) { adjusted = value; return true; }
+        if (value == 0) { adjusted = 0; return publicBase(c, tPointee, cPointee, 0); }
+        std::vector<Sub> subs;
+        walk(c, tPointee, value, true, subs, 0);
+        for (const Sub &s : subs)
+            if (s.pub && sameType(c, s.ti, cPointee)) { adjusted = s.addr; return true; }
+        return false;
+    }
+    if (thrownKind == 5 || catchKind == 5) return false;
     std::vector<Sub> subs;
     walk(c, thrownTi, obj, true, subs, 0);
     for (const Sub &s : subs)
