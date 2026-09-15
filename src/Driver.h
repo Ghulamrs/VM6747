@@ -9,6 +9,8 @@ class Driver {
 public:
     int run(int argc, char **argv);
 
+    static const char *bannerLine();
+
 private:
     struct Job {
         std::string input;
@@ -22,6 +24,7 @@ private:
     // Set when --version was answered, so run() leaves with 0 rather than
     // reporting a usage error the caller did not make.
     bool answered_ = false;
+    bool quiet_ = false;   // -nologo: leave out the start-of-compile banner
     bool toStdout_ = false;
     bool timing_ = false;
     bool assemblyOnly_ = false;

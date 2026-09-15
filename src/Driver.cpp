@@ -50,6 +50,9 @@ const std::size_t kThreadFrom = 4;
 // program calls, which asked nothing new of the compiler itself.
 const char *cc1Version() { return "1.1"; }
 
+// The line printed before each compile and by --version. `-nologo` omits it.
+const char *Driver::bannerLine() { return "©2026 G. R. Akhtar - ISO C 90"; }
+
 void Driver::usage(char *file) {
     std::fprintf(stderr,
         "cc1 %s - an ANSI C compiler\n"
@@ -498,13 +501,15 @@ bool Driver::parseArguments(int argc, char **argv) {
         } else if (std::strcmp(argv[i], "-c") == 0) {
             objectOnly_ = true;
         } else if (std::strcmp(argv[i], "--version") == 0) {
-            std::printf("cc1 %s\n", cc1Version());
+            std::printf("%s\n", bannerLine());
             answered_ = true;
             return false;
         } else if (std::strcmp(argv[i], "-time") == 0) {
             timing_ = true;
         } else if (std::strcmp(argv[i], "-g") == 0) {
             debug_ = true;
+        } else if (std::strcmp(argv[i], "-nologo") == 0) {
+            quiet_ = true;
         } else if (argv[i][0] == '-' && argv[i][1] != '\0') {
             std::fprintf(stderr, "%s: unknown option %s\n", argv[0], argv[i]);
             return false;
@@ -516,6 +521,25 @@ bool Driver::parseArguments(int argc, char **argv) {
     if (CC1_INCLUDE_DIR[0] != '\0') searchPath_.push_back(CC1_INCLUDE_DIR);
 
     if (inputs.empty()) { usage(argv[0]); return false; }
+
+    // **A C++ suffix is turned away by name, not by a parse error.** cc1 reads
+    // C; handed a .cpp it used to lex `virtual`, `class` or `::` as ordinary C
+    // and stop with something like "expected a type", which reads as a fault in
+    // the file rather than the file being the wrong language. Say so plainly and
+    // point at cxx1, the C++ compiler of this line.
+    for (std::size_t k = 0; k < inputs.size(); ++k) {
+        std::size_t dot = inputs[k].rfind('.');
+        if (dot == std::string::npos) continue;
+        std::string suffix = inputs[k].substr(dot);
+        if (suffix == ".cpp" || suffix == ".cc" || suffix == ".cxx" ||
+            suffix == ".C" || suffix == ".hpp" || suffix == ".hh" || suffix == ".hxx") {
+            std::fprintf(stderr,
+                "%s: %s looks like C++ (%s), and cc1 compiles C, not C++ - "
+                "compile it with cxx1\n",
+                argv[0], inputs[k].c_str(), suffix.c_str());
+            return false;
+        }
+    }
 
     if (debug_ && !backend_->emitsLineTable()) {
         std::fprintf(stderr,
@@ -728,6 +752,10 @@ int Driver::run(int argc, char **argv) {
     // Both used to be 1, which is why a script asking three compilers their
     // versions stopped at the first one.
     if (!parseArguments(argc, argv)) return answered_ ? 0 : 1;
+
+    // **Before each compile, once the arguments are known good.** The C++
+    // compiler of this line prints its banner the same way; -nologo omits it.
+    if (!quiet_) std::fprintf(stderr, "%s\n", bannerLine());
 
     std::atexit([] {
         std::vector<std::string> &names = temporaryNames();
