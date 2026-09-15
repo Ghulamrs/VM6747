@@ -78,6 +78,10 @@ int main(int argc, char **argv) {
             std::printf("usage: vm6747 [-t] [-m megabytes] file.s ... [-- args]\n");
             return 0;
         }
+        if (a == "--version") {
+            std::printf("\xc2\xa9" "2026 G. R. Akhtar - VM6747 (C6000 emulator) 1.0\n");
+            return 0;
+        }
         if (isDirectory(a)) {
             std::vector<std::string> inside = assemblyIn(a);
             if (inside.empty()) { std::fprintf(stderr, "vm6747: no .s files in %s\n", a.c_str()); return 2; }
