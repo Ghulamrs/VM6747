@@ -73,7 +73,25 @@
 		2E28904CB2FC6961A2D0F42E /* src/backend/X86_64Linux.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/X86_64Linux.h; sourceTree = "<group>"; };
 		A26C2E36CB65E5A3BDE3B768 /* src/backend/X86_64Windows.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/backend/X86_64Windows.h; sourceTree = "<group>"; };
 		67AAF99CC753BFC75AAF3EAD /* shci.exe */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = shci.exe; sourceTree = BUILT_PRODUCTS_DIR; };
+		39639ADA9821E32E80B83258 /* cxx1i.exe.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = cxx1i.exe.xcodeproj; path = "../Compiler-Cppi/cxx1.xcodeproj"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXContainerItemProxy section */
+		7ECB5021E1C9D7A03BC1C5F8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 39639ADA9821E32E80B83258 /* cxx1i.exe.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = B0DEE53FB510C2BF164ECD03;
+			remoteInfo = cxx1i.exe;
+		};
+		239CA0FD22F1CC99C26BC928 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 39639ADA9821E32E80B83258 /* cxx1i.exe.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 9BDE0D6970DFE91E74C9FC29;
+			remoteInfo = cxx1i.exe;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		876AF45313F36F5DA47CF5F4 /* Frameworks */ = {
@@ -90,6 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				838969CE344FDAEB239F99BB /* Sources */,
+				39639ADA9821E32E80B83258 /* cxx1i.exe.xcodeproj */,
 				287B8F37C5D23BC16E0E80A2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -151,7 +170,25 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		DE1DE0B7B8F110077C3961EB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DD4AB28C5658160CCA7A4AEA /* cxx1i.exe */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
+
+/* Begin PBXReferenceProxy section */
+		DD4AB28C5658160CCA7A4AEA /* cxx1i.exe */ = {
+			isa = PBXReferenceProxy;
+			fileType = "compiled.mach-o.executable";
+			path = cxx1i.exe;
+			remoteRef = 7ECB5021E1C9D7A03BC1C5F8 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+/* End PBXReferenceProxy section */
 
 /* Begin PBXNativeTarget section */
 		E2B705156EA9B32DAB3E58FD /* shci.exe */ = {
@@ -166,6 +203,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				44FA8D4C6D426AF50575250F /* PBXTargetDependency */,
 			);
 			name = shci.exe;
 			productName = shci.exe;
@@ -173,6 +211,14 @@
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXTargetDependency section */
+		44FA8D4C6D426AF50575250F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = cxx1i.exe;
+			targetProxy = 239CA0FD22F1CC99C26BC928 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		8ADA952F0B98A5BB95E9E34E /* Project object */ = {
@@ -191,6 +237,12 @@
 			mainGroup = C79EF7AB2888DFC3020D4C3C;
 			productRefGroup = 287B8F37C5D23BC16E0E80A2 /* Products */;
 			projectDirPath = "";
+			projectReferences = (
+				{
+					ProductGroup = DE1DE0B7B8F110077C3961EB /* Products */;
+					ProjectRef = 39639ADA9821E32E80B83258 /* cxx1i.exe.xcodeproj */;
+				},
+			);
 			projectRoot = "";
 			targets = (
 				E2B705156EA9B32DAB3E58FD /* shci.exe */,
@@ -216,15 +268,22 @@
 				"$(SRCROOT)/runtime/Internal.h",
 				"$(SRCROOT)/runtime/Shortest.h",
 				"$(SRCROOT)/runtime/Debug.h",
+				"$(BUILT_PRODUCTS_DIR)/cxx1i.exe",
 			);
 			name = "the Shalimar runtime, beside shci.exe";
 			outputPaths = (
 				"$(BUILT_PRODUCTS_DIR)/lib/shmrt-arm64-darwin.a",
 				"$(BUILT_PRODUCTS_DIR)/lib/shmrt-arm64-darwin-debug.a",
+				"$(BUILT_PRODUCTS_DIR)/lib/shmrt-tms6747/Shortest.s",
+				"$(BUILT_PRODUCTS_DIR)/lib/shmrt-tms6747/Failure.s",
+				"$(BUILT_PRODUCTS_DIR)/lib/shmrt-tms6747/Numbers.s",
+				"$(BUILT_PRODUCTS_DIR)/lib/shmrt-tms6747/Array.s",
+				"$(BUILT_PRODUCTS_DIR)/lib/shmrt-tms6747/Console.s",
+				"$(BUILT_PRODUCTS_DIR)/lib/shmrt-tms6747/Runtime.s",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\ncxx=\"$(xcrun --find clang++)\"\nar=\"$(xcrun --find ar)\"\nflags=\"-std=c++14 -Wall -Wextra -Werror -pedantic -O2\"\nlib=\"$BUILT_PRODUCTS_DIR/lib\"\nmkdir -p \"$lib\"\nmkdir -p \"$DERIVED_FILE_DIR/runtime\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Shortest.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Shortest.o\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Failure.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Failure.o\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Numbers.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Numbers.o\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Array.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Array.o\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Console.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Console.o\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Runtime.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Runtime.o\"\nrm -f \"$lib/shmrt-arm64-darwin.a\"\n\"$ar\" rcs \"$lib/shmrt-arm64-darwin.a\" \"$DERIVED_FILE_DIR/runtime\"/*.o\nmkdir -p \"$DERIVED_FILE_DIR/runtime-debug\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Shortest.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Shortest.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Failure.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Failure.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Numbers.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Numbers.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Array.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Array.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Console.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Console.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Runtime.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Runtime.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Debug.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Debug.o\"\nrm -f \"$lib/shmrt-arm64-darwin-debug.a\"\n\"$ar\" rcs \"$lib/shmrt-arm64-darwin-debug.a\" \"$DERIVED_FILE_DIR/runtime-debug\"/*.o\n";
+			shellScript = "set -e\ncxx=\"$(xcrun --find clang++)\"\nar=\"$(xcrun --find ar)\"\nflags=\"-std=c++14 -Wall -Wextra -Werror -pedantic -O2\"\nlib=\"$BUILT_PRODUCTS_DIR/lib\"\nmkdir -p \"$lib\"\nmkdir -p \"$DERIVED_FILE_DIR/runtime\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Shortest.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Shortest.o\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Failure.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Failure.o\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Numbers.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Numbers.o\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Array.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Array.o\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Console.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Console.o\"\n\"$cxx\" $flags -c \"$SRCROOT/runtime/Runtime.cpp\" -o \"$DERIVED_FILE_DIR/runtime/Runtime.o\"\nrm -f \"$lib/shmrt-arm64-darwin.a\"\n\"$ar\" rcs \"$lib/shmrt-arm64-darwin.a\" \"$DERIVED_FILE_DIR/runtime\"/*.o\nmkdir -p \"$DERIVED_FILE_DIR/runtime-debug\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Shortest.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Shortest.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Failure.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Failure.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Numbers.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Numbers.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Array.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Array.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Console.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Console.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Runtime.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Runtime.o\"\n\"$cxx\" $flags -DSHM_DEBUG=1 -c \"$SRCROOT/runtime/Debug.cpp\" -o \"$DERIVED_FILE_DIR/runtime-debug/Debug.o\"\nrm -f \"$lib/shmrt-arm64-darwin-debug.a\"\n\"$ar\" rcs \"$lib/shmrt-arm64-darwin-debug.a\" \"$DERIVED_FILE_DIR/runtime-debug\"/*.o\ncxx1i=\"$BUILT_PRODUCTS_DIR/cxx1i.exe\"\ntest -x \"$cxx1i\" || { echo \"shc.xcodeproj: no cxx1i.exe beside the output - the C6000 runtime is its output\" >&2; exit 1; }\nrm -rf \"$lib/shmrt-tms6747\"\nmkdir -p \"$lib/shmrt-tms6747\"\n\"$cxx1i\" -S -arch tms6747 -nologo \"$SRCROOT/runtime/Shortest.cpp\" -o \"$lib/shmrt-tms6747/Shortest.s\"\n\"$cxx1i\" -S -arch tms6747 -nologo \"$SRCROOT/runtime/Failure.cpp\" -o \"$lib/shmrt-tms6747/Failure.s\"\n\"$cxx1i\" -S -arch tms6747 -nologo \"$SRCROOT/runtime/Numbers.cpp\" -o \"$lib/shmrt-tms6747/Numbers.s\"\n\"$cxx1i\" -S -arch tms6747 -nologo \"$SRCROOT/runtime/Array.cpp\" -o \"$lib/shmrt-tms6747/Array.s\"\n\"$cxx1i\" -S -arch tms6747 -nologo \"$SRCROOT/runtime/Console.cpp\" -o \"$lib/shmrt-tms6747/Console.s\"\n\"$cxx1i\" -S -arch tms6747 -nologo \"$SRCROOT/runtime/Runtime.cpp\" -o \"$lib/shmrt-tms6747/Runtime.s\"\n";
 		};
 		6691D8D0016767831EC71BFE /* put the finished program in RStudio's directory */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -239,7 +298,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\ndest=\"$SRCROOT/../../RStudio\"\nmkdir -p \"$dest\"\ncp -f \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME\" \"$dest/.$PRODUCT_NAME.new\"\nmv -f \"$dest/.$PRODUCT_NAME.new\" \"$dest/$PRODUCT_NAME\"\ncodesign --force --sign - \"$dest/$PRODUCT_NAME\"\nmkdir -p \"$dest/lib\"\ncp -f \"$BUILT_PRODUCTS_DIR\"/lib/*.a \"$dest/lib/\"\n";
+			shellScript = "set -e\ndest=\"$SRCROOT/../../RStudio\"\nmkdir -p \"$dest\"\ncp -f \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME\" \"$dest/.$PRODUCT_NAME.new\"\nmv -f \"$dest/.$PRODUCT_NAME.new\" \"$dest/$PRODUCT_NAME\"\ncodesign --force --sign - \"$dest/$PRODUCT_NAME\"\nmkdir -p \"$dest/lib\"\ncp -f \"$BUILT_PRODUCTS_DIR\"/lib/*.a \"$dest/lib/\"\nrm -rf \"$dest/lib/shmrt-tms6747\"\ncp -R \"$BUILT_PRODUCTS_DIR/lib/shmrt-tms6747\" \"$dest/lib/\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
