@@ -43,6 +43,9 @@ namespace shalimar {
 // borrowed library and the foreign declaration.
 const char *shcVersion() { return "1.2"; }
 
+// The line printed before each compile and by --version. `-nologo` omits it.
+const char *Driver::bannerLine() { return "©2026 G. R. Akhtar - Shalimar 1.2"; }
+
 
 void Driver::usage() const {
     std::cerr <<
@@ -309,13 +312,15 @@ bool Driver::parseArguments(const std::vector<std::string> &arguments) {
         } else if (a == "--debug") {
             debug_ = true;
         } else if (a == "--version") {
-            std::cout << "shc " << shcVersion() << "\n";
+            std::cout << bannerLine() << "\n";
             answered_ = true;
             return false;
         } else if (a == "-h" || a == "--help") {
             usage();
             answered_ = true;
             return false;
+        } else if (a == "-nologo") {
+            quiet_ = true;
         } else if (!a.empty() && a[0] == '-') {
             std::cerr << "shc: unknown option " << a << "\n";
             return false;
@@ -341,6 +346,10 @@ int Driver::run(const std::vector<std::string> &arguments) {
     // leaves with 2. Both used to be 2, which is why a script asking three
     // compilers their versions stopped at the second one.
     if (!parseArguments(arguments)) return answered_ ? 0 : 2;
+
+    // **Before each compile, once the arguments are known good.** cc1 and
+    // cxx1 print their banner the same way; -nologo omits it.
+    if (!quiet_) std::cerr << bannerLine() << "\n";
 
     std::unique_ptr<Target> target = Target::forName(targetName_);
     if (!target) {

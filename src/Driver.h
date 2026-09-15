@@ -10,6 +10,8 @@ class Driver {
 public:
     int run(const std::vector<std::string> &arguments);
 
+    static const char *bannerLine();
+
 private:
     std::string input_;
 
@@ -25,6 +27,7 @@ private:
     // Set when --version or --help was answered, so run() can leave with 0
     // rather than reporting a usage error the caller did not make.
     bool answered_ = false;
+    bool quiet_ = false;   // -nologo: leave out the start-of-compile banner
     std::string program_;
     bool assemblyOnly_ = false;
     bool objectOnly_ = false;
