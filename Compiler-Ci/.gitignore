@@ -1,0 +1,54 @@
+cc1.exe
+cc1.exe.dSYM/
+*.o
+tests/out/
+tests/out-arm64/
+tests/out-windows/
+tests/out-windows-native/
+tests/out-masm-native/
+tests/out-c90/
+tests/out-not-c90/
+tests/out-fingerprint/
+tests/out-driver/
+# The programs debug.sh builds, and the .dSYM a Mac link leaves beside each.
+tests/out-debug/
+# The same corpus built for the Microsoft ABI, which debug.sh writes beside it.
+tests/out-debug-x86_64-windows/
+# cross-abi.sh's, which was never listed and so sat untracked on both machines.
+# Untracked output is not untidiness here: 'git pull' aborts over files it
+# would overwrite, and does it *after* printing "Updating", so the relay looks
+# like it worked and the suite then tests code that was never pulled.
+tests/out-cross/
+examples/build/
+examples/**/xcuserdata/
+# Where CC1Lab/on-windows.sh leaves the assembly before relaying it.
+examples/CC1Lab/.windows-out/
+# MSBuild's output, and what Visual Studio leaves beside a solution.
+msvc/x64/
+msvc/demo/x64/
+*.vcxproj.user
+.vs/
+demo/*.ours
+demo/*.gcc
+demo/stub.s
+
+# Finder leaves these beside any directory it has looked at. The box never
+# makes one; the Mac that relays pushes to GitHub does.
+.DS_Store
+
+# Xcode keeps per-user state inside the project; that is not the project.
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/
+
+# Objects and their dependency files, which the Makefile puts here so that a
+# listing of src/ is the code and nothing else.
+obj/
+
+# The example library's build products. A library is built from the .c beside
+# it and never travels - see the note in CLAUDE.md about what this repository
+# ships. shmrt-*.a lands here when the example is built with RT pointing at
+# this directory, and is Compiler-S's to produce, not ours to carry.
+examples/shalimar-library/*.o
+examples/shalimar-library/*.a
+examples/shalimar-library/*.obj
+examples/shalimar-library/*.lib

@@ -1,0 +1,152 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		41FF2010303239FF00BCA80B /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 41FF20053032392500BCA80B /* main.c */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		41FF20053032392500BCA80B /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		BB03 /* CC1Lab */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = CC1Lab; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BB05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		BB06 = {
+			isa = PBXGroup;
+			children = (
+				BB07 /* CC1Lab */,
+				BB08 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		BB07 /* CC1Lab */ = {
+			isa = PBXGroup;
+			children = (
+				41FF20053032392500BCA80B /* main.c */,
+			);
+			path = CC1Lab;
+			sourceTree = "<group>";
+		};
+		BB08 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BB03 /* CC1Lab */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		BB09 /* CC1Lab */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BB12 /* Build configuration list for PBXNativeTarget "CC1Lab" */;
+			buildPhases = (
+				BB04 /* Sources */,
+				BB05 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CC1Lab;
+			productName = CC1Lab;
+			productReference = BB03 /* CC1Lab */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		BB10 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = BB13 /* Build configuration list for PBXProject "CC1Lab" */;
+			compatibilityVersion = "Xcode 12.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = BB06;
+			productRefGroup = BB08 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				BB09 /* CC1Lab */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		BB04 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				41FF2010303239FF00BCA80B /* main.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		BB11 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		BB14 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CC = "$(SRCROOT)/../tools/cc1-as-clang";
+				DEBUG_INFORMATION_FORMAT = "";
+				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		BB12 /* Build configuration list for PBXNativeTarget "CC1Lab" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB11 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BB13 /* Build configuration list for PBXProject "CC1Lab" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB14 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = BB10 /* Project object */;
+}
