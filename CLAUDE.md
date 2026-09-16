@@ -4,13 +4,26 @@ A parallel **i-line** of the three compilers: each cloned from its original in
 `~/Documents/Claude` and built beside it under a distinct executable name, on
 branch `vm6747`.
 
+## Where it lives (since 2026-09-16)
+This directory is one git repository, `git@github.com:Ghulamrs/VM6747.git`,
+holding `Compiler-Ci`, `Compiler-Si`, `Emulator` and the notes above them
+directly, each brought in with its full history. They no longer have a
+`.git` of their own: commit them here, at the top.
+
+`Compiler-Cppi` is the exception. It has its own repository,
+`git@github.com:Ghulamrs/Compiler-Cppi.git`, and is only ever committed and
+pushed there; this repository carries it as a **submodule**, so after a push
+in `Compiler-Cppi` the pointer here is moved with
+`git add Compiler-Cppi && git commit`. A fresh clone wants
+`git clone --recurse-submodules`.
+
 ## Rules this was set up under
 - All work inside `~/Documents/Claude`.
 - **Originals never modified.** Verified after cloning and building: each
   original's `git status` is clean and its HEAD is unchanged.
-- **One commit per change**, on branch `vm6747`. **Nothing pushed.** Each
-  clone's `origin` is the original's GitHub remote, and
-  `remote.origin.push = refs/heads/vm6747:refs/heads/vm6747`.
+- **One commit per change.** Until 2026-09-16 each clone was its own
+  repository on branch `vm6747` with the original's GitHub remote as `origin`
+  and nothing pushed; see *Where it lives* for what replaced that.
 - Cloned with `--no-hardlinks` — no shared object store, no
   `.git/objects/info/alternates`; each clone is independent of its original.
 
@@ -60,7 +73,7 @@ now, so no build system emits the plain name. The runtime archive names
   clone file references an original path.
 
 ## The fourth repository: Emulator
-`VM6747/Emulator` (its own git repository, no remote) builds `vm6747.exe`,
+`VM6747/Emulator` (part of this repository since 2026-09-16) builds `vm6747.exe`,
 the emulator that runs what the i-compilers emit for tms6747; see its
 README.md and TMS6747.md. Same build conventions as the compilers.
 
