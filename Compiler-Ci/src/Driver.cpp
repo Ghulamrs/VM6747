@@ -28,6 +28,12 @@
 #include <sched.h>
 #endif
 
+// Where the running program is, which is how a released compiler finds the
+// headers it ships with: see standardIncludeDirectory().
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
+
 namespace {
 
 const std::size_t kThreadFrom = 4;
@@ -37,6 +43,61 @@ const std::size_t kThreadFrom = 4;
 #ifndef CC1_INCLUDE_DIR
 #define CC1_INCLUDE_DIR ""
 #endif
+
+namespace {
+
+// The directory the running program is in. A released compiler is unpacked
+// somewhere nobody chose at build time, so the headers it ships with cannot
+// be found by a path compiled into it - they are found beside it.
+std::string programDirectory(const std::string &argv0) {
+    std::string full;
+#ifdef _WIN32
+    char buf[4096];
+    DWORD n = GetModuleFileNameA(nullptr, buf, sizeof(buf));
+    if (n > 0 && n < sizeof(buf)) full.assign(buf, n);
+#elif defined(__APPLE__)
+    char buf[4096];
+    uint32_t n = sizeof(buf);
+    if (_NSGetExecutablePath(buf, &n) == 0) {
+        char real[4096];
+        full = realpath(buf, real) != nullptr ? real : buf;
+    }
+#elif defined(__linux__)
+    char buf[4096];
+    ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+    if (n > 0) full.assign(buf, static_cast<std::size_t>(n));
+#endif
+    if (full.empty()) full = argv0;
+    std::size_t cut = full.find_last_of("/\\");
+    if (cut == std::string::npos) return std::string(".");
+    return full.substr(0, cut);
+}
+
+bool directoryHas(const std::string &dir, const char *name) {
+    std::ifstream probe((dir + "/" + name).c_str());
+    return probe.good();
+}
+
+}
+
+// **Where the standard headers are, asked in the order a release wants:**
+// $CC1_LIB, then lib/ beside the binary or one directory up - the installed
+// layout, bin/cc1i.exe and lib/ - and last the directory compiled in, which
+// names the checkout this was built from and outlives nothing that moves.
+void Driver::standardIncludeDirectory(const std::string &argv0) {
+    const char *env = std::getenv("CC1_LIB");
+    if (env != nullptr && env[0] != '\0') { searchPath_.push_back(env); return; }
+
+    const std::string here = programDirectory(argv0);
+    const std::string candidates[2] = { here + "/lib", here + "/../lib" };
+    for (const std::string &dir : candidates) {
+        if (!directoryHas(dir, "stddef.h")) continue;
+        searchPath_.push_back(dir);
+        return;
+    }
+
+    if (CC1_INCLUDE_DIR[0] != '\0') searchPath_.push_back(CC1_INCLUDE_DIR);
+}
 
 // **1.1 is the first version this compiler has had a number for.** It had none
 // until 2026-08-26 - built, relayed between three machines and run without one,
@@ -518,7 +579,7 @@ bool Driver::parseArguments(int argc, char **argv) {
         }
     }
 
-    if (CC1_INCLUDE_DIR[0] != '\0') searchPath_.push_back(CC1_INCLUDE_DIR);
+    standardIncludeDirectory(argv[0]);
 
     if (inputs.empty()) { usage(argv[0]); return false; }
 

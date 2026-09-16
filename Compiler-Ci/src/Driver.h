@@ -63,4 +63,5 @@ private:
     static const char *hostAssembler();
     static const char *hostLinker();
     static void usage(char *);
+    void standardIncludeDirectory(const std::string &argv0);
 };
