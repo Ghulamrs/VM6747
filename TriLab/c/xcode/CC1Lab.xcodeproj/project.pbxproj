@@ -1,0 +1,195 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		8446DA55D0B69521F823AE41 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 9300138A0CF74E884930CB15 /* main.c */; };
+		CAE5F2ACE849E0D8960C0E62 /* ex01_arithmetic.c in Sources */ = {isa = PBXBuildFile; fileRef = 79F27F2FA3B5A9C855DA3E0E /* ex01_arithmetic.c */; };
+		5AC8B828CCD868ACB3D874D4 /* ex02_control.c in Sources */ = {isa = PBXBuildFile; fileRef = 0F9731A0323741B34E1B91F5 /* ex02_control.c */; };
+		269D7AD4E49CD0723F9C10CE /* ex03_pointers.c in Sources */ = {isa = PBXBuildFile; fileRef = 6D29F9D8BC4BDF5C612A029A /* ex03_pointers.c */; };
+		7C6797EFD8E40893065787A3 /* ex04_structs.c in Sources */ = {isa = PBXBuildFile; fileRef = C055EF3B959F74C3BEB7CAD4 /* ex04_structs.c */; };
+		6E07D1E0CA337114CD84995A /* ex05_bitfields.c in Sources */ = {isa = PBXBuildFile; fileRef = D44BAF50655C9EF7A0B78CA7 /* ex05_bitfields.c */; };
+		A71209FBC4133C927F0009CB /* ex06_strings.c in Sources */ = {isa = PBXBuildFile; fileRef = 8C61501DB37F8E9B699F23EE /* ex06_strings.c */; };
+		7CCDE997E51E6F63D66036CF /* ex07_floats.c in Sources */ = {isa = PBXBuildFile; fileRef = 0C18A7A28C4826736CFD8F5F /* ex07_floats.c */; };
+		7CA3050FA10F84285F9CD2A5 /* ex08_fnptr.c in Sources */ = {isa = PBXBuildFile; fileRef = A9D6AD1A0325EF787FE30A9F /* ex08_fnptr.c */; };
+		AC03389E289A21DA19FD95BF /* ex09_initialisers.c in Sources */ = {isa = PBXBuildFile; fileRef = 658EAB85E3D9DC0A5334A335 /* ex09_initialisers.c */; };
+		E76ED1DCC459AB3FC532A01D /* ex10_fileio.c in Sources */ = {isa = PBXBuildFile; fileRef = AECC1D890DC8E5B243752003 /* ex10_fileio.c */; };
+		F532A819A58C7BFEE943DFBB /* heavy.c in Sources */ = {isa = PBXBuildFile; fileRef = C7D9D9608E9A80593F13AAD8 /* heavy.c */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		9300138A0CF74E884930CB15 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = main.c; path = "../main.c"; sourceTree = "<group>"; };
+		79F27F2FA3B5A9C855DA3E0E /* ex01_arithmetic.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ex01_arithmetic.c; path = "../ex01_arithmetic.c"; sourceTree = "<group>"; };
+		0F9731A0323741B34E1B91F5 /* ex02_control.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ex02_control.c; path = "../ex02_control.c"; sourceTree = "<group>"; };
+		6D29F9D8BC4BDF5C612A029A /* ex03_pointers.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ex03_pointers.c; path = "../ex03_pointers.c"; sourceTree = "<group>"; };
+		C055EF3B959F74C3BEB7CAD4 /* ex04_structs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ex04_structs.c; path = "../ex04_structs.c"; sourceTree = "<group>"; };
+		D44BAF50655C9EF7A0B78CA7 /* ex05_bitfields.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ex05_bitfields.c; path = "../ex05_bitfields.c"; sourceTree = "<group>"; };
+		8C61501DB37F8E9B699F23EE /* ex06_strings.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ex06_strings.c; path = "../ex06_strings.c"; sourceTree = "<group>"; };
+		0C18A7A28C4826736CFD8F5F /* ex07_floats.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ex07_floats.c; path = "../ex07_floats.c"; sourceTree = "<group>"; };
+		A9D6AD1A0325EF787FE30A9F /* ex08_fnptr.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ex08_fnptr.c; path = "../ex08_fnptr.c"; sourceTree = "<group>"; };
+		658EAB85E3D9DC0A5334A335 /* ex09_initialisers.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ex09_initialisers.c; path = "../ex09_initialisers.c"; sourceTree = "<group>"; };
+		AECC1D890DC8E5B243752003 /* ex10_fileio.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ex10_fileio.c; path = "../ex10_fileio.c"; sourceTree = "<group>"; };
+		C7D9D9608E9A80593F13AAD8 /* heavy.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = heavy.c; path = "../heavy.c"; sourceTree = "<group>"; };
+		C0960FE1EE87936668B24D11 /* examples.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = examples.h; path = "../examples.h"; sourceTree = "<group>"; };
+		9EC8CBDA2FA17CA102E8B74C /* CC1Lab */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = CC1Lab; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		82FB25E40A529B00F5344E8E = {
+			isa = PBXGroup;
+			children = (
+				9300138A0CF74E884930CB15 /* main.c */,
+				79F27F2FA3B5A9C855DA3E0E /* ex01_arithmetic.c */,
+				0F9731A0323741B34E1B91F5 /* ex02_control.c */,
+				6D29F9D8BC4BDF5C612A029A /* ex03_pointers.c */,
+				C055EF3B959F74C3BEB7CAD4 /* ex04_structs.c */,
+				D44BAF50655C9EF7A0B78CA7 /* ex05_bitfields.c */,
+				8C61501DB37F8E9B699F23EE /* ex06_strings.c */,
+				0C18A7A28C4826736CFD8F5F /* ex07_floats.c */,
+				A9D6AD1A0325EF787FE30A9F /* ex08_fnptr.c */,
+				658EAB85E3D9DC0A5334A335 /* ex09_initialisers.c */,
+				AECC1D890DC8E5B243752003 /* ex10_fileio.c */,
+				C7D9D9608E9A80593F13AAD8 /* heavy.c */,
+				C0960FE1EE87936668B24D11 /* examples.h */,
+				6FF765A2B7F7A16A1635843F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		6FF765A2B7F7A16A1635843F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9EC8CBDA2FA17CA102E8B74C /* CC1Lab */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AB3D132BA9C4ACDDBC327EF7 /* CC1Lab */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 883AC6E745931DB7BD767861;
+			buildPhases = (
+				74CD08556A7352F5BAE6969F /* Sources */,
+			);
+			dependencies = ();
+			name = CC1Lab;
+			productName = CC1Lab;
+			productReference = 9EC8CBDA2FA17CA102E8B74C /* CC1Lab */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E7077D6CCFD5CFDE49A6831B /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 2600;
+			};
+			buildConfigurationList = 13DC23EBBC99A9B223261D40;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = 82FB25E40A529B00F5344E8E;
+			productRefGroup = 6FF765A2B7F7A16A1635843F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AB3D132BA9C4ACDDBC327EF7 /* CC1Lab */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		74CD08556A7352F5BAE6969F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8446DA55D0B69521F823AE41 /* main.c in Sources */,
+				CAE5F2ACE849E0D8960C0E62 /* ex01_arithmetic.c in Sources */,
+				5AC8B828CCD868ACB3D874D4 /* ex02_control.c in Sources */,
+				269D7AD4E49CD0723F9C10CE /* ex03_pointers.c in Sources */,
+				7C6797EFD8E40893065787A3 /* ex04_structs.c in Sources */,
+				6E07D1E0CA337114CD84995A /* ex05_bitfields.c in Sources */,
+				A71209FBC4133C927F0009CB /* ex06_strings.c in Sources */,
+				7CCDE997E51E6F63D66036CF /* ex07_floats.c in Sources */,
+				7CA3050FA10F84285F9CD2A5 /* ex08_fnptr.c in Sources */,
+				AC03389E289A21DA19FD95BF /* ex09_initialisers.c in Sources */,
+				E76ED1DCC459AB3FC532A01D /* ex10_fileio.c in Sources */,
+				F532A819A58C7BFEE943DFBB /* heavy.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		03636B18A5E1E7DC2BE94F3D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ONLY_ACTIVE_ARCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				WARNING_CFLAGS = ("-Wall");
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				PRODUCT_NAME = "CC1Lab";
+				GCC_OPTIMIZATION_LEVEL = 0;
+			};
+			name = Debug;
+		};
+		65847B20DFF1978F2535624A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ONLY_ACTIVE_ARCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				WARNING_CFLAGS = ("-Wall");
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				PRODUCT_NAME = "CC1Lab";
+				GCC_OPTIMIZATION_LEVEL = 2;
+			};
+			name = Release;
+		};
+		104CB4D83C6FE21170189B06 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "CC1Lab";
+			};
+			name = Debug;
+		};
+		6CE6153E0A2C6E74C40A4536 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "CC1Lab";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		13DC23EBBC99A9B223261D40 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				03636B18A5E1E7DC2BE94F3D /* Debug */,
+				65847B20DFF1978F2535624A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		883AC6E745931DB7BD767861 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				104CB4D83C6FE21170189B06 /* Debug */,
+				6CE6153E0A2C6E74C40A4536 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E7077D6CCFD5CFDE49A6831B /* Project object */;
+}

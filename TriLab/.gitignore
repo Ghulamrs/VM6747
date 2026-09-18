@@ -1,0 +1,10 @@
+# what a build leaves in a lab directory; the projects and sources are the lab
+c/cc1lab
+c/cc1lab.dSYM/
+cpp/cxx1lab
+cpp/cxx1lab.dSYM/
+*.vm
+*.o
+*.obj
+*.s
+*.asm
