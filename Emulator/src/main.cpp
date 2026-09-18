@@ -36,21 +36,23 @@ static bool isDirectory(const std::string &path) {
     return stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
 #endif
 }
+// The assembly in a directory: .s as the compilers write it, .asm as cl6x does.
+static bool isAssembly(const std::string &n) {
+    return (n.size() > 2 && n.compare(n.size() - 2, 2, ".s") == 0) ||
+           (n.size() > 4 && n.compare(n.size() - 4, 4, ".asm") == 0);
+}
 static std::vector<std::string> assemblyIn(const std::string &dir) {
     std::vector<std::string> names;
 #ifdef _WIN32
     WIN32_FIND_DATAA f;
-    HANDLE h = FindFirstFileA((dir + "\\*.s").c_str(), &f);
+    HANDLE h = FindFirstFileA((dir + "\\*").c_str(), &f);
     if (h != INVALID_HANDLE_VALUE) {
-        do { names.push_back(f.cFileName); } while (FindNextFileA(h, &f));
+        do { if (isAssembly(f.cFileName)) names.push_back(f.cFileName); } while (FindNextFileA(h, &f));
         FindClose(h);
     }
 #else
     if (DIR *d = opendir(dir.c_str())) {
-        while (struct dirent *e = readdir(d)) {
-            std::string n = e->d_name;
-            if (n.size() > 2 && n.compare(n.size() - 2, 2, ".s") == 0) names.push_back(n);
-        }
+        while (struct dirent *e = readdir(d)) if (isAssembly(e->d_name)) names.push_back(e->d_name);
         closedir(d);
     }
 #endif
@@ -84,7 +86,7 @@ int main(int argc, char **argv) {
         }
         if (isDirectory(a)) {
             std::vector<std::string> inside = assemblyIn(a);
-            if (inside.empty()) { std::fprintf(stderr, "vm6747: no .s files in %s\n", a.c_str()); return 2; }
+            if (inside.empty()) { std::fprintf(stderr, "vm6747: no .s or .asm files in %s\n", a.c_str()); return 2; }
             for (const std::string &f : inside) files.push_back(f);
             continue;
         }

@@ -56,12 +56,13 @@ std::string Cpu::where(uint32_t pc) const {
 void Cpu::fault(const std::string &what) {
     std::fprintf(stderr, "vm6747: fault at %s, cycle %llu: %s\n", where(pc_).c_str(),
                  static_cast<unsigned long long>(cycle_), what.c_str());
-    std::fprintf(stderr, "        A4=0x%x A15=0x%x B3=0x%x B15=0x%x\n", r_[A4], r_[A15], r_[B3], r_[B15]);
+    std::fprintf(stderr, "        A4=0x%x B4=0x%x A15=0x%x B3=0x%x B15=0x%x\n", r_[A4], r_[B4], r_[A15], r_[B3], r_[B15]);
     std::exit(70);
 }
 
 // ---- the pipeline --------------------------------------------------------------
 void Cpu::write(std::vector<Pending> &w, int reg, uint32_t v, int delay) {
+    if (delay < 0) { r_[reg] = v; return; }        // a low word already due
     Pending p; p.at = cycle_ + 1 + delay; p.reg = reg; p.value = v;
     w.push_back(p);
 }
@@ -81,7 +82,39 @@ void Cpu::applyPending() {
     if (branchValid_ && branchAt_ <= cycle_) { pc_ = branchTarget_; branchValid_ = false; }
 }
 
-void Cpu::tick() { cycle_++; applyPending(); }
+void Cpu::writePairSplit(std::vector<Pending> &w, int lo, uint64_t v, int delay) {
+    write(w, lo, uint32_t(v), delay - 1);
+    write(w, lo + 1, uint32_t(v >> 32), delay);
+}
+
+// Which instructions read a double-precision source.
+static bool readsPair(Op op) {
+    switch (op) {
+    case Op::ADDDP: case Op::SUBDP: case Op::MPYDP: case Op::CMPEQDP: case Op::CMPLTDP: case Op::CMPGTDP:
+    case Op::ABSDP: case Op::DPINT: case Op::DPTRUNC: case Op::DPSP: case Op::RCPDP: return true;
+    default: return false;
+    }
+}
+
+// The cycle after issue: the held instructions run with the high words read
+// now, and their results are dated from the issue cycle - one less than the
+// table says, this being a cycle on.
+void Cpu::completeDeferred() {
+    if (deferred_.empty()) return;
+    std::vector<Deferred> held;
+    held.swap(deferred_);
+    std::vector<Pending> writes;
+    completing_ = true;
+    for (const Deferred &x : held) {
+        deferLo1_ = x.lo1; deferLo2_ = x.lo2;
+        bool branched = false; uint32_t target = 0;
+        execute(*x.in, writes, branched, target);
+    }
+    completing_ = false;
+    for (const Pending &p : writes) pending_.push_back(p);
+}
+
+void Cpu::tick() { cycle_++; applyPending(); completeDeferred(); }
 
 uint32_t Cpu::value(const Instr &in, const Operand &o) {
     (void)in;
@@ -139,6 +172,16 @@ void Cpu::execute(const Instr &in, std::vector<Pending> &w, bool &branched, uint
     bool dstPair = !o.empty() && o.back().kind == Operand::Reg && o.back().reg2 >= 0;
     uint64_t p1 = o.size() > 0 && o[0].kind == Operand::Reg && o[0].reg2 >= 0 ? pair(o[0].reg) : s1;
     uint64_t p2 = o.size() > 1 && o[1].kind == Operand::Reg && o[1].reg2 >= 0 ? pair(o[1].reg) : s2;
+    if (readsPair(e->op)) {
+        if (!completing_) {
+            Deferred x; x.in = &in; x.lo1 = uint32_t(p1); x.lo2 = uint32_t(p2);
+            deferred_.push_back(x);
+            return;
+        }
+        p1 = (p1 & 0xffffffff00000000ULL) | deferLo1_;
+        p2 = (p2 & 0xffffffff00000000ULL) | deferLo2_;
+        d--;
+    }
 
     switch (e->op) {
     case Op::NOP: case Op::IDLE: return;
@@ -167,6 +210,7 @@ void Cpu::execute(const Instr &in, std::vector<Pending> &w, bool &branched, uint
     case Op::NOT: write(w, dst, ~s1, 0); return;
     case Op::ABS: write(w, dst, static_cast<int32_t>(s1) < 0 ? 0u - s1 : s1, 0); return;
     case Op::AND: write(w, dst, s1 & s2, 0); return;
+    case Op::ANDN: write(w, dst, s1 & ~s2, 0); return;
     case Op::OR:  write(w, dst, s1 | s2, 0); return;
     case Op::XOR: write(w, dst, s1 ^ s2, 0); return;
     case Op::SHL: { uint32_t c = s2 & 63; write(w, dst, c >= 32 ? 0 : s1 << c, 0); return; }
@@ -193,6 +237,7 @@ void Cpu::execute(const Instr &in, std::vector<Pending> &w, bool &branched, uint
     case Op::CMPLTU: write(w, dst, s1 < s2, 0); return;
     case Op::CMPGTU: write(w, dst, s1 > s2, 0); return;
     case Op::ADDAW: write(w, dst, s1 + s2 * 4, 0); return;
+    case Op::ADDAD: write(w, dst, s1 + s2 * 8, 0); return;
     case Op::ADDAH: write(w, dst, s1 + s2 * 2, 0); return;
     case Op::ADDAB: write(w, dst, s1 + s2, 0); return;
     case Op::SUBAW: write(w, dst, s1 - s2 * 4, 0); return;
@@ -226,14 +271,19 @@ void Cpu::execute(const Instr &in, std::vector<Pending> &w, bool &branched, uint
     case Op::STDW: { uint32_t a = address(in, o[1], 8, w); store64(a, p1); return; }
     case Op::STNDW: { uint32_t a = address(in, o[1], 8, w); check(a, 8, false); wr32(prog_.memory, a, uint32_t(p1)); wr32(prog_.memory, a + 4, uint32_t(p1 >> 32)); return; }
 
-    case Op::B:
+    case Op::B: case Op::RET: case Op::CALL: case Op::BNOP: case Op::RETNOP:
+        // CALL's return address is ADDKPC's to compute, and BNOP's NOPs are
+        // the packet's concern - the branch itself is B either way.
         branched = true;
         target = s1;
         return;
+    case Op::ADDKPC: write(w, o[1].reg, s1, 0); return;
     case Op::CALLP:
         // Protected call: B3 gets the return address and the branch takes
-        // effect at once, the pipeline stalling through the delay slots.
-        write(w, B3, pc_ + 4, 0);
+        // effect at once, the pipeline stalling through the delay slots. The
+        // return is to the packet after this one - cl6x writes the CALLP
+        // beside an argument move, and it is not the first of the pair.
+        write(w, B3, packetEnd_, 0);
         branchValid_ = true; branchAt_ = cycle_ + 1; branchTarget_ = s1;
         return;
 
@@ -249,23 +299,23 @@ void Cpu::execute(const Instr &in, std::vector<Pending> &w, bool &branched, uint
     case Op::INTSPU: write(w, dst, fromFloat(static_cast<float>(s1)), d); return;
     case Op::SPINT:   write(w, dst, static_cast<uint32_t>(roundToInt(asFloat(s1))), d); return;
     case Op::SPTRUNC: write(w, dst, static_cast<uint32_t>(truncToInt(asFloat(s1))), d); return;
-    case Op::SPDP: writePair(w, dst, fromDouble(static_cast<double>(asFloat(s1))), d); return;
+    case Op::SPDP: writePairSplit(w, dst, fromDouble(static_cast<double>(asFloat(s1))), d); return;
     case Op::RCPSP: write(w, dst, fromFloat(1.0f / asFloat(s1)), d); return;
 
     // ---- double precision -------------------------------------------------
-    case Op::ADDDP: writePair(w, dst, fromDouble(asDouble(p1) + asDouble(p2)), d); return;
-    case Op::SUBDP: writePair(w, dst, fromDouble(asDouble(p1) - asDouble(p2)), d); return;
-    case Op::MPYDP: writePair(w, dst, fromDouble(asDouble(p1) * asDouble(p2)), d); return;
+    case Op::ADDDP: writePairSplit(w, dst, fromDouble(asDouble(p1) + asDouble(p2)), d); return;
+    case Op::SUBDP: writePairSplit(w, dst, fromDouble(asDouble(p1) - asDouble(p2)), d); return;
+    case Op::MPYDP: writePairSplit(w, dst, fromDouble(asDouble(p1) * asDouble(p2)), d); return;
     case Op::CMPEQDP: write(w, dst, asDouble(p1) == asDouble(p2), d); return;
     case Op::CMPLTDP: write(w, dst, asDouble(p1) < asDouble(p2), d); return;
     case Op::CMPGTDP: write(w, dst, asDouble(p1) > asDouble(p2), d); return;
-    case Op::ABSDP: writePair(w, dst, p1 & 0x7fffffffffffffffULL, d); return;
-    case Op::INTDP:  writePair(w, dst, fromDouble(static_cast<double>(static_cast<int32_t>(s1))), d); return;
-    case Op::INTDPU: writePair(w, dst, fromDouble(static_cast<double>(s1)), d); return;
+    case Op::ABSDP: writePairSplit(w, dst, p1 & 0x7fffffffffffffffULL, d); return;
+    case Op::INTDP:  writePairSplit(w, dst, fromDouble(static_cast<double>(static_cast<int32_t>(s1))), d); return;
+    case Op::INTDPU: writePairSplit(w, dst, fromDouble(static_cast<double>(s1)), d); return;
     case Op::DPINT:   write(w, dst, static_cast<uint32_t>(roundToInt(asDouble(p1))), d); return;
     case Op::DPTRUNC: write(w, dst, static_cast<uint32_t>(truncToInt(asDouble(p1))), d); return;
     case Op::DPSP: write(w, dst, fromFloat(static_cast<float>(asDouble(p1))), d); return;
-    case Op::RCPDP: writePair(w, dst, fromDouble(1.0 / asDouble(p1)), d); return;
+    case Op::RCPDP: writePairSplit(w, dst, fromDouble(1.0 / asDouble(p1)), d); return;
     case Op::Count: break;
     }
     fault("'" + in.mnem + "' is not implemented");
@@ -286,12 +336,18 @@ void Cpu::executePacket() {
     }
     std::vector<Pending> writes;
     int nops = 1;
+    packetEnd_ = next;
     for (const Instr *in : packet) {
         if (trace_) {
             std::fprintf(stderr, "%8llu %s: %s", static_cast<unsigned long long>(cycle_),
                          where(pc_).c_str(), in->mnem.c_str());
             std::fprintf(stderr, "\n");
         }
+        // The NOPs folded into BNOP, RETNOP and ADDKPC are unconditional: a
+        // predicate that is off skips the branch, not the cycles.
+        if (in->mnem == "NOP" && !in->ops.empty()) nops = static_cast<int>(in->ops[0].imm);
+        else if (in->mnem == "BNOP" || in->mnem == "RETNOP" || in->mnem == "ADDKPC")
+            nops = static_cast<int>(in->ops.back().imm) + 1;
         if (in->pred >= 0) {
             bool on = r_[in->pred] != 0;
             if (in->predNeg) on = !on;
@@ -304,12 +360,12 @@ void Cpu::executePacket() {
             if (branchValid_) fault("a branch issued while another is pending");
             branchValid_ = true; branchAt_ = cycle_ + 6; branchTarget_ = target;
         }
-        if (in->mnem == "NOP" && !in->ops.empty()) nops = static_cast<int>(in->ops[0].imm);
     }
     for (const Pending &p : writes) pending_.push_back(p);
     pc_ = next;
     cycle_++;
     applyPending();
+    completeDeferred();
     for (int k = 1; k < nops; k++) tick();
 }
 
@@ -325,6 +381,7 @@ void Cpu::step() {
     if (name.empty()) fault("a branch below the text base");
     // Everything pending lands before the library runs, as it would have by
     // the time a real callee's first instruction read anything.
+    completeDeferred();
     for (const Pending &p : pending_) r_[p.reg] = p.value;
     pending_.clear();
     branchValid_ = false;
@@ -340,6 +397,7 @@ uint32_t Cpu::callback(uint32_t fn, uint32_t a4, uint32_t b4) {
     r_[B3] = 0xF8;                       // where the callee's return lands
     pc_ = fn;
     while (running_ && pc_ != 0xF8) step();
+    completeDeferred();
     for (const Pending &p : pending_) r_[p.reg] = p.value;
     pending_.clear();
     uint32_t result = r_[A4];

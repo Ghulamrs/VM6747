@@ -26,12 +26,28 @@ the emitted code are the compiler's claim about these latencies, and a
 missing one shows up here as a wrong answer, not as a suspicion. The first
 run found one (`MPY32` with no delay slots).
 
+The double-precision pipeline is split-phase, as SPRUFE8 draws it: a DP
+instruction reads its sources' low words at issue and the high words a cycle
+later, and writes its result low word first, a cycle before the high one -
+the delay-slot count names the high word. cl6x schedules to exactly that
+(`INTDP; NOP 3; MPYDP`); cc1i pads past it, which is why the gap showed only
+when TriLab ran cl6x's code here.
+
 Memory effects are immediate at issue, which keeps a store and a later load
 in order. Loads and stores fault on misalignment, as the hardware would.
 Instructions are executed from their parsed operands; nothing here encodes
 or decodes C6000 machine words, and the memory image holds data only. A
 code address is still a real number four bytes apart from the next, so
 labels, function pointers and the PC behave.
+
+**cl6x's assembly as well as the compilers'.** Since TriLab's CCS leg
+(2026-09-18) the emulator runs what TI's compiler writes for the same C: all
+sixty-four registers, `.asg`'s FP/DP/SP, `BNOP`/`RETNOP`/`CALL`+`ADDKPC` with
+their folded NOPs (unconditional, as the manual says), `ADDAD`, `ANDN`, the
+ucst15 address-adds from DP or SP, `.bits`/`.field`, `.group` as a COMDAT
+(one definition kept, like `.weak`), `.string` with byte values, and a
+directory of `.asm` files. What it does not run is cl6x's C++: STLport's
+streams call into TI's compiled runtime, which is machine code.
 
 **The C library, natively.** A call to a library name lands on a stub below
 the text base and is answered on the host, reading its arguments by the

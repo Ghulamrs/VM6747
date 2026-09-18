@@ -1,4 +1,5 @@
 #include "Isa.h"
+#include "Cpu.h"
 
 #include <cstring>
 
@@ -12,7 +13,7 @@ static const IsaEntry kIsa[] = {
     { "CMPEQ", Op::CMPEQ, 0 }, { "CMPLT", Op::CMPLT, 0 }, { "CMPGT", Op::CMPGT, 0 },
     { "CMPLTU", Op::CMPLTU, 0 }, { "CMPGTU", Op::CMPGTU, 0 },
     { "ADDAW", Op::ADDAW, 0 }, { "ADDAH", Op::ADDAH, 0 }, { "ADDAB", Op::ADDAB, 0 }, { "SUBAW", Op::SUBAW, 0 },
-    { "ADDK", Op::ADDK, 0 }, { "MVC", Op::MVC, 0 },
+    { "ADDK", Op::ADDK, 0 }, { "MVC", Op::MVC, 0 }, { "ADDAD", Op::ADDAD, 0 }, { "ANDN", Op::ANDN, 0 },
     { "MPY32", Op::MPY32, 3 }, { "MPY32U", Op::MPY32U, 3 }, { "MPY32SU", Op::MPY32SU, 3 }, { "MPY32US", Op::MPY32US, 3 },
     { "MPY", Op::MPY, 1 }, { "MPYU", Op::MPYU, 1 }, { "MPYSU", Op::MPYSU, 1 }, { "MPYUS", Op::MPYUS, 1 },
     { "MPYLH", Op::MPYLH, 1 }, { "MPYHL", Op::MPYHL, 1 }, { "MPYH", Op::MPYH, 1 }, { "MPYHU", Op::MPYHU, 1 },
@@ -21,6 +22,7 @@ static const IsaEntry kIsa[] = {
     { "STB", Op::STB, 0 }, { "STH", Op::STH, 0 }, { "STW", Op::STW, 0 }, { "STDW", Op::STDW, 0 },
     { "STNW", Op::STNW, 0 }, { "STNDW", Op::STNDW, 0 },
     { "B", Op::B, 5 }, { "CALLP", Op::CALLP, 0 }, { "NOP", Op::NOP, 0 }, { "SWE", Op::SWE, 0 }, { "IDLE", Op::IDLE, 0 },
+    { "BNOP", Op::BNOP, 5 }, { "RETNOP", Op::RETNOP, 5 }, { "RET", Op::RET, 5 }, { "CALL", Op::CALL, 5 }, { "ADDKPC", Op::ADDKPC, 0 },
     { "ADDSP", Op::ADDSP, 3 }, { "SUBSP", Op::SUBSP, 3 }, { "MPYSP", Op::MPYSP, 3 },
     { "CMPEQSP", Op::CMPEQSP, 1 }, { "CMPLTSP", Op::CMPLTSP, 1 }, { "CMPGTSP", Op::CMPGTSP, 1 },
     { "ABSSP", Op::ABSSP, 1 }, { "INTSP", Op::INTSP, 3 }, { "INTSPU", Op::INTSPU, 3 },
@@ -65,9 +67,15 @@ static bool isaRanges(const Instr &in, std::string &why) {
     case Op::CMPLTU: case Op::CMPGTU:
         for (size_t i = 0; i < 2; i++) if (isImm(o[i])) ok = ok && fits(o[i].imm, 0, 31);
         break;
-    case Op::SHL: case Op::SHR: case Op::SHRU: case Op::ADDAW: case Op::ADDAH: case Op::ADDAB: case Op::SUBAW:
+    case Op::ADDAW: case Op::ADDAH: case Op::ADDAB:
+        // ucst5, or the C64x+ form from DP or SP with a ucst15
+        if (isImm(o[1])) ok = fits(o[1].imm, 0, isReg(o[0]) && (o[0].reg == Cpu::B + 14 || o[0].reg == Cpu::B15) ? 32767 : 31);
+        break;
+    case Op::SHL: case Op::SHR: case Op::SHRU: case Op::ADDAD: case Op::SUBAW:
         if (isImm(o[1])) ok = fits(o[1].imm, 0, 31);
         break;
+    case Op::BNOP: case Op::RETNOP: ok = fits(o[1].imm, 0, 5); break;
+    case Op::ADDKPC: ok = fits(o[2].imm, 0, 7); break;
     case Op::EXT: case Op::EXTU: case Op::SET: case Op::CLR:
         if (n == 4) ok = fits(o[1].imm, 0, 31) && fits(o[2].imm, 0, 31);
         break;
@@ -83,7 +91,7 @@ static bool isaRanges(const Instr &in, std::string &why) {
                         : e->op == Op::LDH || e->op == Op::LDHU || e->op == Op::STH ? 2
                         : e->op == Op::LDDW || e->op == Op::STDW || e->op == Op::LDNDW || e->op == Op::STNDW ? 8 : 4;
         long long off = m.off < 0 ? -m.off : m.off;
-        long long units = m.base == 30 || m.base == 31 ? 32767 : 31;
+        long long units = m.base == Cpu::B + 14 || m.base == Cpu::B15 ? 32767 : 31;   // ucst15 from DP or SP
         if (off % width != 0 || off > units * width) {
             why = "the offset of '" + in.mnem + "' is not " + std::to_string(width) + "-byte units within " +
                   std::to_string(units) + " of the base";
@@ -103,7 +111,9 @@ bool isaCheck(const Instr &in, std::string &why) {
     switch (e->op) {
     case Op::NOP: ok = n <= 1 && (n == 0 || isImm(o[0])); break;
     case Op::SWE: case Op::IDLE: ok = n == 0; break;
-    case Op::B: case Op::CALLP: ok = n >= 1 && (isImm(o[0]) || isReg(o[0])); break;
+    case Op::B: case Op::CALLP: case Op::RET: case Op::CALL: ok = n >= 1 && (isImm(o[0]) || isReg(o[0])); break;
+    case Op::BNOP: case Op::RETNOP: ok = n == 2 && (isImm(o[0]) || isReg(o[0])) && isImm(o[1]); break;
+    case Op::ADDKPC: ok = n == 3 && isImm(o[0]) && isReg(o[1]) && isImm(o[2]); break;
     case Op::MVK: case Op::MVKL: case Op::MVKH: ok = n == 2 && isImm(o[0]) && isReg(o[1]); break;
     case Op::MV: case Op::NEG: case Op::NOT: case Op::ABS:
         ok = n == 2 && (isReg(o[0]) || isPair(o[0])) && (isReg(o[1]) || isPair(o[1])); break;

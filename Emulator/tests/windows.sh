@@ -23,7 +23,7 @@ for f in "$HERE"/../Compiler-Ci/tests/out-tms6747/*.s; do case "$(basename "$f")
 for f in "$HERE"/../Compiler-Cppi/tests/out-tms6747/*.s; do case "$(basename "$f")" in *" "*) ;; *) cp "$f" "$WORK/xwin/cxx/";; esac; done
 # The Shalimar programs run beside the runtime cxx1i compiled for the C6000,
 # a directory of .s the emulator takes whole - so it travels too.
-SHMRT="${SHMRT:-$HERE/../../RStudio/lib/shmrt-tms6747}"
+SHMRT="${SHMRT:-$HERE/../../RStudio/bin/lib/shmrt-tms6747}"   # where the one binary directory puts it
 for f in "$HERE"/../Compiler-Si/tests/out-tms6747/*.s; do case "$(basename "$f")" in *" "*) ;; *) cp "$f" "$WORK/xwin/shm/";; esac; done
 [ -d "$SHMRT" ] && cp "$SHMRT"/*.s "$WORK/xwin/shmrt/"
 cat > "$WORK/xwin/run.sh" <<'REMOTE_EOF'

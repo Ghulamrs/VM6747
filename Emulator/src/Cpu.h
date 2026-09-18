@@ -55,14 +55,17 @@ public:
     uint64_t cycle() const { return cycle_; }
     std::string where(uint32_t pc) const;
 
-    static const int A = 0, B = 16;
-    static const int A4 = 4, B3 = 16 + 3, B4 = 16 + 4, B15 = 16 + 15, A15 = 15;
+    // The C674x file: A0-A31 and B0-B31. The compilers here use the first
+    // sixteen of each; cl6x uses all of them.
+    static const int A = 0, B = 32;
+    static const int A4 = 4, B3 = 32 + 3, B4 = 32 + 4, B15 = 32 + 15, A15 = 15;
 
 private:
     Program &prog_;
     Runtime &rt_;
-    uint32_t r_[32];
+    uint32_t r_[64];
     uint32_t pc_ = 0;
+    uint32_t packetEnd_ = 0;       // the address after the packet executing - a call's return
     uint64_t cycle_ = 0;
     bool running_ = true;
     int exitCode_ = 0;
@@ -70,6 +73,18 @@ private:
 
     struct Pending { uint64_t at; int reg; uint32_t value; };
     std::vector<Pending> pending_;
+    // A double-precision source is read in two phases - the low word at
+    // issue, the high word a cycle later (SPRUFE8's E1 and E2 reads) - so
+    // such an instruction is held with its low words and completes a cycle
+    // on, with the high words as they are then. Its result lands low word
+    // first, a cycle before the high one, which is what the delay-slot
+    // count names. cl6x schedules to exactly this; cc1i pads past it.
+    struct Deferred { const Instr *in; uint32_t lo1, lo2; };
+    std::vector<Deferred> deferred_;
+    bool completing_ = false;
+    uint32_t deferLo1_ = 0, deferLo2_ = 0;
+    void completeDeferred();
+    void writePairSplit(std::vector<Pending> &w, int lo, uint64_t v, int delay);
     bool branchValid_ = false;
     uint64_t branchAt_ = 0;
     uint32_t branchTarget_ = 0;

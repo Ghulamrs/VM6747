@@ -15,13 +15,16 @@ enum class Op {
     // moves and integer arithmetic (0 delay slots)
     MVK, MVKL, MVKH, MV, ZERO, ADD, ADDU, SUB, SUBU, NEG, NOT, AND, OR, XOR,
     SHL, SHR, SHRU, EXT, EXTU, SET, CLR, ABS,
-    CMPEQ, CMPLT, CMPGT, CMPLTU, CMPGTU, ADDAW, ADDAH, ADDAB, SUBAW, ADDK, MVC,
+    CMPEQ, CMPLT, CMPGT, CMPLTU, CMPGTU, ADDAW, ADDAH, ADDAB, ADDAD, SUBAW, ADDK, MVC, ANDN,
     // multiplies (3 delay slots on the C64x+/C674x)
     MPY32, MPY32U, MPY32SU, MPY32US, MPY, MPYU, MPYSU, MPYUS, MPYLH, MPYHL, MPYH, MPYHU,
     // memory (4 delay slots for a load)
     LDB, LDBU, LDH, LDHU, LDW, LDDW, LDNW, LDNDW, STB, STH, STW, STDW, STNW, STNDW,
     // control
     B, CALLP, NOP, SWE, IDLE,
+    // cl6x's spellings: a branch with its NOPs folded in, and the return
+    // address computed after the branch instead of by it
+    BNOP, RETNOP, RET, CALL, ADDKPC,
     // single precision
     ADDSP, SUBSP, MPYSP, CMPEQSP, CMPLTSP, CMPGTSP, ABSSP, INTSP, INTSPU, SPINT, SPTRUNC, SPDP, RCPSP,
     // double precision

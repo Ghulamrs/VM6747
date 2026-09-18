@@ -16,7 +16,7 @@ double Runtime::Args::dbl() { uint64_t v = wide(); double d; std::memcpy(&d, &v,
 
 // The registers an argument arrives in, by position, and where the stack
 // part begins: B15 + 4 is the first stack word.
-static const int kArgRegs[10] = { 4, 16 + 4, 6, 16 + 6, 8, 16 + 8, 10, 16 + 10, 12, 16 + 12 };
+static const int kArgRegs[10] = { 4, Cpu::B + 4, 6, Cpu::B + 6, 8, Cpu::B + 8, 10, Cpu::B + 10, 12, Cpu::B + 12 };
 static uint32_t arg(Cpu &c, int i) {
     if (i < 10) return c.reg(kArgRegs[i]);
     return c.load32(c.reg(Cpu::B15) + 4 + 4 * (i - 10));
@@ -999,14 +999,14 @@ bool Runtime::call(const std::string &n, Cpu &c) {
     // ---- setjmp / longjmp: the callee-saved registers, the stack and the return ----
     if (n == "setjmp" || n == "_setjmp") {
         uint32_t env = arg(c, 0);
-        static const int saved[] = { 10, 11, 12, 13, 14, 15, 16 + 10, 16 + 11, 16 + 12, 16 + 13, 16 + 14, 16 + 15, 16 + 3 };
+        static const int saved[] = { 10, 11, 12, 13, 14, 15, Cpu::B + 10, Cpu::B + 11, Cpu::B + 12, Cpu::B + 13, Cpu::B + 14, Cpu::B + 15, Cpu::B3 };
         for (int i = 0; i < 13; i++) c.store32(env + 4 * i, c.reg(saved[i]));
         ret(c, 0);
         return true;
     }
     if (n == "longjmp") {
         uint32_t env = arg(c, 0), val = arg(c, 1);
-        static const int saved[] = { 10, 11, 12, 13, 14, 15, 16 + 10, 16 + 11, 16 + 12, 16 + 13, 16 + 14, 16 + 15, 16 + 3 };
+        static const int saved[] = { 10, 11, 12, 13, 14, 15, Cpu::B + 10, Cpu::B + 11, Cpu::B + 12, Cpu::B + 13, Cpu::B + 14, Cpu::B + 15, Cpu::B3 };
         for (int i = 0; i < 13; i++) c.setReg(saved[i], c.load32(env + 4 * i));
         ret(c, val == 0 ? 1 : val);           // and B3 is now setjmp's return address
         return true;

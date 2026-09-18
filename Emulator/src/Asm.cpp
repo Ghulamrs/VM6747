@@ -1,4 +1,5 @@
 #include "Asm.h"
+#include "Cpu.h"
 #include "Isa.h"
 
 #include <cctype>
@@ -28,6 +29,7 @@ struct Unit {
     std::map<std::string, Sym> locals;
     std::vector<std::string> exported;      // .global / .weak names
     std::vector<std::string> weak;
+    std::map<std::string, std::string> asg; // .asg register, name - cl6x's FP, DP and SP
     uint32_t size[SectionCount] = { 0, 0, 0, 0, 0, 0 };
     uint32_t base[SectionCount] = { 0, 0, 0, 0, 0, 0 };
     // The largest alignment a section asked for. The first pass aligns
@@ -245,13 +247,18 @@ struct Assembler {
     }
 
     // ---- registers and memory operands --------------------------------------
-    static bool regNumber(const std::string &t, int &r) {
+    static bool regNumber(const Unit &u, const std::string &t, int &r) {
         std::string s = upper(trim(t));
+        // An .asg name stands for its register in this file alone: cl6x
+        // opens every file with .asg A15, FP / B14, DP / B15, SP, and cc1i
+        // has a plain symbol called fp.
+        std::map<std::string, std::string>::const_iterator a = u.asg.find(s);
+        if (a != u.asg.end()) s = a->second;
         if (s.size() < 2 || (s[0] != 'A' && s[0] != 'B')) return false;
         for (size_t i = 1; i < s.size(); i++) if (!std::isdigit(static_cast<unsigned char>(s[i]))) return false;
         int n = std::atoi(s.c_str() + 1);
-        if (n > 15) return false;
-        r = (s[0] == 'B' ? 16 : 0) + n;
+        if (n > 31) return false;
+        r = (s[0] == 'B' ? Cpu::B : Cpu::A) + n;
         return true;
     }
     bool operand(const Unit &u, const Line &ln, const std::string &t, bool resolve, Operand &op) {
@@ -260,13 +267,13 @@ struct Assembler {
         size_t colon = s.find(':');
         if (colon != std::string::npos && s[0] != '*') {
             int hi = 0, lo = 0;
-            if (!regNumber(s.substr(0, colon), hi) || !regNumber(s.substr(colon + 1), lo))
+            if (!regNumber(u, s.substr(0, colon), hi) || !regNumber(u, s.substr(colon + 1), lo))
                 return fail(u, ln, "bad register pair '" + s + "'");
             if (hi != lo + 1 || (lo & 1)) return fail(u, ln, "a register pair is odd:even, '" + s + "' is not");
             op.kind = Operand::Reg; op.reg = lo; op.reg2 = hi;
             return true;
         }
-        if (regNumber(s, r)) { op.kind = Operand::Reg; op.reg = r; return true; }
+        if (regNumber(u, s, r)) { op.kind = Operand::Reg; op.reg = r; return true; }
         if (s[0] == '*') return memOperand(u, ln, s, resolve, op);
         op.kind = Operand::Imm;
         bool hadSym = false;
@@ -287,7 +294,7 @@ struct Assembler {
         else if (body[0] == '-') { op.negative = true; body = body.substr(1); }
         size_t e = 0;
         while (e < body.size() && std::isalnum(static_cast<unsigned char>(body[e]))) e++;
-        if (!regNumber(body.substr(0, e), op.base)) return fail(u, ln, "bad address '" + s + "'");
+        if (!regNumber(u, body.substr(0, e), op.base)) return fail(u, ln, "bad address '" + s + "'");
         std::string rest = trim(body.substr(e));
         if (rest.compare(0, 2, "++") == 0) { op.mode = 3; rest = trim(rest.substr(2)); }
         else if (rest.compare(0, 2, "--") == 0) { op.mode = 4; rest = trim(rest.substr(2)); }
@@ -298,7 +305,7 @@ struct Assembler {
         op.scaled = open == '[';
         std::string inner = trim(rest.substr(1, rest.size() - 2));
         int r;
-        if (regNumber(inner, r)) { op.offReg = r; return true; }
+        if (regNumber(u, inner, r)) { op.offReg = r; return true; }
         long long v;
         if (!evaluate(u, ln, inner, resolve, v)) return false;
         op.off = v;
@@ -307,6 +314,36 @@ struct Assembler {
 
     // ---- pass one: sizes and labels ------------------------------------------
     uint32_t alignUp(uint32_t v, uint32_t a) { return (v + a - 1) / a * a; }
+
+    // A .sect name, with or without quotes, and with the subsection cl6x
+    // appends after a colon (".text:main", ".fardata:box"); a second operand
+    // such as RW is left to the caller to ignore.
+    static bool sectionOf(std::string n, int &sec) {
+        if (n.size() >= 2 && n[0] == '"') n = n.substr(1, n.size() - 2);
+        std::string head = n.substr(0, n.find(':'));
+        if (head == ".text") sec = Text;
+        else if (head == ".data" || head == ".fardata" || head == ".neardata") sec = Data;
+        else if (head == ".const" || head == ".rodata" || head == ".switch" || head.compare(0, 6, ".const") == 0) sec = Const;
+        else if (head == ".bss" || head == ".far") sec = Bss;
+        else if (head == ".init_array") sec = Init;
+        else if (head.compare(0, 13, ".c6xabi.exidx") == 0) sec = Exidx;
+        else if (head.compare(0, 13, ".c6xabi.extab") == 0) sec = Const;
+        else if (head.compare(0, 5, ".text") == 0) sec = Text;
+        else return false;
+        return true;
+    }
+
+    // .bits value, n and .field value, n: n bits of data, whole bytes only
+    // here (cl6x writes a char array as .bits x, 8, a vtable slot as
+    // .field f, 32 and padding as .bits 0, 24); .field aligns to its width.
+    bool bitsWidth(const Unit &u, const Line &ln, int &bytes) {
+        long long n;
+        if (ln.operands.size() != 2 || !evaluate(u, ln, ln.operands[1], false, n))
+            return fail(u, ln, ln.mnem + " needs a value and a width");
+        if (n <= 0 || n % 8 != 0 || n > 64) return fail(u, ln, ln.mnem + " of " + std::to_string(n) + " bits is not whole bytes");
+        bytes = static_cast<int>(n / 8);
+        return true;
+    }
 
     bool passOne(Unit &u) {
         int sec = Text;
@@ -324,16 +361,18 @@ struct Assembler {
                 else if (m == ".data") sec = Data;
                 else if (m == ".sect") {
                     std::string n = ln.operands.empty() ? "" : ln.operands[0];
+                    if (!sectionOf(n, sec)) return fail(u, ln, "unknown section '" + n + "'");
+                } else if (m == ".asg") {
+                    int r;
+                    if (ln.operands.size() != 2 || !regNumber(u, ln.operands[0], r))
+                        return fail(u, ln, ".asg names a register here, nothing else");
+                    u.asg[upper(trim(ln.operands[1]))] = upper(trim(ln.operands[0]));
+                } else if (m == ".group") {
+                    // cl6x's COMDAT group, named for its key symbol: one
+                    // definition is kept across units, as for .weak.
+                    std::string n = ln.operands.empty() ? "" : ln.operands[0];
                     if (n.size() >= 2 && n[0] == '"') n = n.substr(1, n.size() - 2);
-                    if (n == ".text") sec = Text;
-                    else if (n == ".data" || n == ".fardata" || n == ".neardata") sec = Data;
-                    else if (n == ".const" || n == ".rodata" || n.compare(0, 6, ".const") == 0) sec = Const;
-                    else if (n == ".bss" || n == ".far") sec = Bss;
-                    else if (n == ".init_array") sec = Init;
-                    else if (n.compare(0, 13, ".c6xabi.exidx") == 0) sec = Exidx;
-                    else if (n.compare(0, 13, ".c6xabi.extab") == 0) sec = Const;
-                    else if (n.compare(0, 5, ".text") == 0) sec = Text;
-                    else return fail(u, ln, "unknown section '" + n + "'");
+                    u.weak.push_back(n);
                 } else if (m == ".global" || m == ".globl" || m == ".def" || m == ".ref") {
                     for (const std::string &n : ln.operands) u.exported.push_back(n);
                 } else if (m == ".weak") {
@@ -359,6 +398,11 @@ struct Assembler {
                     if (a > 0 && static_cast<uint32_t>(a) > u.align[sec]) u.align[sec] = static_cast<uint32_t>(a);
                     u.size[sec] = alignUp(u.size[sec], static_cast<uint32_t>(a));
                     if (!ln.label.empty()) u.locals[ln.label].offset = u.size[sec];
+                } else if (m == ".bits" || m == ".field") {
+                    int w;
+                    if (!bitsWidth(u, ln, w)) return false;
+                    if (m == ".field" && w <= 4) u.size[sec] = alignUp(u.size[sec], static_cast<uint32_t>(w));
+                    u.size[sec] += static_cast<uint32_t>(w);
                 } else if (m == ".byte" || m == ".char") u.size[sec] += static_cast<uint32_t>(ln.operands.size());
                 else if (m == ".short" || m == ".half" || m == ".uhalf") u.size[sec] += 2 * static_cast<uint32_t>(ln.operands.size());
                 else if (m == ".word" || m == ".long" || m == ".int" || m == ".ulong") u.size[sec] += 4 * static_cast<uint32_t>(ln.operands.size());
@@ -381,8 +425,9 @@ struct Assembler {
                     Sym s; s.section = -1; s.offset = static_cast<uint32_t>(v); s.defined = true;
                     u.locals[name] = s;
                 } else if (m == ".end" || m == ".file" || m == ".clink" || m == ".nocmp" || m == ".symdepend" ||
-                           m == ".compiler_opts" || m == ".asg" || m == ".retain" ||
-                           m == ".ident" || m == ".p2align" || m == ".size" || m == ".type") {
+                           m == ".compiler_opts" || m == ".retain" ||
+                           m == ".ident" || m == ".p2align" || m == ".size" || m == ".type" ||
+                           m == ".battr" || m == ".elfsym" || m == ".hidden" || m == ".gmember" || m == ".endgroup") {
                     // nothing
                 } else return fail(u, ln, "unknown directive '" + m + "'");
                 continue;
@@ -394,9 +439,16 @@ struct Assembler {
         return true;
     }
 
-    static bool stringBytes(const Unit &u, const Line &ln, const std::string &lit, std::string &out) {
-        (void)u; (void)ln;
-        if (lit.size() < 2 || lit[0] != '"' || lit.back() != '"') return false;
+    // A .string operand: quoted text, or a byte value - TI writes a
+    // newline-terminated string as "text",10,0.
+    bool stringBytes(const Unit &u, const Line &ln, const std::string &lit, std::string &out) {
+        if (lit.empty() || lit[0] != '"') {
+            long long v;
+            if (!evaluate(u, ln, lit, true, v)) return false;
+            out += static_cast<char>(v);
+            return true;
+        }
+        if (lit.size() < 2 || lit.back() != '"') return fail(u, ln, "an unclosed string");
         for (size_t i = 1; i + 1 < lit.size(); i++) {
             char c = lit[i];
             if (c != '\\') { out += c; continue; }
@@ -426,12 +478,13 @@ struct Assembler {
             if (mn[0] == '.') {
                 if (mn == ".text") sec = Text;
                 else if (mn == ".data") sec = Data;
-                else if (mn == ".sect") {
-                    std::string n = ln.operands[0];
-                    if (n.size() >= 2 && n[0] == '"') n = n.substr(1, n.size() - 2);
-                    sec = n.compare(0, 5, ".text") == 0 ? Text : (n == ".data" || n == ".fardata" || n == ".neardata") ? Data
-                        : (n == ".bss" || n == ".far") ? Bss : n == ".init_array" ? Init
-                        : n.compare(0, 13, ".c6xabi.exidx") == 0 ? Exidx : Const;
+                else if (mn == ".sect") sectionOf(ln.operands[0], sec);
+                else if (mn == ".bits" || mn == ".field") {
+                    int w; bitsWidth(u, ln, w);
+                    if (mn == ".field" && w <= 4) at[sec] = alignUp(at[sec], static_cast<uint32_t>(w));
+                    long long v; evaluate(u, ln, ln.operands[0], true, v);
+                    for (int k = 0; k < w; k++) m[at[sec] + k] = static_cast<uint8_t>(v >> (8 * k));
+                    at[sec] += w;
                 } else if (mn == ".align") {
                     long long a = 4;
                     if (!ln.operands.empty()) evaluate(u, ln, ln.operands[0], true, a);
@@ -473,8 +526,8 @@ struct Assembler {
             in.line = ln.number;
             if (!ln.pred.empty()) {
                 int r;
-                if (!regNumber(ln.pred, r)) return fail(u, ln, "bad predicate '" + ln.pred + "'");
-                if ((r & 15) > 2) return fail(u, ln, "only A0-A2 and B0-B2 can predicate; '" + ln.pred + "' cannot");
+                if (!regNumber(u, ln.pred, r)) return fail(u, ln, "bad predicate '" + ln.pred + "'");
+                if ((r % Cpu::B) > 2) return fail(u, ln, "only A0-A2 and B0-B2 can predicate; '" + ln.pred + "' cannot");
                 in.pred = r; in.predNeg = ln.predNeg;
             }
             for (const std::string &o : ln.operands) {
