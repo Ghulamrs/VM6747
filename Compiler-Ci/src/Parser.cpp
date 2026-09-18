@@ -88,6 +88,23 @@ const Type *Parser::structOrUnionSpecifier(Kind kind) {
     int widest = 1;
     long long bitCursor = 0;
     long long widestBits = 0;
+    // **The Microsoft ABI allocates bit-fields in units of the declared type**,
+    // a new unit when the type changes or the open one is full, the whole unit
+    // charged; Itanium packs them end to end. Found by TriLab against cl:
+    // {char; unsigned:6; unsigned:6; int} is 12 bytes there and was 8 here.
+    const bool msBits = target_.microsoftLayout();
+    long long msUnitStart = 0, msUnitBits = 0;
+    // Opens a unit of this type for a field of w bits, unless the open one is
+    // of the type and has the room; the open one is charged whole first.
+    auto msOpenUnit = [&](long long unitBits, long w, int a) {
+        if (msUnitBits == unitBits && bitCursor - msUnitStart + w <= msUnitBits)
+            return;
+        const long long full = msUnitBits != 0 ? msUnitStart + msUnitBits : bitCursor;
+        const long long byteCursor = ((bitCursor > full ? bitCursor : full) + 7) / 8;
+        msUnitStart = alignTo(byteCursor, a) * 8;
+        msUnitBits = unitBits;
+        bitCursor = msUnitStart;
+    };
 
     while (!peek().is("}")) {
         if (peek().kind == TokenKind::End) src_.fail(pos, "unclosed '{'");
@@ -108,13 +125,32 @@ const Type *Parser::structOrUnionSpecifier(Kind kind) {
                     src_.fail(cpos, "a bit-field of " + std::to_string(w) +
                                     " bits does not fit in '" + base->describe() + "'");
                 int a = base->align(target_);
-                if (a > widest) widest = a;
+                // A zero-width bit-field does not raise the struct's alignment,
+                // on either ABI: {char a; int :0; char b;} is 2 bytes aligned 1 on Microsoft.
+                if (a > widest && w != 0) widest = a;
                 if (w == 0) {
-                    bitCursor = alignTo(bitCursor, unitBits);
-                } else if (kind != Kind::Union) {
-                    if (bitCursor % unitBits + w > unitBits)
+                    // Itanium rounds to the next unit of this type; Microsoft
+                    // closes the open unit whole, then aligns to the type.
+                    if (msBits) {
+                        if (msUnitBits != 0) {
+                            bitCursor = alignTo(msUnitStart + msUnitBits,
+                                                static_cast<long long>(a) * 8);
+                            msUnitBits = 0;
+                        } else {
+                            bitCursor = alignTo(bitCursor, 8);
+                        }
+                    } else {
                         bitCursor = alignTo(bitCursor, unitBits);
-                    bitCursor += w;
+                    }
+                } else if (kind != Kind::Union) {
+                    if (msBits) {
+                        msOpenUnit(unitBits, w, a);
+                        bitCursor += w;
+                    } else {
+                        if (bitCursor % unitBits + w > unitBits)
+                            bitCursor = alignTo(bitCursor, unitBits);
+                        bitCursor += w;
+                    }
                 }
                 if (kind == Kind::Union && w > unitBits) w = unitBits;
                 if (kind == Kind::Union && w > widestBits) widestBits = w;
@@ -152,6 +188,11 @@ const Type *Parser::structOrUnionSpecifier(Kind kind) {
                     at = 0;
                     bitOff = 0;
                     if (w > widestBits) widestBits = w;
+                } else if (msBits) {
+                    msOpenUnit(unitBits, w, a);
+                    at = msUnitStart / 8;
+                    bitOff = bitCursor - msUnitStart;
+                    bitCursor += w;
                 } else {
                     if (bitCursor % unitBits + w > unitBits)
                         bitCursor = alignTo(bitCursor, unitBits);
@@ -170,19 +211,27 @@ const Type *Parser::structOrUnionSpecifier(Kind kind) {
                 src_.fail(d.pos, "'" + d.name + "' has an incomplete type");
             int a = d.type->align(target_);
             if (a > widest) widest = a;
-            long long byteCursor = (bitCursor + 7) / 8;
+            // A plain member goes after the open unit whole, and closes it.
+            const long long openEnd = (msBits && msUnitBits != 0)
+                ? msUnitStart + msUnitBits : bitCursor;
+            long long byteCursor = ((bitCursor > openEnd ? bitCursor : openEnd) + 7) / 8;
             long long at = (kind == Kind::Union) ? 0 : alignTo(byteCursor, a);
             members.push_back(Member{ d.name, d.type, static_cast<int>(at) });
             long long endBits = (at + d.type->size(target_)) * 8;
             if (kind == Kind::Union) { if (endBits > widestBits) widestBits = endBits; }
             else bitCursor = endBits;
+            msUnitBits = 0;
             if (!consume(",")) break;
         }
         expect(";");
     }
     expect("}");
 
-    long long totalBits = (kind == Kind::Union) ? widestBits : bitCursor;
+    // The open unit's full width counts toward the size, not just the bits used.
+    const long long lastBits = (msBits && msUnitBits != 0 &&
+                                msUnitStart + msUnitBits > bitCursor)
+                             ? msUnitStart + msUnitBits : bitCursor;
+    long long totalBits = (kind == Kind::Union) ? widestBits : lastBits;
     if (members.empty() && totalBits == 0)
         src_.fail(pos, std::string(what) + " has no members");
 

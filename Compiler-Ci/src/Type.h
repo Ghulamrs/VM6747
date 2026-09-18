@@ -146,5 +146,9 @@ public:
 
     virtual Kind wcharType() const = 0;
 
+    // Whether the Microsoft ABI lays this target out - bit-fields in units of
+    // their declared type - as against the System V one the other two share.
+    virtual bool microsoftLayout() const { return false; }
+
     virtual const char *name() const = 0;
 };
