@@ -13,3 +13,6 @@ cpp/cxx1lab.dSYM/
 c/vs/x64/
 cpp/vs/x64/
 out/
+shm/main
+shm/main.exe
+shm/*.obj

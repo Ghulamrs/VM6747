@@ -4,7 +4,7 @@
 #
 #   sh trilab.sh mac            RIDE (cc1i, cxx1i, arm64-darwin) against Xcode, on this Mac
 #   sh trilab.sh windows        RIDE on the box (x86_64-windows, the project's assembler)
-#                               against Visual Studio 2022
+#                               against Visual Studio 2022 - and, for the Shalimar lab, ml64 and link
 #   sh trilab.sh ccs            RIDE on the box (tms6747, run on vm6747) against CCS 7.4's
 #                               cl6x, whose assembly vm6747 runs too (CCS has no simulator)
 #
@@ -75,19 +75,22 @@ windows)
     echo "TriLab, Windows: RIDE (cc1i, cxx1i, the project's assembler) against Visual Studio 2022"
     python3 "$HERE/tools/make-vs.py" > /dev/null
     find "$HERE" -name "* [0-9].*" -delete
-    COPYFILE_DISABLE=1 tar -C "$HERE" --no-xattrs --exclude out --exclude xcode --exclude 'c/cc1lab*' --exclude 'cpp/cxx1lab*' \
-        -czf "$OUT/trilab.tgz" c cpp tools expected 2>/dev/null || { echo "  cannot pack the lab"; exit 2; }
+    COPYFILE_DISABLE=1 tar -C "$HERE" --no-xattrs --exclude out --exclude xcode --exclude 'c/cc1lab*' --exclude 'cpp/cxx1lab*' --exclude 'shm/main' --exclude 'shm/main.exe' \
+        -czf "$OUT/trilab.tgz" c cpp shm tools expected 2>/dev/null || { echo "  cannot pack the lab"; exit 2; }
     ssh -n -o BatchMode=yes "$BOX" "if not exist $W mkdir $W" > /dev/null || exit 2
     scp -q "$OUT/trilab.tgz" "$BOX:$BOXLAB/trilab.tgz" || exit 2
     ssh -n -o BatchMode=yes "$BOX" "cd /d $W & tar xzf trilab.tgz & $W\\tools\\windows-leg.cmd $W $(echo "$BOXRIDE" | sed 's|/|\\|g') $(echo "$BOXASM" | sed 's|/|\\|g')" \
         | grep -vE "^\s*$" | sed 's/^/  /'
-    mkdir -p "$OUT/win" && scp -q "$BOX:$BOXLAB/out/*" "$OUT/win/" || { echo "  no outputs came back"; exit 1; }
-    for d in c cpp; do
+    mkdir -p "$OUT/win" && scp -q "$BOX:$BOXLAB/out/*.out" "$OUT/win/" || { echo "  no outputs came back"; exit 1; }
+    for d in c cpp shm; do
         for side in ride vs; do
             [ -f "$OUT/win/$d-$side.out" ] || { echo "  $d: no $side output - see $OUT/win/$d-$side.build"; status=1; continue 2; }
             tr -d '\r' < "$OUT/win/$d-$side.out" > "$OUT/$d-$side.out"
         done
-        compare "$d" "$OUT/$d-ride.out" "$OUT/$d-vs.out" "Visual Studio"
+        # the Shalimar lab's judge is Microsoft's assembler and linker over shci's
+        # assembly, there being no Visual Studio project for Shalimar
+        [ "$d" = shm ] && judge="ml64 and link" || judge="Visual Studio"
+        compare "$d" "$OUT/$d-ride.out" "$OUT/$d-vs.out" "$judge"
     done
     ;;
 ccs)

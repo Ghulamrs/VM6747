@@ -1,6 +1,8 @@
 @echo off
-rem  TriLab's Windows leg, on the box: RIDE builds each lab with cc1i/cxx1i and the
-rem  project's assembler; MSBuild builds the judge's project with cl; both run.
+rem  TriLab's Windows leg, on the box: RIDE builds each lab with cc1i/cxx1i/shci and
+rem  the project's assembler; the judge builds the same sources with Microsoft's
+rem  tools - MSBuild and cl for C and C++, ml64 and link over shci's assembly for
+rem  Shalimar, which no Visual Studio project can hold; both run.
 rem  Usage: windows-leg.cmd <TriLab dir> <RStudioConsole.exe> <assembler.exe>
 rem  Writes <TriLab dir>\out\<lab>-ride.out, <lab>-vs.out, and the build logs.
 setlocal enabledelayedexpansion
@@ -31,4 +33,26 @@ for %%L in (c:CC1Lab:cc1lab cpp:CXX1Lab:cxx1lab) do (
     )
   )
 )
+rem  the Shalimar lab: RIDE with shci and the assembler, against shci's own
+rem  assembly through ml64 and link - the two commands shci runs when no
+rem  assembler is named, from Compiler-Si\src\Driver.cpp - with RIDE's runtime
+set BIN=%~dp2
+pushd %LAB%\shm
+"%RIDE%" ShmLab.pro --arch x86_64-windows --assembler "%ASM%" --build > %LAB%\out\shm-ride.build 2>&1
+if errorlevel 1 (echo RIDE-FAILED shm) else (
+  main.exe > %LAB%\out\shm-ride.out 2>&1
+  echo RIDE shm rc=!errorlevel!
+)
+set SRCS=
+for %%s in (main prime sqroot invert gaussseidel rotations strsplit) do set SRCS=!SRCS! %%s.shl
+"%BIN%shci.exe" !SRCS! --target=x86_64-windows -S -o %LAB%\out\shm-vs.asm > %LAB%\out\shm-vs.build 2>&1
+if errorlevel 1 (echo VS-FAILED shm) else (
+  ml64 /nologo /c /Fo%LAB%\out\shm-vs.obj %LAB%\out\shm-vs.asm >> %LAB%\out\shm-vs.build 2>&1
+  link /nologo /subsystem:console /out:%LAB%\out\shm-vs.exe %LAB%\out\shm-vs.obj "%BIN%lib\shmrt-x86_64-windows.lib" >> %LAB%\out\shm-vs.build 2>&1
+  if errorlevel 1 (echo VS-FAILED shm) else (
+    %LAB%\out\shm-vs.exe > %LAB%\out\shm-vs.out 2>&1
+    echo VS shm rc=!errorlevel!
+  )
+)
+popd
 echo WINDOWS-LEG-DONE

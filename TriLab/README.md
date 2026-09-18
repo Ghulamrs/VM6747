@@ -9,10 +9,10 @@ legitimately different, with both readings beside each other.
 | Environment | The candidate | The judge |
 |---|---|---|
 | macOS | RIDE on the Mac, `arm64-darwin`, cc1i / cxx1i | Xcode: the same sources in a native project, Apple clang |
-| Windows, first | RIDE on the box, `x86_64-windows`, cc1i / cxx1i with the project's assembler | Visual Studio 2022: a native `.vcxproj`, `cl.exe` |
+| Windows, first | RIDE on the box, `x86_64-windows`, cc1i / cxx1i / shci with the project's assembler | Visual Studio 2022: a native `.vcxproj`, `cl.exe`; for Shalimar, `ml64` and `link` over shci's assembly |
 | Windows, next | RIDE on the box, `tms6747`, cc1i / cxx1i, run on vm6747 | CCS 7.4: `cl6x` / `lnk6x`; its C runs on vm6747 too (CCS has no simulator), its C++ links but cannot run there |
 
-## The two programs
+## The three programs
 
 `c/` is the C lab, **CC1Lab**: `main.c` and ten examples, one per area of the language, plus
 `heavy.c` - a copy of `Compiler-Ci/examples`, frozen here so that the lab's program is its own.
@@ -25,6 +25,16 @@ difference is inside the shipped header or the compiler, never in the lab's sour
 `CC1Lab.pro` and `CXX1Lab.pro` are RIDE's project files - open them in RIDE, pick the target,
 Run. `xcode/` holds the judge's Xcode project, written from the `.pro` by
 `tools/make-xcode.py` and kept, so it is what a user of Xcode would see.
+
+**ShmLab** (`shm/`, Windows leg only): `main.shl` and six of Compiler-Si's examples -
+prime, sqroot, invert, gaussseidel, rotations, strsplit - each a program of its own until
+its `main` was renamed, which is how a Shalimar program becomes a library. Real and
+integer arithmetic, one- and two-dimensional arrays, text, borrowed library functions,
+and a seven-file program the project says how to assemble. There is no Visual Studio
+project for Shalimar, so its judge is Microsoft's assembler and linker over shci's own
+assembly (`ml64`, `link`, the two commands shci runs when no assembler is named) against
+RIDE's runtime archive: what the lab judges is the project's assembler, as the C and
+C++ labs judge the compilers.
 
 ## Running a leg
 
@@ -72,6 +82,10 @@ leg with no such file must print identical output.
   And the file-I/O example wrote to `/tmp/`, which Windows has not, so both sides skipped
   its seven lines and exited 1 in agreement - the comparison was blind to the one example
   that exercises the C runtime. It writes beside the program now.
+- **Windows, Shalimar, 2026-09-18 night**: 61 lines, RIDE (shci through the assembler)
+  and ml64 + link identical, and identical to the Mac's run. Putting shci's corpus through
+  the assembler first, before the lab, found three assembler faults (MASM `36a4c4a`,
+  `b030f89`), one of them real jump sizing; the lab itself passed on its first run.
 - **CCS 7.4, 2026-09-18**: C 111 lines, RIDE (cc1i on vm6747) and cl6x (its assembly on
   vm6747) identical, both sides linked by lnk6x; C++ 6 lines, RIDE on vm6747 identical to
   Xcode's native run, both sides linked by lnk6x, cl6x's own C++ not runnable (above). The
