@@ -29,10 +29,17 @@ Run. `xcode/` holds the judge's Xcode project, written from the `.pro` by
 ## Running a leg
 
     sh trilab.sh mac
+    sh trilab.sh windows
 
-builds each lab through `RStudio --build` (the same code path as F4), runs it, builds the
+The macOS leg builds each lab through `RStudio --build` (the same code path as F4), runs it, builds the
 judge's project with `xcodebuild`, runs that, and diffs. Products go under `$TMPDIR`, not
 the tree; RIDE's own `cc1lab` / `cxx1lab` land beside the sources and are ignored by git.
+
+The Windows leg ships the lab to the box as a tar, and `tools/windows-leg.cmd` there builds
+each lab through `RStudioConsole --build --arch x86_64-windows --assembler <asm-win.exe>`
+(cc1i and cxx1i writing MASM, the project's assembler, `link`), builds the judge's `.sln`
+with `msbuild`, runs all four, and the outputs come back to be compared here. The box needs
+RIDE built by RStudio's `tools/to-windows.sh` and the assembler by MASM's `tests/windows.sh`.
 
 ## The ledger
 
@@ -44,3 +51,11 @@ leg with no such file must print identical output.
 
 - **macOS, 2026-09-18**: C 111 lines and C++ 6 lines, RIDE (cc1i, cxx1i) and Xcode (Apple
   clang 17) identical; no ledger entry needed.
+- **Windows, 2026-09-18**: C 111 lines and C++ 6 lines, RIDE (cc1i, cxx1i, the assembler)
+  and Visual Studio 2022 (cl 19.44) identical; no ledger entry needed. The first run showed
+  two things. cc1i packed bit-fields end to end on every target, where the Microsoft ABI
+  allocates them in units of the declared type: `{char; unsigned:6; unsigned:6; int}` was
+  8 bytes to RIDE and 12 to cl, one line of 104 (fixed in cc1i, `Target::microsoftLayout`).
+  And the file-I/O example wrote to `/tmp/`, which Windows has not, so both sides skipped
+  its seven lines and exited 1 in agreement - the comparison was blind to the one example
+  that exercises the C runtime. It writes beside the program now.

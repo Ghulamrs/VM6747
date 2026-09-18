@@ -1,6 +1,8 @@
 # what a build leaves in a lab directory; the projects and sources are the lab
 c/cc1lab
 c/cc1lab.dSYM/
+cc1_example.txt
+cc1_example.bin
 cpp/cxx1lab
 cpp/cxx1lab.dSYM/
 *.vm
@@ -8,3 +10,6 @@ cpp/cxx1lab.dSYM/
 *.obj
 *.s
 *.asm
+c/vs/x64/
+cpp/vs/x64/
+out/

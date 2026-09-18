@@ -15,14 +15,14 @@ int ex_fileio(void) {
 
     printf("[fileio]\n");
 
-    f = fopen("/tmp/cc1_example.txt", "w");
+    f = fopen("cc1_example.txt", "w");
     if (f == 0) { printf("  cannot write\n"); return 0; }
     fprintf(f, "%d %s %.2f\n", 42, "text", 1.5);
     fputs("second line\n", f);
     fputc('X', f);
     fclose(f);
 
-    f = fopen("/tmp/cc1_example.txt", "r");
+    f = fopen("cc1_example.txt", "r");
     if (f == 0) { printf("  cannot read\n"); return 0; }
     fgets(line, 64, f);
     printf("  line 1   : %s", line);
@@ -38,13 +38,13 @@ int ex_fileio(void) {
     out.score = 2.25;
     out.tag[0] = 'a'; out.tag[1] = 'b'; out.tag[2] = 0;
 
-    f = fopen("/tmp/cc1_example.bin", "wb");
+    f = fopen("cc1_example.bin", "wb");
     if (f == 0) { printf("  cannot write binary\n"); return 0; }
     printf("  wrote    : %lu record of %lu bytes\n",
            fwrite(&out, sizeof out, 1, f), sizeof out);
     fclose(f);
 
-    f = fopen("/tmp/cc1_example.bin", "rb");
+    f = fopen("cc1_example.bin", "rb");
     if (f == 0) { printf("  cannot read binary\n"); return 0; }
     printf("  read     : %lu\n", fread(&in, sizeof in, 1, f));
     printf("  back     : %d %.2f %s\n", in.id, in.score, in.tag);
@@ -53,7 +53,7 @@ int ex_fileio(void) {
     printf("  seek     : %ld -> %ld\n", where, ftell(f));
     fclose(f);
 
-    remove("/tmp/cc1_example.txt");
-    remove("/tmp/cc1_example.bin");
+    remove("cc1_example.txt");
+    remove("cc1_example.bin");
     return 9;
 }
