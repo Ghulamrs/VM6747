@@ -86,6 +86,11 @@ leg with no such file must print identical output.
   and ml64 + link identical, and identical to the Mac's run. Putting shci's corpus through
   the assembler first, before the lab, found three assembler faults (MASM `36a4c4a`,
   `b030f89`), one of them real jump sizing; the lab itself passed on its first run.
+- **CCS 7.4, 2026-09-19**: RIDE links the `.out` itself now - `asm6x.exe` beside it (the
+  ASM6x project, the compilers' C6000 assembler, held object for object to TI's asm6x)
+  assembles the `.vm`, and told TI's compiler directory (`--ti`, `--tilib`) lnk6x links it:
+  `RIDE-OUT c`, `RIDE-OUT cpp`. The cl6x-over-RIDE's-assembly check stays beside it as the
+  independent reading of the same assembly.
 - **CCS 7.4, 2026-09-18**: C 111 lines, RIDE (cc1i on vm6747) and cl6x (its assembly on
   vm6747) identical, both sides linked by lnk6x; C++ 6 lines, RIDE on vm6747 identical to
   Xcode's native run, both sides linked by lnk6x, cl6x's own C++ not runnable (above). The

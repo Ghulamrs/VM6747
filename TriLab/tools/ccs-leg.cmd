@@ -6,6 +6,10 @@ rem  runs both sides. Beside the run, each side is also taken through TI's own
 rem  assembler and linker (asm via cl6x -c, lnk6x against rts6740_elf_eh.lib) to
 rem  a real .out: the judge accepts RIDE's output, and the sources build as a
 rem  real TI program.
+rem  Since 2026-09-19 RIDE links the .out itself: asm6x.exe beside it assembles the
+rem  .vm's assembly and, told TI's compiler directory (--ti, --tilib), lnk6x links
+rem  it - RIDE-OUT below says the .out is there. The cl6x-over-RIDE's-assembly check
+rem  stays as the independent reading of the same assembly.
 rem  Usage: ccs-leg.cmd <TriLab dir> <RStudioConsole.exe> <vm6747.exe>
 rem  Writes <TriLab dir>\out\<lab>-ride-ccs.out, <lab>-ccs.out, and the logs.
 setlocal enabledelayedexpansion
@@ -24,10 +28,12 @@ for %%L in (c:CC1Lab:cc1lab:c cpp:CXX1Lab:cxx1lab:cpp) do (
     rem  the candidate: RIDE, batch, the emulated target; the program is a
     rem  directory of one .s per source, which vm6747 assembles and runs
     pushd %LAB%\%%a
-    "%RIDE%" %%b.pro --arch tms6747 --build > %LAB%\out\%%a-ride-ccs.build 2>&1
+    del /q %%c.out 2>nul
+    "%RIDE%" %%b.pro --arch tms6747 --ti %CGT% --tilib %TILIB% --build > %LAB%\out\%%a-ride-ccs.build 2>&1
     if errorlevel 1 (echo RIDE-FAILED %%a) else (
       "%VM%" %%c.vm > %LAB%\out\%%a-ride-ccs.out 2>&1
       echo RIDE %%a rc=!errorlevel!
+      if exist %%c.out (echo RIDE-OUT %%a) else echo RIDE-NO-OUT %%a
     )
     popd
     rem  TI accepts what RIDE wrote: every .s assembled by cl6x, linked by lnk6x
