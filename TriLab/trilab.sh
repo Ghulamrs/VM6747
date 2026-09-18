@@ -5,7 +5,8 @@
 #   sh trilab.sh mac            RIDE (cc1i, cxx1i, arm64-darwin) against Xcode, on this Mac
 #   sh trilab.sh windows        RIDE on the box (x86_64-windows, the project's assembler)
 #                               against Visual Studio 2022
-#   sh trilab.sh ccs            RIDE on the box (tms6747, vm6747) against CCS 7.4  [not yet]
+#   sh trilab.sh ccs            RIDE on the box (tms6747, run on vm6747) against CCS 7.4's
+#                               cl6x, whose assembly vm6747 runs too (CCS has no simulator)
 #
 # A leg passes when, for each program, RIDE's output and the judge's are the same
 # line for line, except lines the ledger (expected/<leg>-<lab>.allowed) records as
@@ -90,7 +91,48 @@ windows)
     done
     ;;
 ccs)
-    echo "trilab.sh: the $leg leg is not written yet"; status=2 ;;
+    # The box again, with CCS 7.4's compiler (cl6x, lnk6x under C:\ti\ccsv7) and
+    # RIDE's vm6747.exe. CCS 7.4 has no simulator, so the emulator runs both
+    # sides: RIDE's tms6747 program and the assembly cl6x writes for the same
+    # sources. Each side also goes through TI's assembler and linker to a real
+    # .out (the leg says so per lab), which is the acceptance half of the judge.
+    BOX=${BOX:-windows}
+    BOXLAB=${BOXLAB:-C:/Users/GRA/source/VM6747/TriLab}
+    BOXRIDE=${BOXRIDE:-C:/Users/GRA/source/RStudio/bin/RStudioConsole.exe}
+    BOXVM=${BOXVM:-C:/Users/GRA/source/RStudio/bin/vm6747.exe}
+    W=$(echo "$BOXLAB" | sed 's|/|\\|g')
+    echo "TriLab, CCS 7.4: RIDE (cc1i, cxx1i, tms6747, run on vm6747) against cl6x, run on vm6747 too"
+    find "$HERE" -name "* [0-9].*" -delete
+    COPYFILE_DISABLE=1 tar -C "$HERE" --no-xattrs --exclude out --exclude xcode --exclude vs --exclude 'c/cc1lab*' --exclude 'cpp/cxx1lab*' \
+        -czf "$OUT/trilab.tgz" c cpp tools expected 2>/dev/null || { echo "  cannot pack the lab"; exit 2; }
+    ssh -n -o BatchMode=yes "$BOX" "if not exist $W mkdir $W" > /dev/null || exit 2
+    scp -q "$OUT/trilab.tgz" "$BOX:$BOXLAB/trilab.tgz" || exit 2
+    ssh -n -o BatchMode=yes "$BOX" "cd /d $W & tar xzf trilab.tgz & $W\\tools\\ccs-leg.cmd $W $(echo "$BOXRIDE" | sed 's|/|\\|g') $(echo "$BOXVM" | sed 's|/|\\|g')" \
+        | grep -vE "^\s*$" | sed 's/^/  /'
+    mkdir -p "$OUT/win" && scp -q "$BOX:$BOXLAB/out/*.out" "$OUT/win/" || { echo "  no outputs came back"; exit 1; }
+    for d in c cpp; do
+        for side in ride-ccs ccs; do
+            [ -f "$OUT/win/$d-$side.out" ] || { echo "  $d: no $side output - see the box's out\\$d-$side.build"; status=1; continue 2; }
+            tr -d '\r' < "$OUT/win/$d-$side.out" > "$OUT/$d-$side.out"
+        done
+        if [ "$d" = cpp ]; then
+            # cl6x's C++ program links, but its iostreams are STLport's, whose
+            # locale and num_put live in TI's compiled runtime - machine code
+            # the emulator does not read. So the judge's own run is not
+            # available for C++; the judge is TI accepting and linking both
+            # sides (the box says TI-LINKED for each), and the output is held to
+            # Xcode's native run of the same sources, built here.
+            xcodebuild -project "$HERE/cpp/xcode/CXX1Lab.xcodeproj" -target CXX1Lab -configuration Release ARCHS=arm64 \
+                SYMROOT="$OUT/xcode-CXX1Lab" OBJROOT="$OUT/xcode-CXX1Lab/obj" build > "$OUT/cpp-xcode.build" 2>&1 \
+                || { echo "  cpp: Xcode did not build the native reference"; status=1; continue; }
+            ( cd "$HERE/cpp" && "$OUT/xcode-CXX1Lab/Release/CXX1Lab" > "$OUT/cpp-xcode.out" 2>&1 )
+            echo "  cpp: cl6x's own program cannot run on vm6747 (STLport's runtime); the judge is TI linking both sides"
+            compare cpp "$OUT/cpp-ride-ccs.out" "$OUT/cpp-xcode.out" "Xcode's native run"
+        else
+            compare "$d" "$OUT/$d-ride-ccs.out" "$OUT/$d-ccs.out" "cl6x on vm6747"
+        fi
+    done
+    ;;
 *)
     echo "usage: trilab.sh mac|windows|ccs"; status=2 ;;
 esac

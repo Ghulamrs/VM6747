@@ -10,7 +10,7 @@ legitimately different, with both readings beside each other.
 |---|---|---|
 | macOS | RIDE on the Mac, `arm64-darwin`, cc1i / cxx1i | Xcode: the same sources in a native project, Apple clang |
 | Windows, first | RIDE on the box, `x86_64-windows`, cc1i / cxx1i with the project's assembler | Visual Studio 2022: a native `.vcxproj`, `cl.exe` |
-| Windows, next | RIDE on the box, `tms6747`, cc1i / cxx1i, run on vm6747 | CCS 7.4: `cl6x` / `lnk6x`, run on vm6747 too (CCS has no simulator) |
+| Windows, next | RIDE on the box, `tms6747`, cc1i / cxx1i, run on vm6747 | CCS 7.4: `cl6x` / `lnk6x`; its C runs on vm6747 too (CCS has no simulator), its C++ links but cannot run there |
 
 ## The two programs
 
@@ -30,6 +30,7 @@ Run. `xcode/` holds the judge's Xcode project, written from the `.pro` by
 
     sh trilab.sh mac
     sh trilab.sh windows
+    sh trilab.sh ccs
 
 The macOS leg builds each lab through `RStudio --build` (the same code path as F4), runs it, builds the
 judge's project with `xcodebuild`, runs that, and diffs. Products go under `$TMPDIR`, not
@@ -40,6 +41,18 @@ each lab through `RStudioConsole --build --arch x86_64-windows --assembler <asm-
 (cc1i and cxx1i writing MASM, the project's assembler, `link`), builds the judge's `.sln`
 with `msbuild`, runs all four, and the outputs come back to be compared here. The box needs
 RIDE built by RStudio's `tools/to-windows.sh` and the assembler by MASM's `tests/windows.sh`.
+
+The CCS leg is the box again: `tools/ccs-leg.cmd` has RIDE build each lab for `tms6747`
+(a `.vm` directory of one `.s` per source) and runs it on RIDE's `vm6747.exe`; then cl6x
+compiles the same sources to assembly, which vm6747 runs as well - CCS 7.4 ships no
+simulator, so the emulator runs both sides. Each side is also assembled by cl6x and
+linked by lnk6x against `rts6740_elf_eh.lib` into a real `.out` (`TI-LINKED-RIDE`,
+`TI-LINKED-CCS` per lab): TI accepts what RIDE wrote, and the sources build as a real TI
+program. cl6x's C++ program links but cannot run on vm6747 - STLport's streams call into
+TI's compiled runtime, machine code the emulator does not read - so for C++ the judge is
+that double acceptance, and RIDE's emulator output is held to Xcode's native run of the
+same sources. Needs CCS 7.4's compiler at `C:\ti\ccsv7\tools\compiler\ti-cgt-c6000_8.2.2`
+and the exception-handling runtime built once as `Emulator/tests/ti.sh` describes.
 
 ## The ledger
 
@@ -59,3 +72,13 @@ leg with no such file must print identical output.
   And the file-I/O example wrote to `/tmp/`, which Windows has not, so both sides skipped
   its seven lines and exited 1 in agreement - the comparison was blind to the one example
   that exercises the C runtime. It writes beside the program now.
+- **CCS 7.4, 2026-09-18**: C 111 lines, RIDE (cc1i on vm6747) and cl6x (its assembly on
+  vm6747) identical, both sides linked by lnk6x; C++ 6 lines, RIDE on vm6747 identical to
+  Xcode's native run, both sides linked by lnk6x, cl6x's own C++ not runnable (above). The
+  first run of cl6x's code found two things in the emulator, not the compilers: `CALLP`
+  written second in a parallel pair returned to its own slot rather than the packet's end,
+  and the double-precision pipeline was not split-phase - cl6x's `INTDP; NOP 3; MPYDP`
+  read a high word a cycle early and `2.25 * 7` came out `3.375`. cc1i pads past both.
+  The emulator also learned cl6x's dialect (all 64 registers, BNOP/RETNOP/ADDKPC, .asg,
+  .bits, .group) to run it at all; the ILP32 lines (`long` 4, pointers 4) differ from the
+  host legs by design and match on both sides.
