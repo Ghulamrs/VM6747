@@ -16,7 +16,10 @@
 # cxx1i.exe built in ../Compiler-Ci and ../Compiler-Cppi, and xcodebuild.
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
-RIDE=${RIDE:-$HERE/../../RStudio/RStudio.exe}
+# RIDE's console editor: in RStudio's bin since the one-binary-directory
+# change, beside the compilers it drives; the old place is looked at after.
+RIDE=${RIDE:-$HERE/../../RStudio/bin/RStudio.exe}
+[ -x "$RIDE" ] || RIDE=$HERE/../../RStudio/RStudio.exe
 CC1I=${CC1I:-$HERE/../Compiler-Ci/cc1i.exe}
 CXX1I=${CXX1I:-$HERE/../Compiler-Cppi/cxx1i.exe}
 OUT=${OUT:-${TMPDIR:-/tmp}/trilab.$$}
