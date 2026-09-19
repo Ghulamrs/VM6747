@@ -133,9 +133,13 @@ void Driver::usage(char *file) {
         "       -I adds a directory to the ones <...> searches\n"
         "       -j sets how many files are compiled at once; -j 1 is serial\n"
         "       -arch picks the architecture the code is generated for - one of\n"
-        "         x86_64-linux, x86_64-windows, arm64-darwin; the host by default,\n"
-        "         and another one only reaches -S, since the assembler here is\n"
-        "         this machine's\n"
+        "         x86_64-linux, x86_64-windows, arm64-darwin, tms6747; the host\n"
+        "         by default, and another host's only reaches -S, since the\n"
+        "         assembler here is this machine's; tms6747 is assembled on any\n"
+        "         host by asm6x, the project's own C6000 assembler (CC1_AS, or\n"
+        "         the one beside this program), and linked into a .out by TI's\n"
+        "         lnk6x where CCS is (CC1_TI names its C6000 compiler directory,\n"
+        "         CC1_TILIB one holding rts6740_elf_eh.lib)\n"
         "       -masm picks the assembly syntax for x86_64-windows: 'masm' for\n"
         "         ml64, which is the default, or 'gnu' for the GNU spelling\n"
         "       -g writes a line table, so a debugger can stop on a line of C\n"
@@ -315,6 +319,81 @@ const char *Driver::hostLinker() {
     return (env != nullptr && env[0] != '\0') ? env : "link.exe";
 }
 
+bool Driver::targetIsTi() const {
+    return std::strcmp(backend_->name(), "tms6747") == 0;
+}
+
+// A file beside this program - RIDE lays asm6x.exe beside cc1i.exe - or
+// nothing, when argv[0] was a bare name found on PATH.
+static std::string besideProgram(const std::string &program, const char *leaf) {
+    std::size_t slash = program.find_last_of("/\\");
+    if (slash == std::string::npos) return std::string();
+    std::string path = program.substr(0, slash + 1) + leaf;
+    std::ifstream probe(path.c_str());
+    return probe.good() ? path : std::string();
+}
+
+// **asm6x, the project's C6000 assembler, which runs on every host.** CC1_AS
+// names another; else the one beside this program; else the name, on PATH.
+std::string Driver::tiAssembler() const {
+    const char *env = std::getenv("CC1_AS");
+    if (env != nullptr && env[0] != '\0') return env;
+    std::string found = besideProgram(program_, "asm6x.exe");
+    if (found.empty()) found = besideProgram(program_, "asm6x");
+    return found.empty() ? std::string("asm6x") : found;
+}
+
+// **TI's linker, which only a machine with CCS has.** CC1_LD names it; else
+// CC1_TI names the C6000 compiler directory, the one with bin\lnk6x and
+// lib\rts6740_elf.lib; else lnk6x is asked for by name.
+std::string Driver::tiLinker() const {
+    const char *env = std::getenv("CC1_LD");
+    if (env != nullptr && env[0] != '\0') return env;
+    const char *ti = std::getenv("CC1_TI");
+    if (ti != nullptr && ti[0] != '\0') {
+        std::string dir = std::string(ti) + (hostIsWindows() ? "\\bin\\" : "/bin/");
+        std::ifstream exe((dir + "lnk6x.exe").c_str());
+        if (exe.good()) return dir + "lnk6x.exe";
+        return dir + "lnk6x";
+    }
+    return "lnk6x";
+}
+
+// The linker command file lnk6x needs: one flat memory for the C6747 and
+// every section the compilers and TI's runtime write placed in it - the same
+// file RIDE and VM6747's tests link with.
+static const char *const kTiLinkCommands =
+    "--rom_model\n"
+    "--stack_size=0x4000\n"
+    "--heap_size=0x100000\n"
+    "MEMORY\n"
+    "{\n"
+    "    RAM : origin = 0xC0000000, length = 0x04000000\n"
+    "}\n"
+    "SECTIONS\n"
+    "{\n"
+    "    .text        > RAM\n"
+    "    .const       > RAM\n"
+    "    .data        > RAM\n"
+    "    .bss         > RAM\n"
+    "    .far         > RAM\n"
+    "    .fardata     > RAM\n"
+    "    .neardata    > RAM\n"
+    "    .rodata      > RAM\n"
+    "    .cinit       > RAM\n"
+    "    .init_array  > RAM\n"
+    "    .switch      > RAM\n"
+    "    .cio         > RAM\n"
+    "    .stack       > RAM\n"
+    "    .sysmem      > RAM\n"
+    "    .vm6747.eh   > RAM\n"
+    "}\n";
+
+static bool fileExists(const std::string &path) {
+    std::ifstream probe(path.c_str());
+    return probe.good();
+}
+
 std::string Driver::temporaryName(int index) {
     const char *dir = std::getenv("TMPDIR");
     if (dir == nullptr || dir[0] == '\0') dir = std::getenv("TEMP");
@@ -382,7 +461,11 @@ std::vector<std::pair<std::string, std::string> > Driver::macrosFor() const {
 bool Driver::assembleObjects() {
     for (std::size_t i = 0; i < temporaries_.size(); i++) {
         std::string command;
-        if (hostIsWindows()) {
+        if (targetIsTi()) {
+            command = shellQuote(tiAssembler());
+            command += " " + shellQuote(temporaries_[i]);
+            command += " -o " + shellQuote(objects_[i]);
+        } else if (hostIsWindows()) {
             command = shellQuote(hostAssembler());
             command += " /nologo /c /Fo " + shellQuote(objects_[i]);
             command += " " + shellQuote(temporaries_[i]);
@@ -403,7 +486,67 @@ bool Driver::assembleObjects() {
     return true;
 }
 
+// **A TI program: every .s through asm6x, the objects through lnk6x against
+// TI's runtime.** The exception-handling build of the runtime where there is
+// one - CC1_TILIB names a directory holding it, as CCS ships only the other.
+bool Driver::linkTi() {
+    std::vector<std::string> objects;
+    for (const std::string &t : temporaries_) {
+        std::size_t dot = t.rfind('.');
+        std::string obj = (dot == std::string::npos ? t : t.substr(0, dot)) + ".obj";
+        std::string step = shellQuote(tiAssembler()) + " " + shellQuote(t) +
+                           " -o " + shellQuote(obj);
+        if (runTool(step) != 0) {
+            std::fprintf(stderr, "%s: the assembler failed - the command was:\n  %s\n",
+                         program_.c_str(), lastToolCommand.c_str());
+            return false;
+        }
+        objects.push_back(obj);
+        temporaryNames().push_back(obj);
+    }
+
+    std::string cmdfile = temporaryName(static_cast<int>(temporaries_.size()));
+    cmdfile.replace(cmdfile.size() - 2, 2, ".cmd");
+    {
+        std::ofstream out(cmdfile.c_str());
+        if (!out) {
+            std::fprintf(stderr, "%s: cannot write %s\n", program_.c_str(), cmdfile.c_str());
+            return false;
+        }
+        out << kTiLinkCommands;
+    }
+    temporaryNames().push_back(cmdfile);
+
+    const std::string sep = hostIsWindows() ? "\\" : "/";
+    std::vector<std::string> libraryDirs;
+    const char *ti = std::getenv("CC1_TI");
+    if (ti != nullptr && ti[0] != '\0') libraryDirs.push_back(std::string(ti) + sep + "lib");
+    const char *tilib = std::getenv("CC1_TILIB");
+    if (tilib != nullptr && tilib[0] != '\0') libraryDirs.push_back(tilib);
+    std::string rts = "rts6740_elf.lib";
+    for (const std::string &d : libraryDirs)
+        if (fileExists(d + sep + "rts6740_elf_eh.lib")) rts = "rts6740_elf_eh.lib";
+
+    std::string command = shellQuote(tiLinker()) + " -mv6740 --abi=eabi";
+    for (const std::string &d : libraryDirs) command += " -i " + shellQuote(d);
+    command += " " + shellQuote(cmdfile);
+    for (const std::string &o : objects) command += " " + shellQuote(o);
+    command += " -l " + rts + " -o " + shellQuote(linkTo_);
+
+    if (runTool(command) != 0) {
+        std::fprintf(stderr, "%s: the linker failed - the command was:\n  %s\n",
+                     program_.c_str(), command.c_str());
+        std::fprintf(stderr, "  lnk6x and rts6740_elf.lib are TI's, under CCS's C6000 "
+                             "compiler directory: CC1_TI names it, CC1_TILIB a "
+                             "directory holding rts6740_elf_eh.lib, CC1_LD the "
+                             "linker itself.\n");
+        return false;
+    }
+    return true;
+}
+
 bool Driver::link() {
+    if (targetIsTi()) return linkTi();
     std::string command;
     if (hostIsWindows()) {
 
@@ -459,12 +602,14 @@ std::string Driver::assemblyNameFor(const std::string &source) {
     return hasSuffix ? source.substr(0, dot) + ".s" : source + ".s";
 }
 
-std::string Driver::objectNameFor(const std::string &source) {
+std::string Driver::objectNameFor(const std::string &source) const {
     std::size_t slash = source.find_last_of('/');
     std::string base = slash == std::string::npos ? source
                                                   : source.substr(slash + 1);
     std::size_t dot = base.rfind('.');
-    return (dot == std::string::npos ? base : base.substr(0, dot)) + ".o";
+    // .obj for the TI target, which is what asm6x and TI's tools call one
+    return (dot == std::string::npos ? base : base.substr(0, dot)) +
+           (targetIsTi() ? ".obj" : ".o");
 }
 
 bool Driver::parseArguments(int argc, char **argv) {
@@ -636,7 +781,7 @@ bool Driver::parseArguments(int argc, char **argv) {
         return true;
     }
 
-    if (backend_ != &defaultBackend()) {
+    if (backend_ != &defaultBackend() && !targetIsTi()) {
         std::fprintf(stderr,
             "%s: cannot assemble %s code on this machine, which is %s - use -S "
             "to write the assembly and take it there\n",
@@ -652,7 +797,8 @@ bool Driver::parseArguments(int argc, char **argv) {
     }
 
     if (!objectOnly_)
-        linkTo_ = !output.empty() ? output : (hostIsWindows() ? "a.exe" : "a.out");
+        linkTo_ = !output.empty() ? output
+                : (hostIsWindows() && !targetIsTi() ? "a.exe" : "a.out");
 
     for (std::size_t i = 0; i < inputs.size(); i++) {
         std::string temp = temporaryName(static_cast<int>(i));
