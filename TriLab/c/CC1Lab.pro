@@ -20,12 +20,11 @@
       ],
       "toolchain": "cc1"
     },
-    "Headers": {
-      "files": [
-        "examples.h"
-      ]
-    }
+    "Headers": [
+      "examples.h"
+    ]
   },
+  "open": "main.c",
   "build": {
     "target": "cc1lab",
     "groups": [

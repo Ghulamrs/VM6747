@@ -35,7 +35,7 @@ def write(lab):
     name = p["name"]
     srcs, hdrs = [], []
     for g in p["groups"].values():
-        for f in g["files"]:
+        for f in (g["files"] if isinstance(g, dict) else g):   # a list, or an object with its own toolchain
             (srcs if f.endswith((".c", ".cpp")) else hdrs).append(f)
     cxx = any(f.endswith(".cpp") for f in srcs)
 

@@ -54,7 +54,7 @@ mac)
         prog=$(sed -n 's/^\[built \(.*\)\]$/\1/p' "$OUT/$d-ride.build" | tail -1)
         ( cd "$HERE/$d" && "$prog" > "$OUT/$d-ride.out" 2>&1 ); echo "  $d: RIDE's program returned $?"
         # the judge: Xcode's own project, Apple clang, built out of the tree
-        python3 "$HERE/tools/make-xcode.py" "$d" > /dev/null
+        python3 "$HERE/tools/make-xcode.py" "$d" > /dev/null || { echo "  make-xcode.py failed - the judge's project is not current"; exit 2; }
         xcodebuild -project "$HERE/$d/xcode/$n.xcodeproj" -target "$n" -configuration Release ARCHS=arm64 \
             SYMROOT="$OUT/xcode-$n" OBJROOT="$OUT/xcode-$n/obj" build > "$OUT/$d-xcode.build" 2>&1 \
             || { echo "  $d: Xcode did not build it:"; grep -E "error:" "$OUT/$d-xcode.build" | head -5; status=1; continue; }
@@ -73,7 +73,9 @@ windows)
     BOXASM=${BOXASM:-C:/masm-tests/build/asm-win.exe}
     W=$(echo "$BOXLAB" | sed 's|/|\\|g')
     echo "TriLab, Windows: RIDE (cc1i, cxx1i, the project's assembler) against Visual Studio 2022"
-    python3 "$HERE/tools/make-vs.py" > /dev/null
+    # The judge's project is written from the .pro; a failure here must stop the
+    # leg, or the box runs a stale project and the comparison passes on old output.
+    python3 "$HERE/tools/make-vs.py" > /dev/null || { echo "  make-vs.py failed - the judge's project is not current"; exit 2; }
     find "$HERE" -name "* [0-9].*" -delete
     COPYFILE_DISABLE=1 tar -C "$HERE" --no-xattrs --exclude out --exclude xcode --exclude 'c/cc1lab*' --exclude 'cpp/cxx1lab*' --exclude 'shm/main' --exclude 'shm/main.exe' \
         -czf "$OUT/trilab.tgz" c cpp shm tools expected 2>/dev/null || { echo "  cannot pack the lab"; exit 2; }

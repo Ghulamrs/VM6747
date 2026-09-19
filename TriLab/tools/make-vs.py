@@ -34,8 +34,11 @@ def write(lab):
     p = json.load(open(os.path.join(root, pro[0])))
     name = p["name"]
     srcs, hdrs = [], []
+    # A group is a list of files, or an object holding "files" and its own
+    # "toolchain" - RIDE writes the first form when the group names none, and
+    # rewrote CC1Lab.pro that way on 2026-09-19, which this then could not read.
     for g in p["groups"].values():
-        for f in g["files"]:
+        for f in (g["files"] if isinstance(g, dict) else g):
             (srcs if f.endswith((".c", ".cpp")) else hdrs).append(f)
     cxx = any(f.endswith(".cpp") for f in srcs)
     g = guid(lab + ":project")
