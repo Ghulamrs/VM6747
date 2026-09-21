@@ -1,1 +1,6 @@
 .DS_Store
+
+# build/test outputs and Xcode user state - never committed
+out-asm6x/
+out-tms6747/
+xcuserdata/
