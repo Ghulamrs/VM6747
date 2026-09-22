@@ -17,6 +17,8 @@ public:
     virtual void run(const Program &program) = 0;
 
     virtual void setLineSource(const Source *, const std::string &) {}
+    // -O0, -O1 or -O2. A backend with no optimizer ignores it.
+    virtual void setOptimize(int) {}
 };
 
 enum class Segment { Code, Const, ConstRelocated, Data, Bss };

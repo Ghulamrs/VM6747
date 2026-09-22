@@ -712,6 +712,12 @@ bool Driver::parseArguments(int argc, char **argv) {
             return false;
         } else if (std::strcmp(argv[i], "-time") == 0) {
             timing_ = true;
+        } else if (std::strcmp(argv[i], "-O0") == 0) {
+            optimize_ = 0;
+        } else if (std::strcmp(argv[i], "-O1") == 0) {
+            optimize_ = 1;
+        } else if (std::strcmp(argv[i], "-O2") == 0) {
+            optimize_ = 2;
         } else if (std::strcmp(argv[i], "-g") == 0) {
             debug_ = true;
         } else if (std::strcmp(argv[i], "-nologo") == 0) {
@@ -837,6 +843,7 @@ bool Driver::compile(const Job &job) {
     bool ok = true;
     if (job.output.empty()) {
         std::unique_ptr<CodeGen> gen = backend_->codegen(std::cout);
+        gen->setOptimize(optimize_);
         if (debug_) gen->setLineSource(&src, workingDirectory());
         gen->run(program);
     } else {
@@ -847,6 +854,7 @@ bool Driver::compile(const Job &job) {
             return false;
         }
         std::unique_ptr<CodeGen> gen = backend_->codegen(file);
+        gen->setOptimize(optimize_);
         if (debug_) gen->setLineSource(&src, workingDirectory());
         gen->run(program);
     }

@@ -29,6 +29,8 @@ private:
     bool timing_ = false;
     bool assemblyOnly_ = false;
     bool debug_ = false;
+    // -O0, -O1 or -O2: how hard the code generator optimizes.
+    int optimize_ = 0;
     bool objectOnly_ = false;
     unsigned threads_ = 0;
     std::string linkTo_;

@@ -2,6 +2,7 @@
 
 #include "Backend.h"
 #include "Dwarf.h"
+#include "Optimizer.h"
 #include "Spelling.h"
 #include "Walker.h"
 
@@ -60,8 +61,17 @@ protected:
     virtual bool writesDwarf() const { return true; }
 
     std::string out_;
-    std::size_t emittedSize() override { return out_.size(); }
+    // Measured after the IR has written out, so the count is of real text.
+    std::size_t emittedSize() override { opt_.flush(); return out_.size(); }
+    // **The IR in front of whichever spelling the target chose**, and only
+    // when asked: at -O0 the walker speaks to the spelling directly.
+    void setOptimize(int level) override {
+        if (level < 1) return;
+        opt_.wrap(a_, level);
+        a_ = &opt_;
+    }
     Spelling *a_ = &gnu_;
+    Optimizer opt_;
 
 private:
     std::vector<std::string> chunks_;
