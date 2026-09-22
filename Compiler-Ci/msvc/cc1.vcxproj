@@ -182,6 +182,7 @@
     <ClCompile Include="..\src\backend\Backend.cpp" />
     <ClCompile Include="..\src\backend\Dwarf.cpp" />
     <ClCompile Include="..\src\backend\Masm.cpp" />
+    <ClCompile Include="..\src\backend\Optimizer.cpp" />
     <ClCompile Include="..\src\backend\Spelling.cpp" />
     <ClCompile Include="..\src\backend\Tms6747.cpp" />
     <ClCompile Include="..\src\backend\Walker.cpp" />
@@ -201,6 +202,7 @@
     <ClInclude Include="..\src\backend\Backend.h" />
     <ClInclude Include="..\src\backend\Dwarf.h" />
     <ClInclude Include="..\src\backend\Masm.h" />
+    <ClInclude Include="..\src\backend\Optimizer.h" />
     <ClInclude Include="..\src\backend\Spelling.h" />
     <ClInclude Include="..\src\backend\Tms6747.h" />
     <ClInclude Include="..\src\backend\Walker.h" />
