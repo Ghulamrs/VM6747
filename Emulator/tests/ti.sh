@@ -1,8 +1,8 @@
 #!/bin/sh
 # The fourth sandbox: TI's own C6000 tools on the Windows box, as a second
 # oracle beside the emulator. Every .s the three compilers' tms6747 suites
-# left behind - cc1i's, cxx1i's, shci's programs and the Shalimar runtime
-# cxx1i built - is shipped there, assembled by cl6x and linked by lnk6x
+# left behind - c90's, cpp11's, shalimar's programs and the Shalimar runtime
+# cpp11 built - is shipped there, assembled by cl6x and linked by lnk6x
 # against rts6740_elf_eh.lib. The emulator says whether a program computes
 # the right answer; this says whether TI's assembler takes every instruction,
 # constant and directive as written and whether every name the backend uses

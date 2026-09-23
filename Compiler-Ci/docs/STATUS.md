@@ -481,7 +481,7 @@ again when it looks wrong.
 **`cc1 hello.c` now produces a program**, named by `-o` or `a.out`. The compiler
 still emits nothing but assembly — what changed is that the driver finishes the
 job, writing the assembly to a temporary file and handing it to the host's `cc`
-to assemble and link. `CC1_CC` names a different one.
+to assemble and link. `C90_CC` names a different one.
 
 `-S` stops where the whole thing used to stop, and writes the assembly instead:
 one `.s` per input, or `-o` to name the output of a single one, or standard

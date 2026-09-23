@@ -1,6 +1,6 @@
 // A22 - std::move absent from <utility>
 // cl:    runs
-// cxx1i: error: 'std::move' was not declared - a prototype must come first
+// cpp11: error: 'std::move' was not declared - a prototype must come first
 #include <utility>
 extern "C" int printf(const char *, ...);
 struct Buf {

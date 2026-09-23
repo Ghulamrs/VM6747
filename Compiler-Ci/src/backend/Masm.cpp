@@ -1,3 +1,4 @@
+#include "../Name.h"
 #include "Masm.h"
 
 #include <cstdio>
@@ -9,7 +10,7 @@
 namespace {
 
 [[noreturn]] void give_up(const std::string &what, const std::string &why) {
-    std::fprintf(stderr, "cc1: masm: %s\n  for: %s\n", why.c_str(),
+    std::fprintf(stderr, "%s: masm: %s\n  for: %s\n", program::kName, why.c_str(),
                  what.c_str());
     std::exit(1);
 }

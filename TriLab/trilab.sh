@@ -2,7 +2,7 @@
 # TriLab: two programs, each built by RIDE with the project's own compilers and by
 # the environment's native toolchain - the judge - and their outputs compared.
 #
-#   sh trilab.sh mac            RIDE (cc1i, cxx1i, arm64-darwin) against Xcode, on this Mac
+#   sh trilab.sh mac            RIDE (c90, cpp11, arm64-darwin) against Xcode, on this Mac
 #   sh trilab.sh windows        RIDE on the box (x86_64-windows, the project's assembler)
 #                               against Visual Studio 2022 - and, for the Shalimar lab, ml64 and link
 #   sh trilab.sh ccs            RIDE on the box (tms6747, run on vm6747) against CCS 7.4's
@@ -12,16 +12,16 @@
 # line for line, except lines the ledger (expected/<leg>-<lab>.allowed) records as
 # legitimately different, with both readings. Anything else is a defect, named.
 #
-# Needs: RStudio built (../../RStudio/RStudio.exe, or RIDE=path), cc1i.exe and
-# cxx1i.exe built in ../Compiler-Ci and ../Compiler-Cppi, and xcodebuild.
+# Needs: RStudio built (../../RStudio/RStudio.exe, or RIDE=path), c90.exe and
+# cpp11.exe built in ../Compiler-Ci and ../Compiler-Cppi, and xcodebuild.
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
 # RIDE's console editor: in RStudio's bin since the one-binary-directory
 # change, beside the compilers it drives; the old place is looked at after.
 RIDE=${RIDE:-$HERE/../../RStudio/bin/RStudio.exe}
 [ -x "$RIDE" ] || RIDE=$HERE/../../RStudio/RStudio.exe
-CC1I=${CC1I:-$HERE/../Compiler-Ci/cc1i.exe}
-CXX1I=${CXX1I:-$HERE/../Compiler-Cppi/cxx1i.exe}
+CC1I=${CC1I:-$HERE/../Compiler-Ci/c90.exe}
+CXX1I=${CXX1I:-$HERE/../Compiler-Cppi/cpp11.exe}
 OUT=${OUT:-${TMPDIR:-/tmp}/trilab.$$}
 mkdir -p "$OUT"
 leg=${1:-mac}
@@ -75,7 +75,7 @@ windows)
     BOXRIDE=${BOXRIDE:-C:/Users/GRA/source/RStudio/bin/RStudioConsole.exe}
     BOXASM=${BOXASM:-C:/masm-tests/build/asm-win.exe}
     W=$(echo "$BOXLAB" | sed 's|/|\\|g')
-    echo "TriLab, Windows: RIDE (cc1i, cxx1i, the project's assembler) against Visual Studio 2022"
+    echo "TriLab, Windows: RIDE (c90, cpp11, the project's assembler) against Visual Studio 2022"
     # The judge's project is written from the .pro; a failure here must stop the
     # leg, or the box runs a stale project and the comparison passes on old output.
     python3 "$HERE/tools/make-vs.py" > /dev/null || { echo "  make-vs.py failed - the judge's project is not current"; exit 2; }
@@ -92,7 +92,7 @@ windows)
             [ -f "$OUT/win/$d-$side.out" ] || { echo "  $d: no $side output - see $OUT/win/$d-$side.build"; status=1; continue 2; }
             tr -d '\r' < "$OUT/win/$d-$side.out" > "$OUT/$d-$side.out"
         done
-        # the Shalimar lab's judge is Microsoft's assembler and linker over shci's
+        # the Shalimar lab's judge is Microsoft's assembler and linker over shalimar's
         # assembly, there being no Visual Studio project for Shalimar
         [ "$d" = shm ] && judge="ml64 and link" || judge="Visual Studio"
         compare "$d" "$OUT/$d-ride.out" "$OUT/$d-vs.out" "$judge"
@@ -109,7 +109,7 @@ ccs)
     BOXRIDE=${BOXRIDE:-C:/Users/GRA/source/RStudio/bin/RStudioConsole.exe}
     BOXVM=${BOXVM:-C:/Users/GRA/source/RStudio/bin/vm6747.exe}
     W=$(echo "$BOXLAB" | sed 's|/|\\|g')
-    echo "TriLab, CCS 7.4: RIDE (cc1i, cxx1i, tms6747, run on vm6747) against cl6x, run on vm6747 too"
+    echo "TriLab, CCS 7.4: RIDE (c90, cpp11, tms6747, run on vm6747) against cl6x, run on vm6747 too"
     find "$HERE" -name "* [0-9].*" -delete
     COPYFILE_DISABLE=1 tar -C "$HERE" --no-xattrs --exclude out --exclude xcode --exclude vs --exclude 'c/cc1lab*' --exclude 'cpp/cxx1lab*' \
         -czf "$OUT/trilab.tgz" c cpp tools expected 2>/dev/null || { echo "  cannot pack the lab"; exit 2; }

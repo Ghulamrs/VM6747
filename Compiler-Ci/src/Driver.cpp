@@ -1,4 +1,5 @@
 #include "Driver.h"
+#include "Name.h"
 #include "backend/X86_64Windows.h"
 
 #include "backend/Backend.h"
@@ -81,11 +82,11 @@ bool directoryHas(const std::string &dir, const char *name) {
 }
 
 // **Where the standard headers are, asked in the order a release wants:**
-// $CC1_LIB, then lib/ beside the binary or one directory up - the installed
-// layout, bin/cc1i.exe and lib/ - and last the directory compiled in, which
+// $C90_LIB, then lib/ beside the binary or one directory up - the installed
+// layout, bin/c90.exe and lib/ - and last the directory compiled in, which
 // names the checkout this was built from and outlives nothing that moves.
 void Driver::standardIncludeDirectory(const std::string &argv0) {
-    const char *env = std::getenv("CC1_LIB");
+    const char *env = std::getenv(program::env("LIB").c_str());
     if (env != nullptr && env[0] != '\0') { searchPath_.push_back(env); return; }
 
     const std::string here = programDirectory(argv0);
@@ -116,7 +117,7 @@ const char *Driver::bannerLine() { return "©2026 G. R. Akhtar - ISO C 90"; }
 
 void Driver::usage(char *file) {
     std::fprintf(stderr,
-        "cc1 %s - an ANSI C compiler\n"
+        "%s %s - an ANSI C compiler\n"
         "\n"
         "usage: %s <file.c> [more.c ...] [-S|-c] [-o out] [-D n[=v]] [-U n]\n"
         "               [-I dir] [-j n] [-arch a] [-masm=m] [-g] [-time]\n"
@@ -136,15 +137,15 @@ void Driver::usage(char *file) {
         "         x86_64-linux, x86_64-windows, arm64-darwin, tms6747; the host\n"
         "         by default, and another host's only reaches -S, since the\n"
         "         assembler here is this machine's; tms6747 is assembled on any\n"
-        "         host by asm6x, the project's own C6000 assembler (CC1_AS, or\n"
+        "         host by asm6x, the project's own C6000 assembler (C90_AS, or\n"
         "         the one beside this program), and linked into a .out by TI's\n"
-        "         lnk6x where CCS is (CC1_TI names its C6000 compiler directory,\n"
-        "         CC1_TILIB one holding rts6740_elf_eh.lib)\n"
+        "         lnk6x where CCS is (C90_TI names its C6000 compiler directory,\n"
+        "         C90_TILIB one holding rts6740_elf_eh.lib)\n"
         "       -masm picks the assembly syntax for x86_64-windows: 'masm' for\n"
         "         ml64, which is the default, or 'gnu' for the GNU spelling\n"
         "       -g writes a line table, so a debugger can stop on a line of C\n"
         "         and step through it; x86_64-linux and arm64-darwin only\n"
-        "       -time reports how long each phase took\n", cc1Version(), file);
+        "       -time reports how long each phase took\n", program::kName, cc1Version(), file);
 }
 
 static std::string workingDirectory() {
@@ -168,7 +169,7 @@ static std::string askVswhere() {
     char temp[MAX_PATH];
     char folder[MAX_PATH];
     if (GetTempPathA(MAX_PATH, folder) == 0) return std::string();
-    if (GetTempFileNameA(folder, "cc1", 0, temp) == 0) return std::string();
+    if (GetTempFileNameA(folder, program::kName, 0, temp) == 0) return std::string();
 
     std::string command =
         "\"\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe\""
@@ -274,7 +275,7 @@ static int runTool(const std::string &command) {
     char folder[MAX_PATH];
     char script[MAX_PATH];
     if (GetTempPathA(MAX_PATH, folder) == 0) return std::system(forCmd(command).c_str());
-    if (GetTempFileNameA(folder, "cc1", 0, script) == 0) {
+    if (GetTempFileNameA(folder, program::kName, 0, script) == 0) {
         return std::system(forCmd(command).c_str());
     }
     std::string batch = script;
@@ -305,17 +306,17 @@ static void noteWindowsToolchain() {
 }
 
 const char *Driver::hostCompiler() {
-    const char *env = std::getenv("CC1_CC");
+    const char *env = std::getenv(program::env("CC").c_str());
     return (env != nullptr && env[0] != '\0') ? env : "cc";
 }
 
 const char *Driver::hostAssembler() {
-    const char *env = std::getenv("CC1_AS");
+    const char *env = std::getenv(program::env("AS").c_str());
     return (env != nullptr && env[0] != '\0') ? env : "ml64.exe";
 }
 
 const char *Driver::hostLinker() {
-    const char *env = std::getenv("CC1_LD");
+    const char *env = std::getenv(program::env("LD").c_str());
     return (env != nullptr && env[0] != '\0') ? env : "link.exe";
 }
 
@@ -323,7 +324,7 @@ bool Driver::targetIsTi() const {
     return std::strcmp(backend_->name(), "tms6747") == 0;
 }
 
-// A file beside this program - RIDE lays asm6x.exe beside cc1i.exe - or
+// A file beside this program - RIDE lays asm6x.exe beside c90.exe - or
 // nothing, when argv[0] was a bare name found on PATH.
 static std::string besideProgram(const std::string &program, const char *leaf) {
     std::size_t slash = program.find_last_of("/\\");
@@ -333,23 +334,23 @@ static std::string besideProgram(const std::string &program, const char *leaf) {
     return probe.good() ? path : std::string();
 }
 
-// **asm6x, the project's C6000 assembler, which runs on every host.** CC1_AS
+// **asm6x, the project's C6000 assembler, which runs on every host.** C90_AS
 // names another; else the one beside this program; else the name, on PATH.
 std::string Driver::tiAssembler() const {
-    const char *env = std::getenv("CC1_AS");
+    const char *env = std::getenv(program::env("AS").c_str());
     if (env != nullptr && env[0] != '\0') return env;
     std::string found = besideProgram(program_, "asm6x.exe");
     if (found.empty()) found = besideProgram(program_, "asm6x");
     return found.empty() ? std::string("asm6x") : found;
 }
 
-// **TI's linker, which only a machine with CCS has.** CC1_LD names it; else
-// CC1_TI names the C6000 compiler directory, the one with bin\lnk6x and
+// **TI's linker, which only a machine with CCS has.** C90_LD names it; else
+// C90_TI names the C6000 compiler directory, the one with bin\lnk6x and
 // lib\rts6740_elf.lib; else lnk6x is asked for by name.
 std::string Driver::tiLinker() const {
-    const char *env = std::getenv("CC1_LD");
+    const char *env = std::getenv(program::env("LD").c_str());
     if (env != nullptr && env[0] != '\0') return env;
-    const char *ti = std::getenv("CC1_TI");
+    const char *ti = std::getenv(program::env("TI").c_str());
     if (ti != nullptr && ti[0] != '\0') {
         std::string dir = std::string(ti) + (hostIsWindows() ? "\\bin\\" : "/bin/");
         std::ifstream exe((dir + "lnk6x.exe").c_str());
@@ -402,7 +403,7 @@ std::string Driver::temporaryName(int index) {
     while (!base.empty() && (base[base.size() - 1] == '/' ||
                              base[base.size() - 1] == '\\'))
         base.erase(base.size() - 1);
-    return base + (hostIsWindows() ? "\\" : "/") + "cc1-" +
+    return base + (hostIsWindows() ? "\\" : "/") + program::kName + "-" +
            std::to_string(static_cast<long>(getpid())) + "-" +
            std::to_string(index) + ".s";
 }
@@ -488,7 +489,7 @@ bool Driver::assembleObjects() {
 
 // **A TI program: every .s through asm6x, the objects through lnk6x against
 // TI's runtime.** The exception-handling build of the runtime where there is
-// one - CC1_TILIB names a directory holding it, as CCS ships only the other.
+// one - C90_TILIB names a directory holding it, as CCS ships only the other.
 bool Driver::linkTi() {
     std::vector<std::string> objects;
     for (const std::string &t : temporaries_) {
@@ -519,9 +520,9 @@ bool Driver::linkTi() {
 
     const std::string sep = hostIsWindows() ? "\\" : "/";
     std::vector<std::string> libraryDirs;
-    const char *ti = std::getenv("CC1_TI");
+    const char *ti = std::getenv(program::env("TI").c_str());
     if (ti != nullptr && ti[0] != '\0') libraryDirs.push_back(std::string(ti) + sep + "lib");
-    const char *tilib = std::getenv("CC1_TILIB");
+    const char *tilib = std::getenv(program::env("TILIB").c_str());
     if (tilib != nullptr && tilib[0] != '\0') libraryDirs.push_back(tilib);
     std::string rts = "rts6740_elf.lib";
     for (const std::string &d : libraryDirs)
@@ -537,8 +538,8 @@ bool Driver::linkTi() {
         std::fprintf(stderr, "%s: the linker failed - the command was:\n  %s\n",
                      program_.c_str(), command.c_str());
         std::fprintf(stderr, "  lnk6x and rts6740_elf.lib are TI's, under CCS's C6000 "
-                             "compiler directory: CC1_TI names it, CC1_TILIB a "
-                             "directory holding rts6740_elf_eh.lib, CC1_LD the "
+                             "compiler directory: C90_TI names it, C90_TILIB a "
+                             "directory holding rts6740_elf_eh.lib, C90_LD the "
                              "linker itself.\n");
         return false;
     }

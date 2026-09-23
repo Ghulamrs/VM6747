@@ -1,6 +1,6 @@
 #pragma once
 
-// The assembler: C6000 assembly text, as cc1i and cxx1i write it and in the
+// The assembler: C6000 assembly text, as c90 and cpp11 write it and in the
 // wider forms TI's own tools write, into a Program. Two passes - the first
 // lays out sections and defines labels, the second resolves every symbol -
 // over any number of files, each with its own local labels and a shared set

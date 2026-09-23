@@ -1,6 +1,6 @@
 // A27 - dependent type used without typename
 // cl:    cl refuses: C2061/C7510
-// cxx1i: compiles; prints 3
+// cpp11: compiles; prints 3
 extern "C" int printf(const char *, ...);
 struct T { typedef int type; };
 template <class X> struct U { X::type v; };

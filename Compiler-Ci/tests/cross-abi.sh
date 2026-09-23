@@ -28,7 +28,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CC1="${CC1:-$ROOT/cc1.exe}"
-REF="${CC1_CC:-cc}"
+REF="${C90_CC:-cc}"
 OUT="$ROOT/tests/out-cross"
 
 [ -x "$CC1" ] || { echo "FATAL: $CC1 not built - run ./build first"; exit 1; }

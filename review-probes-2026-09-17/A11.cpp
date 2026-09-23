@@ -1,6 +1,6 @@
 // A11 - a constexpr function call in a floating constant expression is refused
 // cl:    3.50
-// cxx1i: error: 'H' is 'constexpr' ... this initialiser is not a constant expression
+// cpp11: error: 'H' is 'constexpr' ... this initialiser is not a constant expression
 extern "C" int printf(const char *, ...);
 constexpr double half(double d) { return d / 2.0; }
 constexpr double H = half(7.0);

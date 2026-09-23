@@ -1,6 +1,6 @@
 // A14 - template <class T> T Tm<T>::st; is a definition, read as a declaration
 // cl:    4 5
-// cxx1i: error: 'Tm::st' is declared here and not defined
+// cpp11: error: 'Tm::st' is declared here and not defined
 extern "C" int printf(const char *, ...);
 template <class T> struct Tm { static T st; };
 template <class T> T Tm<T>::st;

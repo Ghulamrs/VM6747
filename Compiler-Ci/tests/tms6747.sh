@@ -1,6 +1,6 @@
 #!/bin/sh
 # The tms6747 backend, run the same way the arm64 one is: compile each case
-# twice, once with cc1i for the C6000 and once with the host's compiler, run
+# twice, once with c90 for the C6000 and once with the host's compiler, run
 # both - the C6000 one on vm6747, the VM6747 emulator - and require that they
 # agree on the printed output and the exit status.
 #
@@ -12,7 +12,7 @@
 set -u
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-CC1="${CC1:-$ROOT/cc1i.exe}"
+CC1="${CC1:-$ROOT/c90.exe}"
 VM="${VM:-$ROOT/../Emulator/vm6747.exe}"
 SRC="$ROOT/tests/cases"
 OUT="$ROOT/tests/out-tms6747"
@@ -41,7 +41,7 @@ for src in "$SRC"/*.c; do
     expect=$(sed -n 's|^// expect: *||p' "$src" | head -1)
 
     if ! "$CC1" -S -arch tms6747 "$src" -o "$OUT/$name.s" 2> "$OUT/$name.cc1.err"; then
-        echo "FAIL $name - cc1i refused it:"
+        echo "FAIL $name - c90 refused it:"
         sed 's/^/       /' "$OUT/$name.cc1.err" | head -3
         fail=$((fail + 1))
         continue

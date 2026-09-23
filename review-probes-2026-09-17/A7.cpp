@@ -1,6 +1,6 @@
 // A7 - Microsoft names: a global of pointer-to-member type is spelled ...A where cl spells ...EQ<class>@ (compile with -S and compare PUBLIC symbols)
 // cl:    ?gpm@@3PEQNest@@HEQ1@  ?gpmf@@3P8Nest@@EAAHUIn@1@PEAU21@@ZEQ1@
-// cxx1i: ?gpm@@3PEQNest@@HA  ?gpmf@@3P8Nest@@EAAHUIn@1@PEAU21@@ZA
+// cpp11: ?gpm@@3PEQNest@@HA  ?gpmf@@3P8Nest@@EAAHUIn@1@PEAU21@@ZA
 namespace outer { namespace inner { struct Deep { int m; int get() const; static int s; }; int Deep::s = 1; int Deep::get() const { return m; } int free1(Deep, const Deep &, Deep *) { return 0; } } }
 struct Nest { struct In { int v; int f(int); }; In in; int g(In, In *) { return 0; } };
 int Nest::In::f(int k) { return k; }

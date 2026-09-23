@@ -1,6 +1,6 @@
 // A17 - int ns::f(int) { } defining a namespace member by qualified name
 // cl:    2 5
-// cxx1i: error: 'ns' is not a class
+// cpp11: error: 'ns' is not a class
 extern "C" int printf(const char *, ...);
 namespace ns { int f(int); int g(double); }
 int ns::f(int x) { return x + 1; }

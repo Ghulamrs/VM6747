@@ -1,6 +1,6 @@
 // A9 - <istream> >> int consumes the whole word, so what follows the digits is lost
 // cl:    42 [abc] / 7 [tail]
-// cxx1i: 42 [] / 7 [tail]
+// cpp11: 42 [] / 7 [tail]
 #include <sstream>
 #include <iostream>
 #include <string>

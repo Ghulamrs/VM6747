@@ -1,6 +1,6 @@
 // A13 - P g = P(); at file scope is refused
 // cl:    0 0.0 5 3 0
-// cxx1i: error: a struct or union at file scope needs a braced initialiser
+// cpp11: error: a struct or union at file scope needs a braced initialiser
 extern "C" int printf(const char *, ...);
 struct P { int a; double b; };
 P g = P();

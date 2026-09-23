@@ -1,7 +1,7 @@
 #!/bin/sh
 # The tms6747 target through asm6x, the project's own C6000 assembler: every
 # case tests/tms6747.sh compiles is taken to a TI object by the driver itself
-# (`cc1i -arch tms6747 -c`, which runs asm6x on what it wrote), and that
+# (`c90 -arch tms6747 -c`, which runs asm6x on what it wrote), and that
 # object must be the one asm6x writes for the same assembly by hand - every
 # table of it, the file symbol aside, which names the temporary. What this
 # checks is the driver's path to the assembler, on any host; that asm6x's
@@ -12,7 +12,7 @@
 #                                          build beside this tree, else one on PATH
 set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-CC1="${CC1:-$ROOT/cc1i.exe}"
+CC1="${CC1:-$ROOT/c90.exe}"
 ASM6X="${ASM6X:-}"
 if [ -z "$ASM6X" ]; then
     for c in "$ROOT/../../ASM6x/build/asm6x.exe" "$HOME/asm6x-build/asm6x.exe" "$(command -v asm6x 2>/dev/null)"; do
@@ -33,7 +33,7 @@ for src in "$ROOT"/tests/cases/*.c; do
     case "$name" in *" "*) continue;; esac
     # the cases written for a 64-bit long, which tests/tms6747.sh leaves out too
     if grep -q "^$name[[:space:]]" "$LP64"; then skip=$((skip + 1)); continue; fi
-    if ! ( ulimit -t 20; CC1_AS="$ASM6X" "$CC1" -arch tms6747 -c "$src" -o "$OUT/$name.obj" < /dev/null ) 2> "$OUT/$name.err"; then
+    if ! ( ulimit -t 20; C90_AS="$ASM6X" "$CC1" -arch tms6747 -c "$src" -o "$OUT/$name.obj" < /dev/null ) 2> "$OUT/$name.err"; then
         echo "FAIL $name - the driver did not make an object:"
         sed 's/^/       /' "$OUT/$name.err" | head -3
         fail=$((fail + 1)); continue

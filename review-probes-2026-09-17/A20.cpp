@@ -1,6 +1,6 @@
 // A20 - a pointer to a member of a nested class in a declarator
 // cl:    2 5 3
-// cxx1i: error: expected ','
+// cpp11: error: expected ','
 extern "C" int printf(const char *, ...);
 struct Nest { struct In { int v; int f(int k) { return k + v; } }; };
 int call(int (Nest::In::*m)(int), Nest::In *o) { return (o->*m)(1); }

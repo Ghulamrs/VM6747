@@ -98,7 +98,7 @@
     <OutDir Condition="'$(SolutionDir)'!='' And '$(SolutionDir)'!='*Undefined*'">$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
     <OutDir Condition="'$(SolutionDir)'=='' Or '$(SolutionDir)'=='*Undefined*'">$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)$(Platform)\$(Configuration)\obj\</IntDir>
-    <TargetName>cc1i</TargetName>
+    <TargetName>c90</TargetName>
   </PropertyGroup>
 
   <ItemDefinitionGroup>

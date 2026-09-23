@@ -1,4 +1,4 @@
-// vm6747 - run C6000 assembly as cc1i and cxx1i emit it for -arch tms6747.
+// vm6747 - run C6000 assembly as c90 and cpp11 emit it for -arch tms6747.
 //
 //   vm6747 [-t] [-m megabytes] file.s|directory [more ...] [-- args]
 //
