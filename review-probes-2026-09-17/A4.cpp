@@ -1,6 +1,6 @@
 // A4 - two adjacent empty bases share offset 0; cl puts the second at 1
 // cl:    1 2 8 8 8 8 12 8 8 / 1 4 4 4 4 8 4 4 / 8 4 8 4 16 8 / 0 1
-// cxx1i: 1 1 4 4 8 8 8 8 8 / 0 0 0 4 4 4 4 4 / 8 4 4 0 8 0 / 0 0
+// cpp11: 1 1 4 4 8 8 8 8 8 / 0 0 0 4 4 4 4 4 / 8 4 4 0 8 0 / 0 0
 extern "C" int printf(const char *, ...);
 #define OFF(T, m) ((int)((char *)&((T *)64)->m - (char *)64))
 struct E1 {}; struct E2 {}; struct E3 {};

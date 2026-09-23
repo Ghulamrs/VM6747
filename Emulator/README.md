@@ -1,6 +1,6 @@
 # vm6747 — the VM6747 emulator
 
-Runs the C6000 assembly that `cc1i` and `cxx1i` emit for `-arch tms6747`,
+Runs the C6000 assembly that `c90` and `cpp11` emit for `-arch tms6747`,
 so that the fourth target can be verified the way the other three are: the
 same program compiled twice, run twice, and required to agree.
 
@@ -30,7 +30,7 @@ The double-precision pipeline is split-phase, as SPRUFE8 draws it: a DP
 instruction reads its sources' low words at issue and the high words a cycle
 later, and writes its result low word first, a cycle before the high one -
 the delay-slot count names the high word. cl6x schedules to exactly that
-(`INTDP; NOP 3; MPYDP`); cc1i pads past it, which is why the gap showed only
+(`INTDP; NOP 3; MPYDP`); c90 pads past it, which is why the gap showed only
 when TriLab ran cl6x's code here.
 
 Memory effects are immediate at issue, which keeps a store and a later load
@@ -76,7 +76,7 @@ such a one is an assembly error, by line.
 `Compiler-Ci/tests/tms6747.sh` runs the whole C corpus through it: 399 of
 425 cases agree with clang's native run; the other 26 need a 64-bit long or
 an 8-byte pointer on the reference side and are skipped by name
-(`tests/tms6747-lp64.txt`). C++ through `cxx1i` runs the same way; the C++
+(`tests/tms6747-lp64.txt`). C++ through `cpp11` runs the same way; the C++
 ABI runtime (`__dynamic_cast`, the `__cxxabiv1` typeinfo vtables, `operator
 new`, the `__cxa_*` family) is the next piece.
 

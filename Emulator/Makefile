@@ -1,4 +1,4 @@
-# vm6747 - the VM6747 emulator: runs the C6000 assembly that cc1i and cxx1i
+# vm6747 - the VM6747 emulator: runs the C6000 assembly that c90 and cpp11
 # emit for -arch tms6747, so that what they emit can be verified rather than
 # only read. Built the way the compilers are: C++14, one translation unit at a
 # time, -Wall -Wextra -Werror -pedantic under clang++ on the Mac and g++ on the

@@ -78,7 +78,7 @@ private:
     // such an instruction is held with its low words and completes a cycle
     // on, with the high words as they are then. Its result lands low word
     // first, a cycle before the high one, which is what the delay-slot
-    // count names. cl6x schedules to exactly this; cc1i pads past it.
+    // count names. cl6x schedules to exactly this; c90 pads past it.
     struct Deferred { const Instr *in; uint32_t lo1, lo2; };
     std::vector<Deferred> deferred_;
     bool completing_ = false;

@@ -90,7 +90,10 @@ BINDIR  ?= .
 # cc1.exe on every machine, not only Windows. The three programs in this family
 # - RStudio, cc1 and shc - carry one name each wherever they are, and a
 # suffix that changes by platform is one more thing a script has to know.
-TARGET   = $(BINDIR)/cc1i.exe
+# The program's name, once - src/Name.h and the project files RIDE's
+# tools/make-projects.py writes spell it the same.
+PROGRAM  = c90
+TARGET   = $(BINDIR)/$(PROGRAM).exe
 
 .PHONY: all test clean help
 

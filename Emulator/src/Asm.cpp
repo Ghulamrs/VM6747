@@ -250,7 +250,7 @@ struct Assembler {
     static bool regNumber(const Unit &u, const std::string &t, int &r) {
         std::string s = upper(trim(t));
         // An .asg name stands for its register in this file alone: cl6x
-        // opens every file with .asg A15, FP / B14, DP / B15, SP, and cc1i
+        // opens every file with .asg A15, FP / B14, DP / B15, SP, and c90
         // has a plain symbol called fp.
         std::map<std::string, std::string>::const_iterator a = u.asg.find(s);
         if (a != u.asg.end()) s = a->second;

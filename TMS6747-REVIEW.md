@@ -1,7 +1,7 @@
 # TMS6747 backend review — discrepancy checklist (Fable 5.1, 2026-09-14)
 
-Reviewed: cc1i and cxx1i `src/backend/Tms6747.{h,cpp}`, the Walkers, cxx1i's
-parser, the VM6747 emulator runtime, shci's target registry. ~20 probe
+Reviewed: c90 and cpp11 `src/backend/Tms6747.{h,cpp}`, the Walkers, cpp11's
+parser, the VM6747 emulator runtime, shalimar's target registry. ~20 probe
 programs compiled with the docked binaries and run on vm6747. Paths are
 under `~/Documents/Claude/VM6747/`.
 
@@ -12,27 +12,27 @@ name, unverified against TI tools, or missing.
 
 | id | title | who | severity | evidence | fix |
 |---|---|---|---|---|---|
-| A1 | 64-bit shift by a runtime count >= 32 yields 0 (or the sign) | cc1i **and** cxx1i | **wrong-code** | `Compiler-Cppi/src/backend/Tms6747.cpp:582-598`: `SUB A0, A6, A0` (32-count) is emitted after `[!A1] B big` + `NOP 5`, so on the taken path A0 is still 32 and `NEG` gives -32 -> shift by 32. Probe: `1LL<<33, u>>40, s>>35, (1LL<<40)>>8` printed `0 0 0 0`; host `8589934592 8388608 -33554432 4294967296`. Identical in cc1i. No suite has a runtime count >= 32. | Compute count-32 on the big path, or hoist the SUB above the branch. Add cases. |
-| A2 | Pointer-to-member sized as on a 64-bit target | cxx1i | **wrong-code** (layout) | `src/Type.cpp:22,38` data-member pointer = `microsoftNames() ? 4 : 8`; `src/Type.cpp:191-195` pmf struct `{$fn @0, $adj: long long @8}` size 16 align 8. Probe: `pm 8 pmf 16` (32-bit Itanium: 4/8). Values work; any class holding one, `sizeof`, and interop are off. | Size both from `pointerBytes()`/`ptrdiffType()`, as vtables already are (`Parser.h:576-578`). |
-| A3 | `size_t` is `unsigned long` in the headers but `unsigned int` to the target; `operator new` mangled `_Znwm` | cxx1i | divergence, masked by the emulator | `lib/stddef.h:34` has no `__TMS320C6X__` case; `Tms6747.h:19` `sizeType()=UInt`; probe: "'size_t' is typedefed twice ... 'unsigned long' ... 'unsigned int'". `ParserExprNew.cpp:1077` hard-codes `_Znwm`/`_Znam` (32-bit Itanium is `_Znwj`); the emulator accepts both (`Emulator/src/Runtime.cpp:389`). | A `__TMS320C6X__` branch in stddef.h; pick `j`/`m` from `sizeType()`. |
-| A4 | Pointer to a **virtual** member function | cxx1i, all targets | refused-but-should-work | "'S::vget' is virtual, and a pointer to a virtual member function is not supported yet" | Itanium encoding `$fn = 1 + vtable offset`, dispatch through the vptr at the call. |
-| A5 | `typeid` | cxx1i, all targets | missing-feature | "'typeid' is not supported yet"; `src/parser/Parser.cpp:23`. Leaves `__cxa_bad_typeid` and `type_info::{==,!=,name,before}` in `Runtime.cpp:957-962` dead. | Emit `&_ZTIx` / load vptr[-4]; a `<typeinfo>` header (absent from `lib/`). |
-| A6 | `throw` of a pointer type | cxx1i, all targets | refused-but-should-work | "'throw' cannot name the type of this: only a fundamental type has a type_info..." (`src/Mangle.cpp:1243`); the runtime already carries `_ZTIPKc` (`Runtime.cpp:186-200`). | Emit `__pointer_type_info` objects as class typeinfo is emitted. |
-| A7 | `new T[n]` with a constructor; arrays of a class with a destructor | cxx1i, all targets | missing-feature | "'new T[n]' of a class with a constructor would have to run it once per element - not supported yet"; "an array of 'struct Sc' is not supported yet because it has a destructor". No array cookie, no `__cxa_vec_*`. | Element loops + cookie. |
-| A8 | User / placement `operator new` | cxx1i, all targets | refused | "'operator new' is not supported yet"; `tests/cases/operator-new-refused.cpp` | - |
-| A9 | `enum E : T`, `alignas` | cxx1i, all targets | refused | `ParserType.cpp:1175`; `alignas` lexed (`Lexer.cpp:72`), not parsed. | - |
+| A1 | 64-bit shift by a runtime count >= 32 yields 0 (or the sign) | c90 **and** cpp11 | **wrong-code** | `Compiler-Cppi/src/backend/Tms6747.cpp:582-598`: `SUB A0, A6, A0` (32-count) is emitted after `[!A1] B big` + `NOP 5`, so on the taken path A0 is still 32 and `NEG` gives -32 -> shift by 32. Probe: `1LL<<33, u>>40, s>>35, (1LL<<40)>>8` printed `0 0 0 0`; host `8589934592 8388608 -33554432 4294967296`. Identical in c90. No suite has a runtime count >= 32. | Compute count-32 on the big path, or hoist the SUB above the branch. Add cases. |
+| A2 | Pointer-to-member sized as on a 64-bit target | cpp11 | **wrong-code** (layout) | `src/Type.cpp:22,38` data-member pointer = `microsoftNames() ? 4 : 8`; `src/Type.cpp:191-195` pmf struct `{$fn @0, $adj: long long @8}` size 16 align 8. Probe: `pm 8 pmf 16` (32-bit Itanium: 4/8). Values work; any class holding one, `sizeof`, and interop are off. | Size both from `pointerBytes()`/`ptrdiffType()`, as vtables already are (`Parser.h:576-578`). |
+| A3 | `size_t` is `unsigned long` in the headers but `unsigned int` to the target; `operator new` mangled `_Znwm` | cpp11 | divergence, masked by the emulator | `lib/stddef.h:34` has no `__TMS320C6X__` case; `Tms6747.h:19` `sizeType()=UInt`; probe: "'size_t' is typedefed twice ... 'unsigned long' ... 'unsigned int'". `ParserExprNew.cpp:1077` hard-codes `_Znwm`/`_Znam` (32-bit Itanium is `_Znwj`); the emulator accepts both (`Emulator/src/Runtime.cpp:389`). | A `__TMS320C6X__` branch in stddef.h; pick `j`/`m` from `sizeType()`. |
+| A4 | Pointer to a **virtual** member function | cpp11, all targets | refused-but-should-work | "'S::vget' is virtual, and a pointer to a virtual member function is not supported yet" | Itanium encoding `$fn = 1 + vtable offset`, dispatch through the vptr at the call. |
+| A5 | `typeid` | cpp11, all targets | missing-feature | "'typeid' is not supported yet"; `src/parser/Parser.cpp:23`. Leaves `__cxa_bad_typeid` and `type_info::{==,!=,name,before}` in `Runtime.cpp:957-962` dead. | Emit `&_ZTIx` / load vptr[-4]; a `<typeinfo>` header (absent from `lib/`). |
+| A6 | `throw` of a pointer type | cpp11, all targets | refused-but-should-work | "'throw' cannot name the type of this: only a fundamental type has a type_info..." (`src/Mangle.cpp:1243`); the runtime already carries `_ZTIPKc` (`Runtime.cpp:186-200`). | Emit `__pointer_type_info` objects as class typeinfo is emitted. |
+| A7 | `new T[n]` with a constructor; arrays of a class with a destructor | cpp11, all targets | missing-feature | "'new T[n]' of a class with a constructor would have to run it once per element - not supported yet"; "an array of 'struct Sc' is not supported yet because it has a destructor". No array cookie, no `__cxa_vec_*`. | Element loops + cookie. |
+| A8 | User / placement `operator new` | cpp11, all targets | refused | "'operator new' is not supported yet"; `tests/cases/operator-new-refused.cpp` | - |
+| A9 | `enum E : T`, `alignas` | cpp11, all targets | refused | `ParserType.cpp:1175`; `alignas` lexed (`Lexer.cpp:72`), not parsed. | - |
 | A10 | Backend refusals by name | both | refused | `Tms6747.cpp:836` switch on a 64-bit value; `:352` bit-field in a 64-bit unit; `:882` non-word relocated piece; `:236` "this address". | Switch: compare pairs. Bit-field: LDDW + two-word EXT. |
-| A11 | `noexcept` | cxx1i | works | Direct throw -> abort (`ParserStmt.cpp:1604-1612`; rc 134). Propagation through a noexcept frame terminates, handler not entered. | - |
-| A12 | Everything else probed **works** | cxx1i | - | MI thunks, covariant returns, cross `dynamic_cast`, pure virtual, 4-byte vtables with offset-to-top and `_ZTI`; virtual bases (`sizeof(D)=28`, correct ILP32 Itanium); catch by ref/value/`...`, rethrow, nested throw from a handler, cleanups, unwinding through a variadic function and a 1200-byte frame; hidden-pointer class return with a balanced ctor/dtor ledger; static guards; `.init_array` + `__cxa_atexit` order; lambdas, range-for, `auto`, `constexpr`, bit-fields, goto across a cleanup, EBO, unions, `bool`=1, `nullptr_t`=4, `long double`=8. | - |
+| A11 | `noexcept` | cpp11 | works | Direct throw -> abort (`ParserStmt.cpp:1604-1612`; rc 134). Propagation through a noexcept frame terminates, handler not entered. | - |
+| A12 | Everything else probed **works** | cpp11 | - | MI thunks, covariant returns, cross `dynamic_cast`, pure virtual, 4-byte vtables with offset-to-top and `_ZTI`; virtual bases (`sizeof(D)=28`, correct ILP32 Itanium); catch by ref/value/`...`, rethrow, nested throw from a handler, cleanups, unwinding through a variadic function and a 1200-byte frame; hidden-pointer class return with a balanced ctor/dtor ledger; static guards; `.init_array` + `__cxa_atexit` order; lambdas, range-for, `auto`, `constexpr`, bit-fields, goto across a cleanup, EBO, unions, `bool`=1, `nullptr_t`=4, `long double`=8. | - |
 | A13 | Not probed | - | unverified | catch-by-value of a class with a non-trivial copy ctor (`tests/open/catch-copy-throws.cpp`, open on all targets); `char16_t`/`char32_t`; rvalue references to prvalues. | - |
 
-## B. cc1i vs cxx1i `Tms6747.cpp`
+## B. c90 vs cpp11 `Tms6747.cpp`
 
 | id | delta | class | evidence |
 |---|---|---|---|
-| B1 | Not byte-identical any more: cxx1i mangles even a `.c` input | drift, doc stale | Diff is labels only (`mk` -> `_Z2mkii`, `counter` -> `_ZL7counter`); bodies identical; `TMS6747.md:35-36` still claims byte-identity. Fix: C linkage for `.c` in cxx1i's driver, or amend the claim. |
+| B1 | Not byte-identical any more: cpp11 mangles even a `.c` input | drift, doc stale | Diff is labels only (`mk` -> `_Z2mkii`, `counter` -> `_ZL7counter`); bodies identical; `TMS6747.md:35-36` still claims byte-identity. Fix: C linkage for `.c` in cpp11's driver, or amend the claim. |
 | B2 | C++-only additions | intended | `Abi.h`, `Kind::Bool/NullPtr`, `codegen(..., gnuAsm)`, `emitsLineTable`, `landingPad`/`emitExceptionTable`, `.weak`/`isInline`/`prefixWord`/`.space`, ctor alias labels, `.init_array`, `clearCallSites`, `symbol()` for `name()`, `microsoftNames()`. Walker +220 lines. |
-| B3 | Comment drift | drift | cc1i keeps the long explanatory blocks; cxx1i's were trimmed to its comment-line policy on 2026-09-14. Harmless; the files no longer diff cleanly. |
+| B3 | Comment drift | drift | c90 keeps the long explanatory blocks; cpp11's were trimmed to its comment-line policy on 2026-09-14. Harmless; the files no longer diff cleanly. |
 | B4 | A1 is in both | - | no hunk at `:575-601`. |
 
 ## C. Conventions not confirmed against TI tools
@@ -56,11 +56,11 @@ name, unverified against TI tools, or missing.
 | id | finding | evidence |
 |---|---|---|
 | D1 | Native runtime, so a missing RTS symbol is invisible: all of libc, every `__c6xabi_*`, every `__cxa_*`, `__dynamic_cast`, the `__cxxabiv1` vtables and fundamental typeinfos | `Runtime.cpp:369-401, 170-200` |
-| D2 | Present but unreachable from cxx1i: `__cxa_bad_typeid`, `type_info::{==,!=,name,before}` (A5); `__gxx_personality_v0` faults | `:957-963` |
+| D2 | Present but unreachable from cpp11: `__cxa_bad_typeid`, `type_info::{==,!=,name,before}` (A5); `__gxx_personality_v0` faults | `:957-963` |
 | D3 | Missing: nothrow new, aligned new, `__cxa_throw_bad_array_new_length`, `__cxa_vec_*`, `std::uncaught_exception(s)`, `.fini_array` (assembler knows `.init_array` only, `Asm.cpp:409`); `__cxa_guard_*` is a one-byte flag, not thread-safe - acceptable single-core. Nothing emits these today; latent. | - |
 | D4 | Emulator-only behaviours a real RTS lacks: division by zero faults (`:965-972`); `abort` exits 134 silently (`:635`) | - |
 
-## E. shci - the missing fourth target
+## E. shalimar - the missing fourth target
 
 `Compiler-Si/src/Target.cpp:36-53` registers three targets; `Driver.cpp:56`
 lists them; no `tms6747`. The port is smaller than the C compilers' because
@@ -74,7 +74,7 @@ to `.sect ".const"` `.byte` lists, plus a `Target` subclass that stops at
 `.s`. Two harder parts: `Driver.cpp:477-500` assembles and links on the host,
 so a tms6747 target must stop at `-S` and hand the file to `vm6747`; and the
 Shalimar runtime (`runtime/shmrt.h`, ~90 `shm_*` entry points) is a C library
-the emulator does not implement natively - either compile it with `cc1i -arch
+the emulator does not implement natively - either compile it with `c90 -arch
 tms6747` and give both `.s` files to `vm6747`, or add the `shm_*` names to
 `Runtime::names()`.
 
@@ -89,7 +89,7 @@ Paths (abbreviated below): **Ci** = `/Users/g.r.akhtar/Documents/Claude/VM6747/C
 
 Severity: **S** = silent wrong result on silicon or at a boundary with TI-compiled code; **R** = assembler/linker rejection; **C** = cosmetic/conformance.
 
-1. **[S, verified by TI] Struct/union return of 8 bytes or less.** TI returns it in A5:A4 (TI:313-334 `mk2`: `ADD .L1 1,A4,A5; RETNOP A0,5`); we always go through the hidden pointer in A3: `structReturnLimit 0` at Ci:43-45 / Cppi:44-46, the callee copy at Ci:694-701 / Cppi:715-722, the caller at Ci:802,806 / Cppi:813,817. Probe p2 (`3 4 | abc | 2 -2 | 9 | 34 9`) is right only because both sides are ours; p2_structs.s:517 shows `SUB A15, 8, A3` before `B mk2`. Fix: `structReturnLimit 8` in both Abis (the parser's `returnsIndirectly`, Compiler-Ci `src/Parser.h:98-110`, already keys on it); callee loads the value into A5:A4 (LDDW when 8-aligned, else LDW/LDH/LDB pieces), caller stores A5:A4 into `resultSlot`. Also the shci runtime (cxx1i-compiled) and any Shalimar `foreign` declaration returning a small struct.
+1. **[S, verified by TI] Struct/union return of 8 bytes or less.** TI returns it in A5:A4 (TI:313-334 `mk2`: `ADD .L1 1,A4,A5; RETNOP A0,5`); we always go through the hidden pointer in A3: `structReturnLimit 0` at Ci:43-45 / Cppi:44-46, the callee copy at Ci:694-701 / Cppi:715-722, the caller at Ci:802,806 / Cppi:813,817. Probe p2 (`3 4 | abc | 2 -2 | 9 | 34 9`) is right only because both sides are ours; p2_structs.s:517 shows `SUB A15, 8, A3` before `B mk2`. Fix: `structReturnLimit 8` in both Abis (the parser's `returnsIndirectly`, Compiler-Ci `src/Parser.h:98-110`, already keys on it); callee loads the value into A5:A4 (LDDW when 8-aligned, else LDW/LDH/LDB pieces), caller stores A5:A4 into `resultSlot`. Also the shalimar runtime (cpp11-compiled) and any Shalimar `foreign` declaration returning a small struct.
 
 2. **[S, verified by TI] A3 may be null for a >8-byte struct return.** TI's callee tests it (TI:227,252 `MV .S1 A3,A0 ... [!A0] BNOP $C$L1,4`); ours stores unconditionally (Ci:697-700, Cppi:718-721). A TI caller that discards the result would fault our callee. Fix: guard the copy in `Return` with `[!A1] B skip` on the loaded pointer.
 
@@ -107,9 +107,9 @@ Severity: **S** = silent wrong result on silicon or at a boundary with TI-compil
 
 9. **[S, unverified] 64-bit stack arguments 8-aligned.** Caller: Ci:768-776 (`end = align8(end)` for a wide arg after the reserved word, so the 11th double sits at SP+8), callee mirror at Ci:815-823. conv.c has no such call; p5's `dmany(11 doubles)` printed `22` under our own convention. Add to conv2.
 
-10. **[S at a TI boundary, verified by reading] shci clobbers callee-saved A10/B10/A12/B12.** Si:43-46 assigns arguments 7-10 to them and Si:109-124 loads them for a call; the shci frame saves only B3 (Si:72-87). Probe s1.shm: `shm_user_main` loads B12/A12/B10/A10 (s1.s:463-478) and its prologue is `STW B3, *B15` alone (s1.s:345). cc1i/cxx1i save them (Ci:1105-1116). Harmless inside this line (nothing keeps a value there across a call), wrong for a TI-compiled caller (e.g. RTS `qsort` calling a Shalimar comparator). Fix: save the four in the shci frame when a function makes a call with more than six arguments.
+10. **[S at a TI boundary, verified by reading] shalimar clobbers callee-saved A10/B10/A12/B12.** Si:43-46 assigns arguments 7-10 to them and Si:109-124 loads them for a call; the shalimar frame saves only B3 (Si:72-87). Probe s1.shm: `shm_user_main` loads B12/A12/B10/A10 (s1.s:463-478) and its prologue is `STW B3, *B15` alone (s1.s:345). c90/cpp11 save them (Ci:1105-1116). Harmless inside this line (nothing keeps a value there across a call), wrong for a TI-compiled caller (e.g. RTS `qsort` calling a Shalimar comparator). Fix: save the four in the shalimar frame when a function makes a call with more than six arguments.
 
-11. **[S, private convention, verified by reading] shci's >10-argument overflow block travels in B1** (Si:129-139), not at SP+4 as TI does (TI:707-718). Breaks only a `foreign` declaration with more than ten arguments.
+11. **[S, private convention, verified by reading] shalimar's >10-argument overflow block travels in B1** (Si:129-139), not at SP+4 as TI does (TI:707-718). Breaks only a `foreign` declaration with more than ten arguments.
 
 12. **[R, verified by TI] `AND A6, 63, A6`** — Ci:637, Cppi:658; 32 occurrences in the sweep. Neither the range (scst5 is -16..15) nor the position (the constant is src1 for AND/OR/XOR) is legal. Fix: `EXTU A6, 26, 26, A6` (one instruction, ucst5 fields; masks to 6 bits).
 
@@ -117,7 +117,7 @@ Severity: **S** = silent wrong result on silicon or at a boundary with TI-compil
 
 14. **[R, structural, verified by probe] The emulator range-checks no immediate and no operand position.** Isa.cpp:45-99 (`isaCheck`) checks shapes only: default case at 87-95, NOP at 53, MVK at 56; Cpu.cpp:142-144 silently truncates MVK. Hand-written `lax.s` (ADD ucst5 40, `AND 63`, `OR 200`, `SHL 40`, `CMPEQ A4, 100`, `MVK 100000`, `NOP 12`) ran to rc=6. So items 12-13 can recur unnoticed in any of the three emulator sandboxes. Fix (the cheapest way to make the Mac/Linux/Windows sandboxes catch what asm6x catches): scst5 for constant-first .L/.S forms, ucst5 for `ADD/SUB reg, ucst5`, shift counts and EXT/EXTU/SET/CLR fields, scst16 for MVK, 1..9 for NOP, and reject a constant in src2 of AND/OR/XOR/CMPxx.
 
-15. **[R, verified by TI; in progress] Dots in symbols.** `tiSpelling` (Ci:86-104, Cppi:87-105, applied at Ci:1146 / Cppi:1178) is a whole-text post-pass; the rebuilt cc1i emits `L$return$mk2` (conv-cc1i-new.s:61-66). shci emits no dots itself (`Lshm`, `Lshmb`, `Lshmr`: Si:59-60,142) but its runtime is cxx1i's, so `tisweep/shmrt` must be regenerated with the rebuilt cxx1i. The emulator accepts any token before `:` (Asm.cpp:102-116; lax2.s assembled `L.done.x`), so it cannot guard this either.
+15. **[R, verified by TI; in progress] Dots in symbols.** `tiSpelling` (Ci:86-104, Cppi:87-105, applied at Ci:1146 / Cppi:1178) is a whole-text post-pass; the rebuilt c90 emits `L$return$mk2` (conv-c90-new.s:61-66). shalimar emits no dots itself (`Lshm`, `Lshmb`, `Lshmr`: Si:59-60,142) but its runtime is cpp11's, so `tisweep/shmrt` must be regenerated with the rebuilt cpp11. The emulator accepts any token before `:` (Asm.cpp:102-116; lax2.s assembled `L.done.x`), so it cannot guard this either.
 
 16. **[R, unverified] Symbols spelled like registers or mnemonics.** cl6x writes `||fp||` for a function named `fp` (TI:499,538) because of `.asg A15, FP`. We emit no `.asg`, so only raw `A0-A15`/`B0-B15` names collide; the sweep also has column-0 labels `add:`, `b:`, `set:`, `sub:` (likely fine with the colon). Cheap fix: `||name||`-quote any symbol matching a register or mnemonic.
 
@@ -152,11 +152,11 @@ Windows-built compilers write CRLF (`std::ofstream` text mode, Compiler-Ci `src/
 
 ---
 
-# Third review - binary compatibility of cxx1i's C6000 objects with cl6x's (Fable 5.1, 2026-09-15)
+# Third review - binary compatibility of cpp11's C6000 objects with cl6x's (Fable 5.1, 2026-09-15)
 
-**Question.** Can an object cl6x produces and one cxx1i produces be linked together and run on a C6747: call, be called, throw through, catch from, inherit from, share globals and layouts. Instruction text is not compared; the ABI is.
+**Question.** Can an object cl6x produces and one cpp11 produces be linked together and run on a C6747: call, be called, throw through, catch from, inherit from, share globals and layouts. Instruction text is not compared; the ABI is.
 
-**Method.** Nine probe translation units, each compiled by `cl6x -mv6740 --abi=eabi -O0 -k --exceptions --rtti` (TI CGT 8.2.2 on the Windows box) and by `cxx1i -S -arch tms6747`, our `.s` assembled by `cl6x -c`, mixed links by `lnk6x` against `rts6740_elf_eh.lib`, objects read with `nm6x`/`ofd6x`; TI's runtime sources (`lib/src/tdeh_*.cpp`, `tdeh_uwentry_c6000.asm`, `autoinit.c`, `boot.c`, `guard.cpp`, `rtti.cpp`, `vec_newdel.cpp`, `stdarg.h`) read where a fact is not in the text. Everything is under `scratchpad/ti/review3/` (abbreviated **R3** below): probes `cc.cpp` (calling convention), `layout.cpp`, `mangle.cpp`, `sect.cpp` (+`sect-ext.cpp`, `tm2.cpp`), `eh2.cpp`, `init.cpp`, `newdel.cpp`, `dp-ti.c`/`dp-ours.cpp`/`dp-link.cmd` (data-page test), `probe2.cpp`/`probe2b.c`/`probe3.cpp` (hidden-pointer order, extern addressing), `extra.cpp` (cl6x only), `vbase.cpp` (emulator); our output `<probe>.s`; TI's output and every log, map and object dump in `R3/out/` (`<probe>-ti.asm`, `*.lnk`, `*.map`, `*.nm`, `*.ofd`); TI's sources and the two library symbol lists in `R3/rts/` (`eh-syms.txt` is `nm6x -g rts6740_elf_eh.lib`). The box build scripts are `R3/build.cmd`, `build2.cmd`; the box copy is `C:\Users\GRA\Documents\VM6747\review`. Nothing under `~/Documents/Claude` was changed but this file.
+**Method.** Nine probe translation units, each compiled by `cl6x -mv6740 --abi=eabi -O0 -k --exceptions --rtti` (TI CGT 8.2.2 on the Windows box) and by `cpp11 -S -arch tms6747`, our `.s` assembled by `cl6x -c`, mixed links by `lnk6x` against `rts6740_elf_eh.lib`, objects read with `nm6x`/`ofd6x`; TI's runtime sources (`lib/src/tdeh_*.cpp`, `tdeh_uwentry_c6000.asm`, `autoinit.c`, `boot.c`, `guard.cpp`, `rtti.cpp`, `vec_newdel.cpp`, `stdarg.h`) read where a fact is not in the text. Everything is under `scratchpad/ti/review3/` (abbreviated **R3** below): probes `cc.cpp` (calling convention), `layout.cpp`, `mangle.cpp`, `sect.cpp` (+`sect-ext.cpp`, `tm2.cpp`), `eh2.cpp`, `init.cpp`, `newdel.cpp`, `dp-ti.c`/`dp-ours.cpp`/`dp-link.cmd` (data-page test), `probe2.cpp`/`probe2b.c`/`probe3.cpp` (hidden-pointer order, extern addressing), `extra.cpp` (cl6x only), `vbase.cpp` (emulator); our output `<probe>.s`; TI's output and every log, map and object dump in `R3/out/` (`<probe>-ti.asm`, `*.lnk`, `*.map`, `*.nm`, `*.ofd`); TI's sources and the two library symbol lists in `R3/rts/` (`eh-syms.txt` is `nm6x -g rts6740_elf_eh.lib`). The box build scripts are `R3/build.cmd`, `build2.cmd`; the box copy is `C:\Users\GRA\Documents\VM6747\review`. Nothing under `~/Documents/Claude` was changed but this file.
 
 Two facts about the vendor side that frame everything: **cl6x 8.2.2 defaults to no exceptions and no RTTI** (`--exceptions --rtti` must be given, and the shipped `rts6740_elf.lib` is the no-EH build; the EH build is the one mklib made), and **it is a C++03 compiler** (`noexcept`, `override`, `enum class`, `char16_t`, `decltype(nullptr)` are syntax errors - `R3/out/eh2-ti.log`, `extra-ti.log` before the probes were trimmed). A shared header must be C++03 whatever the ABI says.
 
@@ -168,7 +168,7 @@ Severity: **S** = silent wrong behaviour on silicon in a mixed link; **R** = the
 - Area: exceptions. Probe: `R3/eh2.cpp` (`cleanup_only`, `conditional_cleanup`, `nested`, `ret_in_catch`, every function with a destructor-bearing local), and `R3/../eh.cpp` from the second review.
 - cl6x: every cleanup pad ends `CALLP .S2 __cxa_end_cleanup,B3` (`R3/out/eh2-ti.asm:1668, 2011, 2572, 2595, 2616`, `eh-ti.asm:490, 662`); `__cxa_end_cleanup` takes no argument. TI's personality, `tdeh_pr_common.cpp` `process_cleanup` (scratchpad/ti/tdeh, line ~265): for a cleanup it calls `__cxa_begin_cleanup(uexcep)` (records the exception in `__cxa_eh_globals::cleanup_exception`) and `__TI_targ_regbuf_set_pc(context, pad)` - *nothing else*; only `process_catch` (line ~394) calls `__TI_targ_setup_call_parm0(context, uexcep)`. `__TI_Install_CoreRegs` (`tdeh_uwentry_c6000.asm:270ff`) then loads A4 unconditionally from the register buffer (`LDW *A4[_Unwind_Reg_Id._UR_A4], A4`), and `_Unwind_RaiseException` (`:58-175`) never stores A4 into that buffer (it stores B3, DP, B10-B13, A10-A15, SP). So at one of our cleanup pads under TI's runtime A4 is an uninitialised stack word. `__cxa_end_cleanup` (`:385-460`) fetches the exception from `cleanup_exception` via `__TI_cxa_end_cleanup()` and only then calls `_Unwind_Resume`.
 - ours: `R3/eh2.s:904, 1042, 1132, 1194` (`B _Unwind_Resume` after loading the pad's stored A4); the backend's `landingPad` stores A4 for every pad (`Compiler-Cppi/src/backend/Tms6747.cpp` `landingPad`), the parser emits the `_Unwind_Resume` call (`src/parser/ParserStmt.cpp` and `ParserClass.cpp`, `runtimeCall("_Unwind_Resume", ...)`). The emulator's `_Unwind_Resume` takes the exception as its argument (`Emulator/src/Runtime.cpp:1043-1049`), which is why 281/281 pass there.
-- Consequence: the first exception that unwinds through any cxx1i frame with a destructor on silicon calls `_Unwind_Resume` with garbage - a crash or a wrong resumption. This is the one item that breaks every C++ program with exceptions, not a corner.
+- Consequence: the first exception that unwinds through any cpp11 frame with a destructor on silicon calls `_Unwind_Resume` with garbage - a crash or a wrong resumption. This is the one item that breaks every C++ program with exceptions, not a corner.
 - Fix: on this target end every cleanup pad with `__cxa_end_cleanup()` (no argument, never returns) instead of `_Unwind_Resume(ptr)`; the pad need not store A4 for a cleanup at all. Teach the emulator `__cxa_end_cleanup` (resume the exception the last cleanup landing recorded). A catch handler that falls off its end stays as it is (`__cxa_end_catch`). Effort: S (parser hook + one native).
 
 ### T2. [S] A class that is non-trivial for calls is returned through a hidden pointer in **A4, as the first parameter, before `this`** - not through A3
@@ -246,8 +246,8 @@ Severity: **S** = silent wrong behaviour on silicon in a mixed link; **R** = the
 ### T13. [C] Inline functions, vtables and typeinfo are `.weak` in `.text`/`.const`, not per-symbol sections in a group
 - Proven harmless at the link (`scratchpad/ti/weak/`: two `.weak w` definitions link, `nm6x` shows one `W w`; a `.weak` beside a `.global` takes the `.global`; `R3/out/mangle-ours.nm` `W` against TI's `?` links in every mixed probe). Every TU keeps its own body of every inline function and vtable; TI folds them through `.sect ".text:sym"` + `.clink` + `.group`/`.gmember`. Size only. Effort: M if wanted.
 
-### T14. [C, cc1i only] Uninitialised globals are common symbols in TI's output
-- `.nearcommon gz,4,4`, `.farcommon zarr,16,8` even for C++ (`R3/out/sect-ti.asm:75, 291`); ours `.bss gz,4,4` is a definition. No C++ consequence; in C two TUs with `int x;` link under cl6x and would clash under cc1i's `.bss`. Note for the C sibling.
+### T14. [C, c90 only] Uninitialised globals are common symbols in TI's output
+- `.nearcommon gz,4,4`, `.farcommon zarr,16,8` even for C++ (`R3/out/sect-ti.asm:75, 291`); ours `.bss gz,4,4` is a definition. No C++ consequence; in C two TUs with `int x;` link under cl6x and would clash under c90's `.bss`. Note for the C sibling.
 
 ### Cxx1i front-end limits met while probing (not ABI, recorded for the author)
 - a member of a struct returned by a *virtual* call: "this address is not supported yet" (`c.vbig().c`); `p != 0` on a member pointer, and a member-function-pointer call through a typedef of a class in a nested namespace: "target: no size for this type yet (tms6747)"; `int (M::*pmv)() = &M::vf;` at file scope: "needs a braced initialiser"; `extern const` definitions dropped (T7); `va_arg` of an aggregate refused (the backend has the code); `offsetof` and dynamic initialisers of scalars refused as non-constant; `volatile int *` and pointers to const member functions refused; `enum class`, `char16_t`, function-try-blocks absent. Each is in the probe sources' history (`R3/*.cpp` were trimmed to what both compilers take).
@@ -289,4 +289,4 @@ TI's tools assemble, link and dump; they do not run. What stays unproven is beha
 - T11 [R] `__cxa_get_exception_ptr` is not in TI's runtime; copy from `__cxa_begin_catch`'s result.
 - T12 [C] duplicate catch rows on nested tries.
 - T13 [C] `.weak` bodies are not folded (size only).
-- T14 [C] cc1i: TI's uninitialised globals are common symbols.
+- T14 [C] c90: TI's uninitialised globals are common symbols.

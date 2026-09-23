@@ -1,6 +1,6 @@
 // F3 - tms6747: std::map<int,double> reads back 0.0
 // cl:    2.5 2.5 1.5 1 (arm64-darwin agrees)
-// cxx1i: 0.0 0.0 0.0 1 on vm6747
+// cpp11: 0.0 0.0 0.0 1 on vm6747
 #include <map>
 extern "C" int printf(const char *, ...);
 int main() {

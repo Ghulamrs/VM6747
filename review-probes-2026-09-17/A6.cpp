@@ -1,6 +1,6 @@
 // A6 - pointer-to-member widths under multiple and virtual inheritance (pm row), and sizeof of a class with two empty bases (class row, 7th)
 // cl:    class 1 1 16 16 4 8 8 4 / pm 4 8 4 16 8 16
-// cxx1i: class 1 1 16 16 4 8 4 4 / pm 4 8 4 8 4 8
+// cpp11: class 1 1 16 16 4 8 4 4 / pm 4 8 4 8 4 8
 extern "C" int printf(const char *, ...);
 struct Empty {};
 struct One { char c; };

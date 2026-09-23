@@ -4,7 +4,7 @@
     tools/make-vs.py c      -> c/vs/CC1Lab.vcxproj (+ .sln)
     tools/make-vs.py cpp    -> cpp/vs/CXX1Lab.vcxproj
 
-cl.exe builds the same sources RIDE builds with cc1i or cxx1i, from a project of
+cl.exe builds the same sources RIDE builds with c90 or cpp11, from a project of
 its own: a console application, Release|x64, the files by reference from the lab
 directory, C compiled as C (/TC) and C++ as C++ with exceptions (/EHsc, the
 lowest standard cl offers is /std:c++14). The oracle on Windows, so everything

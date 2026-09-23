@@ -1,6 +1,6 @@
 // A5 - #pragma pack is read and dropped without a word
 // cl:    7 10 16
-// cxx1i: 12 16 16
+// cpp11: 12 16 16
 extern "C" int printf(const char *, ...);
 #pragma pack(push, 1)
 struct P1 { char c; int i; short s; };

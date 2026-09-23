@@ -1,6 +1,6 @@
 // A16 - an out-of-line static data member is replayed for a partial specialization's instantiation
 // cl:    4 10 3
-// cxx1i: error: 'Box<int>::count' is defined twice
+// cpp11: error: 'Box<int>::count' is defined twice
 extern "C" int printf(const char *, ...);
 template <class T> struct Box { T v; Box(T x) : v(x) {} T get() const { return v; } static int count; };
 template <class T> int Box<T>::count = 0;

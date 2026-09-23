@@ -290,5 +290,5 @@ codegen: this binary operator is not supported yet by the arm64-darwin backend
 | `-j n` | how many files compile at once; `-j 1` is serial |
 | `-time` | report how long each phase took |
 
-`CC1_CC` names the host compiler cc1 shells out to for assembling and linking,
+`C90_CC` names the host compiler cc1 shells out to for assembling and linking,
 where the default is `cc`.

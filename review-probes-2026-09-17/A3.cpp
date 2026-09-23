@@ -1,6 +1,6 @@
 // A3 - callee half of the cross-link pair (A3-caller.cpp, A3.h): overloaded virtuals g(int)/g(double) laid in declaration order where cl lays adjacent overloads in reverse
 // cl:    callVirt 53 1003 2003 300 ... plain 729 1 2 3 101 201
-// cxx1i: either mixed link: callVirt 53 2000 1003 300 ... plain 729 1 2 3 204 101
+// cpp11: either mixed link: callVirt 53 2000 1003 300 ... plain 729 1 2 3 204 101
 #include "A3.h"
 Virt::Virt() : base(11) {} Virt::~Virt() { printf("~Virt %d\n", base); }
 int Virt::vf(int k) { return k + base; } int Virt::g(int k) { return 100 + k; } int Virt::g(double d) { return 200 + (int)d; } int Virt::h() { return 300; }

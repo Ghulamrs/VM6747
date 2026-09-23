@@ -4,7 +4,7 @@
     tools/make-xcode.py c      -> c/xcode/CC1Lab.xcodeproj
     tools/make-xcode.py cpp    -> cpp/xcode/CXX1Lab.xcodeproj
 
-Apple clang builds the same sources RIDE builds with cc1i or cxx1i, from a
+Apple clang builds the same sources RIDE builds with c90 or cpp11, from a
 project of its own: a command-line tool, one target, the files by reference
 from the lab directory, C as gnu99 and C++ as C++11 - the levels the two
 compilers implement - with -Wall and nothing else Xcode's template adds. It is

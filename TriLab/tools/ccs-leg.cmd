@@ -1,6 +1,6 @@
 @echo off
 rem  TriLab's CCS 7.4 leg, on the box: RIDE builds each lab for tms6747 with
-rem  cc1i/cxx1i and vm6747 runs it; TI's cl6x compiles the same sources to
+rem  c90/cpp11 and vm6747 runs it; TI's cl6x compiles the same sources to
 rem  assembly and vm6747 runs that - CCS 7.4 has no simulator, so the emulator
 rem  runs both sides. Beside the run, each side is also taken through TI's own
 rem  assembler and linker (asm via cl6x -c, lnk6x against rts6740_elf_eh.lib) to
