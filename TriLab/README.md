@@ -42,15 +42,15 @@ C++ labs judge the compilers.
     sh trilab.sh windows
     sh trilab.sh ccs
 
-The macOS leg builds each lab through `RStudio --build` (the same code path as F4), runs it, builds the
+The macOS leg builds each lab through `RIDE --build` (the same code path as F4), runs it, builds the
 judge's project with `xcodebuild`, runs that, and diffs. Products go under `$TMPDIR`, not
 the tree; RIDE's own `cc1lab` / `cxx1lab` land beside the sources and are ignored by git.
 
 The Windows leg ships the lab to the box as a tar, and `tools/windows-leg.cmd` there builds
-each lab through `RStudioConsole --build --arch x86_64-windows --assembler <asm-win.exe>`
+each lab through `RIDEConsole --build --arch x86_64-windows --assembler <asm-win.exe>`
 (c90 and cpp11 writing MASM, the project's assembler, `link`), builds the judge's `.sln`
 with `msbuild`, runs all four, and the outputs come back to be compared here. The box needs
-RIDE built by RStudio's `tools/to-windows.sh` and the assembler by MASM's `tests/windows.sh`.
+RIDE built by RIDE 4.5's `tools/to-windows.sh` and the assembler by MASM's `tests/windows.sh`.
 
 The CCS leg is the box again: `tools/ccs-leg.cmd` has RIDE build each lab for `tms6747`
 (a `.vm` directory of one `.s` per source) and runs it on RIDE's `vm6747.exe`; then cl6x

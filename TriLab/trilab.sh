@@ -12,14 +12,13 @@
 # line for line, except lines the ledger (expected/<leg>-<lab>.allowed) records as
 # legitimately different, with both readings. Anything else is a defect, named.
 #
-# Needs: RStudio built (../../RStudio/RStudio.exe, or RIDE=path), c90.exe and
+# Needs: RIDE 4.5 built (../../RIDE-4.5/bin/RIDE.exe, or RIDE=path), c90.exe and
 # cpp11.exe built in ../Compiler-Ci and ../Compiler-Cppi, and xcodebuild.
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
-# RIDE's console editor: in RStudio's bin since the one-binary-directory
-# change, beside the compilers it drives; the old place is looked at after.
-RIDE=${RIDE:-$HERE/../../RStudio/bin/RStudio.exe}
-[ -x "$RIDE" ] || RIDE=$HERE/../../RStudio/RStudio.exe
+# RIDE's console editor, in RIDE 4.5's bin beside the compilers it drives.
+# RStudio, its name before the rename, takes --cc1/--cxx1 and is not asked.
+RIDE=${RIDE:-$HERE/../../RIDE-4.5/bin/RIDE.exe}
 CC1I=${CC1I:-$HERE/../Compiler-Ci/c90.exe}
 CXX1I=${CXX1I:-$HERE/../Compiler-Cppi/cpp11.exe}
 OUT=${OUT:-${TMPDIR:-/tmp}/trilab.$$}
@@ -28,7 +27,7 @@ leg=${1:-mac}
 status=0
 
 # the two labs: directory, project, RIDE compiler flag, Xcode target
-labs="c:CC1Lab:--cc1=$CC1I cpp:CXX1Lab:--cxx1=$CXX1I"
+labs="c:CC1Lab:--c90=$CC1I cpp:CXX1Lab:--cpp11=$CXX1I"
 
 compare() {   # compare <lab> <candidate output> <judge output> <judge name>
     lab=$1; mine=$2; theirs=$3; judge=$4
@@ -66,13 +65,13 @@ mac)
     done
     ;;
 windows)
-    # The box: `ssh windows`, the RIDE solution built there by RStudio's
-    # tools/to-windows.sh (RStudioConsole.exe and the compilers in bin\), and
+    # The box: `ssh windows`, the RIDE solution built there by RIDE 4.5's
+    # tools/to-windows.sh (RIDEConsole.exe and the compilers in bin\), and
     # the assembler built by MASM's tests/windows.sh. The lab is shipped as a
     # tar, the .cmd runs both sides, and the outputs come back to be compared.
     BOX=${BOX:-windows}
     BOXLAB=${BOXLAB:-C:/Users/GRA/source/VM6747/TriLab}
-    BOXRIDE=${BOXRIDE:-C:/Users/GRA/source/RStudio/bin/RStudioConsole.exe}
+    BOXRIDE=${BOXRIDE:-C:/Users/GRA/source/RIDE-4.5/bin/RIDEConsole.exe}
     BOXASM=${BOXASM:-C:/masm-tests/build/asm-win.exe}
     W=$(echo "$BOXLAB" | sed 's|/|\\|g')
     echo "TriLab, Windows: RIDE (c90, cpp11, the project's assembler) against Visual Studio 2022"
@@ -106,8 +105,8 @@ ccs)
     # .out (the leg says so per lab), which is the acceptance half of the judge.
     BOX=${BOX:-windows}
     BOXLAB=${BOXLAB:-C:/Users/GRA/source/VM6747/TriLab}
-    BOXRIDE=${BOXRIDE:-C:/Users/GRA/source/RStudio/bin/RStudioConsole.exe}
-    BOXVM=${BOXVM:-C:/Users/GRA/source/RStudio/bin/vm6747.exe}
+    BOXRIDE=${BOXRIDE:-C:/Users/GRA/source/RIDE-4.5/bin/RIDEConsole.exe}
+    BOXVM=${BOXVM:-C:/Users/GRA/source/RIDE-4.5/bin/vm6747.exe}
     W=$(echo "$BOXLAB" | sed 's|/|\\|g')
     echo "TriLab, CCS 7.4: RIDE (c90, cpp11, tms6747, run on vm6747) against cl6x, run on vm6747 too"
     find "$HERE" -name "* [0-9].*" -delete

@@ -3,10 +3,10 @@ rem  TriLab's Windows leg, on the box: RIDE builds each lab with c90/cpp11/shali
 rem  the project's assembler; the judge builds the same sources with Microsoft's
 rem  tools - MSBuild and cl for C and C++, ml64 and link over shalimar's assembly for
 rem  Shalimar, which no Visual Studio project can hold; both run.
-rem  Usage: windows-leg.cmd <TriLab dir> <RStudioConsole.exe> <assembler.exe>
+rem  Usage: windows-leg.cmd <TriLab dir> <RIDEConsole.exe> <assembler.exe>
 rem  Writes <TriLab dir>\out\<lab>-ride.out, <lab>-vs.out, and the build logs.
 setlocal enabledelayedexpansion
-if "%~3"=="" (echo windows-leg.cmd: needs the TriLab dir, RStudioConsole.exe and the assembler & exit /b 2)
+if "%~3"=="" (echo windows-leg.cmd: needs the TriLab dir, RIDEConsole.exe and the assembler & exit /b 2)
 set LAB=%~1
 set RIDE=%~2
 set ASM=%~3

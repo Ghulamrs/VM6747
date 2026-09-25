@@ -10,10 +10,10 @@ rem  Since 2026-09-19 RIDE links the .out itself: asm6x.exe beside it assembles 
 rem  .vm's assembly and, told TI's compiler directory (--ti, --tilib), lnk6x links
 rem  it - RIDE-OUT below says the .out is there. The cl6x-over-RIDE's-assembly check
 rem  stays as the independent reading of the same assembly.
-rem  Usage: ccs-leg.cmd <TriLab dir> <RStudioConsole.exe> <vm6747.exe>
+rem  Usage: ccs-leg.cmd <TriLab dir> <RIDEConsole.exe> <vm6747.exe>
 rem  Writes <TriLab dir>\out\<lab>-ride-ccs.out, <lab>-ccs.out, and the logs.
 setlocal enabledelayedexpansion
-if "%~3"=="" (echo ccs-leg.cmd: needs the TriLab dir, RStudioConsole.exe and vm6747.exe & exit /b 2)
+if "%~3"=="" (echo ccs-leg.cmd: needs the TriLab dir, RIDEConsole.exe and vm6747.exe & exit /b 2)
 set LAB=%~1
 set RIDE=%~2
 set VM=%~3
