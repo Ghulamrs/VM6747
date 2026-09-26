@@ -1,7 +1,7 @@
 ©2026 G. R. Akhtar - ISO C 90
 Release seal, version 1.1, sealed 26-09-2026
 Written by tools/seal; check it with `tools/seal check`.
-CRC32  size  file - 86 files, seal 3CFA3191
+CRC32  size  file - 86 files, seal 41D6C8F5
 ------------------------------------------------------------------
 CB7B0DCF      9572  Makefile
 8262F74B      3886  examples/CC1Lab.xcodeproj/project.pbxproj
@@ -55,19 +55,19 @@ F091405C     10404  msvc/cc1.vcxproj
 F97E6338     10010  msvc/readme.txt
 033FA1DE      6067  msvc/run-corpus.ps1
 EA66D133     16155  src/Ast.h
-49B46980     38505  src/Driver.cpp
+C131402A     36452  src/Driver.cpp
 9E61BCC2      2195  src/Driver.h
 1424D482      8857  src/Lexer.cpp
 779AEACA       994  src/Lexer.h
 7DBE9C6A       483  src/Name.h
-25894E7E    107479  src/Parser.cpp
-804ACDE3     11363  src/Parser.h
+BAD64C33    107000  src/Parser.cpp
+D838E7F7     11345  src/Parser.h
 A40019C8     35302  src/Preprocessor.cpp
 BCA01EF2      2886  src/Preprocessor.h
 5538DB98      3134  src/Source.cpp
 181237A8      1017  src/Source.h
 F8A291F9      8202  src/Type.cpp
-3F79FA97      4329  src/Type.h
+5794F40C      4296  src/Type.h
 E73FF197     35717  src/backend/Arm64Darwin.cpp
 D656912C      4102  src/backend/Arm64Darwin.h
 292E5E11      3681  src/backend/Backend.cpp
@@ -80,8 +80,8 @@ FE043B76     62191  src/backend/Optimizer.cpp
 99800A52      7494  src/backend/Optimizer.h
 3785C1FF      3373  src/backend/Spelling.cpp
 821497E8      5315  src/backend/Spelling.h
-67F95924     58163  src/backend/Tms6747.cpp
-9F7FCF74      8801  src/backend/Tms6747.h
+DBBB307A     57435  src/backend/Tms6747.cpp
+C29D3444      6795  src/backend/Tms6747.h
 8C9A8273      5180  src/backend/Walker.cpp
 45A8B306      2321  src/backend/Walker.h
 194F68C5     52833  src/backend/X86_64Linux.cpp
