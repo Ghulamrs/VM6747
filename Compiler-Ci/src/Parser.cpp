@@ -88,10 +88,9 @@ const Type *Parser::structOrUnionSpecifier(Kind kind) {
     int widest = 1;
     long long bitCursor = 0;
     long long widestBits = 0;
-    // **The Microsoft ABI allocates bit-fields in units of the declared type**,
-    // a new unit when the type changes or the open one is full, the whole unit
-    // charged; Itanium packs them end to end. Found by TriLab against cl:
-    // {char; unsigned:6; unsigned:6; int} is 12 bytes there and was 8 here.
+    // **The Microsoft ABI allocates bit-fields in units of the declared type**, a new unit when
+    // the type changes or the open one is full, the whole unit charged; Itanium packs them end to
+    // end. Found by TriLab against cl: {char; unsigned:6; unsigned:6; int} is 12 bytes there and was 8 here.
     const bool msBits = target_.microsoftLayout();
     long long msUnitStart = 0, msUnitBits = 0;
     // Opens a unit of this type for a field of w bits, unless the open one is
@@ -292,17 +291,9 @@ const Type *Parser::specifiers(StorageClass *storage, Qualifiers *quals) {
     int isSigned = 0, isUnsigned = 0, isFloat = 0, isDouble = 0;
 
     while (atTypeName()) {
-        // atTypeName() is also true for an identifier naming a typedef, and
-        // nothing below consumes one - so without this the loop spins forever
-        // on "typedef long T;" where T is already a typedef. A typedef name
-        // used *as* the type was taken above, before this loop; reaching one
-        // here means it is the declarator's name, or a mistake, and either way
-        // the specifiers are finished.
-        //
-        // Stopping here is what lets the "typedefed twice" error below be
-        // reached at all. It never was: 425 cases and not one of them
-        // redeclares a typedef, so the compiler hung instead of saying no,
-        // which is the worse of the two by a distance.
+        // atTypeName() is also true for an identifier naming a typedef, and nothing below consumes
+        // one - so without this the loop spins forever on "typedef long T;" where T is already a
+        // typedef. A typedef name used *as* the type was taken above; reaching one here means the specifiers are finished.
         if (peek().kind == TokenKind::Ident) break;
         if (consume("const"))         { quals->isConst = true; continue; }
         if (consume("volatile"))      { quals->isVolatile = true; continue; }
@@ -920,10 +911,9 @@ ExprPtr Parser::primary(Program *program) {
                                             : types_.get(Kind::LongLong);
 
         else if (t.wide)                 ty = types_.get(target_.wcharType());
-        // A character constant is an int (C90 6.1.3.4), and '\x80' is -128:
-        // read as an unsigned number that fits nothing short of unsigned
-        // long long, which is what it was typed as until the C6000 target
-        // put such a constant on the stack as eight bytes.
+        // A character constant is an int (C90 6.1.3.4), and '\x80' is -128: read as an unsigned
+        // number that fits nothing short of unsigned long long, which is what it was typed as
+        // until the C6000 target put such a constant on the stack as eight bytes.
         else if (t.isChar)               ty = types_.intType();
         else if (fits(Kind::Int))        ty = types_.intType();
         else if (fits(Kind::Long))       ty = types_.get(Kind::Long);
@@ -2600,11 +2590,9 @@ StmtPtr Parser::statementBody() {
 }
 
 void Parser::topLevel(Program &program) {
-    // File scope, so a typedef here is judged against the whole file. The stack
-    // is cleared HERE rather than beside scopeStarts_.clear() below, because the
-    // typedef branch returns before reaching it - and a mark left by the
-    // previous function would then have a file-scope duplicate compared against
-    // the wrong starting point, and silently accepted.
+    // File scope, so a typedef here is judged against the whole file. The stack is cleared HERE
+    // rather than beside scopeStarts_.clear() below, because the typedef branch returns before
+    // reaching it - and a mark left by the previous function would then let a file-scope duplicate through silently.
     typedefStarts_.clear();
     StorageClass sc;
     Qualifiers quals;

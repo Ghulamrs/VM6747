@@ -1,17 +1,8 @@
 #pragma once
 
-// The C674x as this emulator models it: the two register files, a program
-// counter, and the pipeline's one visible property - a result lands some
-// cycles after its instruction issues, and a branch takes effect five packets
-// after it - which is what the NOPs in the emitted code are for, and what a
-// too-short NOP would get wrong. Registers read the old value until the
-// cycle a write lands; memory effects are immediate at issue, which keeps a
-// store and a later load in order.
-//
-// Execution is by parsed operands, one execute packet per cycle, parallel
-// (||) instructions reading their operands before any of them writes. A PC
-// below the text base is a native stub: the runtime answers it and returns
-// through B3.
+// The C674x as this emulator models it: the two register files, a program counter, and the
+// pipeline's one visible property - a result lands some cycles after its instruction issues, and
+// a branch takes effect five packets after it - which is what the NOPs in the emitted code are for. The rest of the model is in README.md, "What it models".
 
 #include "Program.h"
 
@@ -73,12 +64,9 @@ private:
 
     struct Pending { uint64_t at; int reg; uint32_t value; };
     std::vector<Pending> pending_;
-    // A double-precision source is read in two phases - the low word at
-    // issue, the high word a cycle later (SPRUFE8's E1 and E2 reads) - so
-    // such an instruction is held with its low words and completes a cycle
-    // on, with the high words as they are then. Its result lands low word
-    // first, a cycle before the high one, which is what the delay-slot
-    // count names. cl6x schedules to exactly this; c90 pads past it.
+    // A double-precision source is read in two phases - the low word at issue, the high word a
+    // cycle later (SPRUFE8's E1 and E2 reads) - so such an instruction is held with its low words and completes a cycle on, with the high words as they are then.
+    // Its result lands low word first, a cycle before the high one, which is what the delay-slot count names. cl6x schedules to exactly this; c90 pads past it.
     struct Deferred { const Instr *in; uint32_t lo1, lo2; };
     std::vector<Deferred> deferred_;
     bool completing_ = false;

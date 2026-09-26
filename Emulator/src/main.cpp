@@ -1,10 +1,6 @@
-// vm6747 - run C6000 assembly as c90 and cpp11 emit it for -arch tms6747.
-//
+// vm6747 - run C6000 assembly as c90 and cpp11 emit it for -arch tms6747:
 //   vm6747 [-t] [-m megabytes] file.s|directory [more ...] [-- args]
-//
-// The files are assembled together, the C library and the EABI helpers are
-// provided natively, main is called with argc and argv, and the exit status
-// is main's return or exit's argument. -t traces every instruction.
+// The files are assembled together, the C library is provided natively, and the exit status is main's return or exit's argument; -t traces every instruction.
 
 #include "Asm.h"
 #include "Cpu.h"

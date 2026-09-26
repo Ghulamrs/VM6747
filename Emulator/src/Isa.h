@@ -1,11 +1,8 @@
 #pragma once
 
-// The instructions the emulator knows: their spelling, their operand shape,
-// and their delay slots - the cycles between issue and the result being
-// visible to a later packet, which is what a NOP count in the emitted code
-// has to cover. Every entry's delay is from the C674x CPU reference; where a
-// count was doubted in TMS6747.md, this table is what the emulator holds the
-// code to.
+// The instructions the emulator knows: their spelling, their operand shape, and their delay slots - the cycles between
+// issue and the result being visible to a later packet, which is what a NOP count in the emitted code has to cover.
+// Every entry's delay is from the C674x CPU reference; where a count was doubted in TMS6747.md, this table is what the emulator holds the code to.
 
 #include "Program.h"
 
@@ -22,8 +19,7 @@ enum class Op {
     LDB, LDBU, LDH, LDHU, LDW, LDDW, LDNW, LDNDW, STB, STH, STW, STDW, STNW, STNDW,
     // control
     B, CALLP, NOP, SWE, IDLE,
-    // cl6x's spellings: a branch with its NOPs folded in, and the return
-    // address computed after the branch instead of by it
+    // cl6x's spellings: a branch with its NOPs folded in, and the return address computed after the branch instead of by it
     BNOP, RETNOP, RET, CALL, ADDKPC,
     // single precision
     ADDSP, SUBSP, MPYSP, CMPEQSP, CMPLTSP, CMPGTSP, ABSSP, INTSP, INTSPU, SPINT, SPTRUNC, SPDP, RCPSP,

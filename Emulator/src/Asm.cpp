@@ -32,11 +32,9 @@ struct Unit {
     std::map<std::string, std::string> asg; // .asg register, name - cl6x's FP, DP and SP
     uint32_t size[SectionCount] = { 0, 0, 0, 0, 0, 0 };
     uint32_t base[SectionCount] = { 0, 0, 0, 0, 0, 0 };
-    // The largest alignment a section asked for. The first pass aligns
-    // offsets within the section and the second aligns addresses, and the
-    // two agree only if the section's base is aligned at least this much:
-    // a `.align 64` in a section placed at 8 put a label 16 bytes from its
-    // bytes, and the object read as zero.
+    // The largest alignment a section asked for. The first pass aligns offsets within the section
+    // and the second aligns addresses, and the two agree only if the section's base is aligned at
+    // least this much: a `.align 64` in a section placed at 8 put a label 16 bytes from its bytes, and the object read as zero.
     uint32_t align[SectionCount] = { 8, 8, 8, 8, 8, 8 };
 };
 
@@ -176,9 +174,8 @@ struct Assembler {
         return false;
     }
     // Evaluate in pass two; in pass one only the shape is checked.
-    // TI's relocation operators - $EXIDX_FUNC(f), $EXIDX_EXTAB("t"),
-    // $EXTAB_LP(l), $EXTAB_RTTI(t), $EXTAB_SCOPE(l) - are the symbol's
-    // address here, where nothing is relative: the name inside, unquoted.
+    // TI's relocation operators - $EXIDX_FUNC(f), $EXIDX_EXTAB("t"), $EXTAB_LP(l), $EXTAB_RTTI(t),
+    // $EXTAB_SCOPE(l) - are the symbol's address here, where nothing is relative: the name inside, unquoted.
     static std::string tiOperator(const std::string &term) {
         if (term.empty() || term[0] != '$' || term.back() != ')') return term;
         size_t open = term.find('(');

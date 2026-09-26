@@ -47,10 +47,9 @@ static bool isMem(const Operand &o) { return o.kind == Operand::Mem; }
 
 static bool fits(long long v, long long lo, long long hi) { return v >= lo && v <= hi; }
 
-// The constant fields, as asm6x enforces them (probed 2026-09-14 with one
-// form per line): scst5 first for the .L/.S forms, ucst5 second for .D's,
-// ucst5 shift counts and fields, scst16 for MVK/ADDK, NOP 1-9, and a memory
-// offset of ucst5 units of the access - ucst15 from B14 or B15.
+// The constant fields, as asm6x enforces them (probed 2026-09-14 with one form per line): scst5
+// first for the .L/.S forms, ucst5 second for .D's, ucst5 shift counts and fields, scst16 for
+// MVK/ADDK, NOP 1-9, and a memory offset of ucst5 units of the access - ucst15 from B14 or B15.
 static bool isaRanges(const Instr &in, std::string &why) {
     const IsaEntry *e = isaLookup(in.mnem);
     const std::vector<Operand> &o = in.ops;

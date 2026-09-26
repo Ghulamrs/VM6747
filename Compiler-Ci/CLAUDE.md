@@ -121,3 +121,65 @@ files rather than pulling them, hash them on the far side against
 `git show HEAD:<path>` — a relayed tree is not a checked-out one, and `git
 pull` aborts over untracked files it would overwrite *after* printing
 "Updating", so the failure reads like success.
+
+## Comments cut to the cap, 2026-09-26: the long forms
+
+**No comment group in `src/` runs longer than three lines, and one standing in
+front of a single line of code runs one line** - the house rule, with
+`C++Optimize/tools/comment-lines` as its oracle (`--count` for a gate). The
+28 groups over it were cut the way the compiler repository's were: whole
+sentences kept, the finding first, and what the code beside them no longer
+needs to say written here. `git log -p` holds every long form; these are the
+ones worth finding without it.
+
+**1.1 is the first version this compiler has had a number for** (`Driver.cpp`,
+`cc1Version`). It had none until 2026-08-26 - built, relayed between three
+machines and run without one, which works until somebody holds two copies and
+has to say which is which. It is numbered with the group rather than on its
+own: cc1 is used beside a particular RStudio and shc, and 1.1 is the release
+where it stopped being the only compiler in the workbench - a target could hold
+C and C++ together, and C became the one language with a choice of compiler in
+it. The 1.2 work is Shalimar's; cc1's part in it was to build the libraries a
+Shalimar program calls, which asked nothing new of the compiler itself.
+
+**--version leaves with 0** because a question answered is not a failure; it
+and a bad argument both used to leave with 1, which is why a script asking three
+compilers their versions stopped at the first one.
+
+**The Windows toolchain, from inside an editor** (`Driver.cpp`, `askVswhere`,
+`developerShell`, `forCmd`). Three findings, each a build that failed only from
+RStudio and never from a command prompt:
+
+- vswhere's answer is fetched through a temporary file rather than a pipe.
+  `_popen` would be the obvious way and does not work here: cc1 is itself run
+  through a pipe by the editor, and a nested `_popen` fails when the parent's
+  stdio are not consoles - so it found Visual Studio from a command prompt and
+  never from inside RStudio, which is the one place it was needed.
+- ml64 and link live in Visual Studio and are on PATH only inside a Developer
+  Command Prompt. An editor launched from Explorer is not one, so every build it
+  asked cc1 for failed at the assembler with a message telling a person to open
+  a different shell - which the editor cannot do for them. So when the tools are
+  not already reachable, the command runs inside a shell that has sourced
+  `vcvars64.bat`. That sets LIB as well as PATH, which matters: finding ml64
+  alone still leaves the linker unable to see `libcmt.lib`.
+- The tool runs through a batch file rather than by prefixing the command.
+  cmd's rule for stripping the outer quotes of a `/c` string is not something to
+  build on when the string already holds several quoted paths and an `&&` -
+  every spelling tried produced "The filename, directory name, or volume label
+  syntax is incorrect" from somewhere inside it. A file has no quoting question:
+  the call is on its own line and the command is on the next, exactly as
+  written. And `cmd /c` strips the first and last quote of a command that has
+  both, so `"ml64.exe" ... "x.s"` arrives as `ml64.exe" ... "x.s`; one more pair
+  around the whole thing is what cmd eats instead. That was visible only where
+  the tools were already on PATH and no vcvars shell was added, which is how it
+  hid: standalone the wrapper replaced the command and covered it, and the
+  editor - which imports the MSVC environment into itself before running
+  anything - was the one caller that took this path.
+
+**A typedef name reaching the specifier loop ends the specifiers**
+(`Parser.cpp`, the `while (atTypeName())` loop). `atTypeName()` is also true
+for an identifier naming a typedef, and nothing in the loop consumes one, so
+without the `break` it spun forever on `typedef long T;` where `T` was already a
+typedef. Stopping there is what lets the "typedefed twice" error be reached at
+all: it never was - 425 cases and not one of them redeclares a typedef, so the
+compiler hung instead of saying no, which is the worse of the two by a distance.

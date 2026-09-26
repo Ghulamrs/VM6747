@@ -81,10 +81,9 @@ bool directoryHas(const std::string &dir, const char *name) {
 
 }
 
-// **Where the standard headers are, asked in the order a release wants:**
-// $C90_LIB, then lib/ beside the binary or one directory up - the installed
-// layout, bin/c90.exe and lib/ - and last the directory compiled in, which
-// names the checkout this was built from and outlives nothing that moves.
+// **Where the standard headers are, asked in the order a release wants:** $C90_LIB, then lib/
+// beside the binary or one directory up - the installed layout, bin/c90.exe and lib/ - and
+// last the directory compiled in, which names the checkout this was built from and outlives nothing that moves.
 void Driver::standardIncludeDirectory(const std::string &argv0) {
     const char *env = std::getenv(program::env("LIB").c_str());
     if (env != nullptr && env[0] != '\0') { searchPath_.push_back(env); return; }
@@ -100,16 +99,7 @@ void Driver::standardIncludeDirectory(const std::string &argv0) {
     if (CC1_INCLUDE_DIR[0] != '\0') searchPath_.push_back(CC1_INCLUDE_DIR);
 }
 
-// **1.1 is the first version this compiler has had a number for.** It had none
-// until 2026-08-26 - built, relayed between three machines and run without one,
-// which works until somebody holds two copies and has to say which is which.
-//
-// Numbered with the group rather than on its own. cc1 is used beside a
-// particular RStudio and shc, and 1.1 is the release where it stopped being
-// the only compiler in the workbench: a target could hold C and C++ together,
-// and C became the one language with a choice of compiler in it. The 1.2 work
-// is Shalimar's; cc1's part in it was to build the libraries a Shalimar
-// program calls, which asked nothing new of the compiler itself.
+// **1.1 is the first version this compiler has had a number for**, numbered with the group rather than on its own - see CLAUDE.md.
 const char *cc1Version() { return "1.1"; }
 
 // The line printed before each compile and by --version. `-nologo` omits it.
@@ -160,11 +150,8 @@ static bool hostIsWindows() {
 
 #ifdef _WIN32
 // vswhere's answer, fetched through a temporary file rather than a pipe.
-//
-// _popen would be the obvious way and does not work here. cc1 is itself run
-// through a pipe by the editor, and a nested _popen fails when the parent's
-// stdio are not consoles - so this found Visual Studio from a command prompt
-// and never from inside RStudio, which is the one place it was needed.
+// _popen would be the obvious way and does not work here: cc1 is itself run through a pipe by
+// the editor, and a nested _popen fails when the parent's stdio are not consoles - see CLAUDE.md.
 static std::string askVswhere() {
     char temp[MAX_PATH];
     char folder[MAX_PATH];
@@ -217,16 +204,9 @@ static std::string findVcvars() {
 }
 #endif
 
-// ml64 and link live in Visual Studio and are on PATH only inside a Developer
-// Command Prompt. An editor launched from Explorer is not one, so every build
-// it asked cc1 for failed at the assembler with a message telling a person to
-// open a different shell - which the editor cannot do for them.
-//
-// So when the tools are not already reachable, the command is run inside a
-// shell that has sourced vcvars64.bat. That sets LIB as well as PATH, which
-// matters: finding ml64 alone still leaves the linker unable to see
-// libcmt.lib. Empty when there is nothing to add, and the command runs as it
-// always did.
+// ml64 and link live in Visual Studio and are on PATH only inside a Developer Command Prompt,
+// which an editor launched from Explorer is not - so when the tools are not already reachable
+// the command runs inside a shell that has sourced vcvars64.bat, which sets LIB as well as PATH. Empty when there is nothing to add.
 static std::string developerShell() {
 #ifdef _WIN32
     const char *inside = std::getenv("VCToolsInstallDir");
@@ -242,22 +222,9 @@ static std::string developerShell() {
 
 static std::string lastToolCommand;
 
-// Runs one tool, inside a developer environment when the machine needs one.
-//
-// Through a batch file rather than by prefixing the command. cmd's rule for
-// stripping the outer quotes of a /c string is not something to build on when
-// the string already holds several quoted paths and an '&&' - every spelling
-// tried produced "The filename, directory name, or volume label syntax is
-// incorrect" from somewhere inside it. A file has no quoting question: the
-// call is on its own line and the command is on the next, exactly as written.
-// cmd /c strips the first and last quote of a command that has both, so a
-// command whose program is quoted and whose last argument is quoted arrives
-// mangled - '"ml64.exe" ... "x.s"' becomes 'ml64.exe" ... "x.s'. One more
-// pair around the whole thing is what cmd eats instead. This is only visible
-// where the tools are already on PATH and no vcvars shell is added, which is
-// how it hid: standalone the wrapper replaced the command and covered it,
-// and the editor - which imports the MSVC environment into itself before
-// running anything - was the one caller that took this path.
+// cmd /c strips the first and last quote of a command that has both, so a command whose
+// program is quoted and whose last argument is quoted arrives mangled - '"ml64.exe" ... "x.s"'
+// becomes 'ml64.exe" ... "x.s'. One more pair around the whole thing is what cmd eats instead; the rest of the story is in CLAUDE.md.
 static std::string forCmd(const std::string &command) {
 #ifdef _WIN32
     return "\"" + command + "\"";
@@ -735,11 +702,9 @@ bool Driver::parseArguments(int argc, char **argv) {
 
     if (inputs.empty()) { usage(argv[0]); return false; }
 
-    // **A C++ suffix is turned away by name, not by a parse error.** cc1 reads
-    // C; handed a .cpp it used to lex `virtual`, `class` or `::` as ordinary C
-    // and stop with something like "expected a type", which reads as a fault in
-    // the file rather than the file being the wrong language. Say so plainly and
-    // point at cxx1, the C++ compiler of this line.
+    // **A C++ suffix is turned away by name, not by a parse error.** cc1 reads C; handed a .cpp
+    // it used to lex `virtual`, `class` or `::` as ordinary C and stop with something like
+    // "expected a type", which reads as a fault in the file rather than the file being the wrong language.
     for (std::size_t k = 0; k < inputs.size(); ++k) {
         std::size_t dot = inputs[k].rfind('.');
         if (dot == std::string::npos) continue;
@@ -963,14 +928,10 @@ int Driver::run(int argc, char **argv) {
     }
     toStdout_ = (sawS && inputs == 1 && !sawO);
 
-    // **A question answered is not a failure.** --version is a request this
-    // program can satisfy, so it leaves with 0; a bad argument leaves with 1.
-    // Both used to be 1, which is why a script asking three compilers their
-    // versions stopped at the first one.
+    // **A question answered is not a failure.** --version leaves with 0 and a bad argument with 1; both used to be 1.
     if (!parseArguments(argc, argv)) return answered_ ? 0 : 1;
 
-    // **Before each compile, once the arguments are known good.** The C++
-    // compiler of this line prints its banner the same way; -nologo omits it.
+    // **Before each compile, once the arguments are known good.** cxx1 prints its banner the same way; -nologo omits it.
     if (!quiet_) std::fprintf(stderr, "%s\n", bannerLine());
 
     std::atexit([] {
