@@ -175,10 +175,9 @@ std::string Runtime::format(Cpu &cpu, const std::string &fmt, Args &args) {
 }
 
 // ---- what the runtime contributes as data ----------------------------------------
-// The streams as objects; the Itanium ABI's three typeinfo classes' vtables,
-// which a program's typeinfo objects point at (their address point, +8) and
-// __dynamic_cast tells apart by the word there (1: no bases, 2: one base at
-// offset 0, 3: several); std::type_info's own; and __dso_handle.
+// The streams as objects; the Itanium ABI's three typeinfo classes' vtables, which a program's
+// typeinfo objects point at (their address point, +8) and __dynamic_cast tells apart by the word
+// there (1: no bases, 2: one base at offset 0, 3: several); std::type_info's own; and __dso_handle.
 std::string Runtime::prelude() {
     return
         "\t.data\n"
@@ -203,10 +202,9 @@ std::string Runtime::prelude() {
         + fundamentalTypeInfos();
 }
 
-// The typeinfo objects the standard library carries for the fundamental
-// types, and for pointers to them, so that `throw 7` and `catch (const char
-// *)` name something: _ZTIi is [vptr][name "i"], _ZTIPKc is [vptr][name
-// "PKc"][flags][pointee _ZTIc]. Matched by name.
+// The typeinfo objects the standard library carries for the fundamental types, and for pointers
+// to them, so that `throw 7` and `catch (const char *)` name something: _ZTIi is [vptr][name "i"],
+// _ZTIPKc is [vptr][name "PKc"][flags][pointee _ZTIc]. Matched by name.
 std::string Runtime::fundamentalTypeInfos() {
     static const char *const codes[] = { "v", "b", "c", "a", "h", "s", "t", "i", "j", "l", "m",
                                          "x", "y", "n", "o", "f", "d", "e", "w", "Dn" };
@@ -246,10 +244,9 @@ void Runtime::terminate(Cpu &cpu, const char *why) {
 }
 
 // ---- __dynamic_cast ------------------------------------------------------------
-// The subobjects of the complete object, walked from its typeinfo: a class
-// typeinfo is [vptr][name]; si adds [base]; vmi adds [flags][count] then
-// [base][offset<<8 | flags] per base, a virtual base's offset naming the
-// vbase_offset slot in the vtable of the subobject that holds it.
+// The subobjects of the complete object, walked from its typeinfo: a class typeinfo is
+// [vptr][name]; si adds [base]; vmi adds [flags][count] then [base][offset<<8 | flags] per base,
+// a virtual base's offset naming the vbase_offset slot in the vtable of the subobject that holds it.
 namespace {
 struct Sub { uint32_t ti, addr; bool pub; };
 void walk(Cpu &c, uint32_t ti, uint32_t addr, bool pub, std::vector<Sub> &out, int depth) {
@@ -310,22 +307,13 @@ uint32_t Runtime::dynamicCast(Cpu &c, uint32_t sub, uint32_t src, uint32_t dst) 
 }
 
 // ---- exceptions ------------------------------------------------------------------
-// The tables are TI's (lib/src/tdeh_pr_common.cpp): the index gives a
-// function's compact unwind word, or the address of its table - the word,
-// then scope descriptors, then a zero. A descriptor is two halves, the
-// range's length and its offset in the function (+2), whose low bits tell a
-// cleanup (0) from a catch (2); then the pad, and a catch's type.
+// The tables are TI's (lib/src/tdeh_pr_common.cpp): the index gives a function's compact unwind
+// word, or the address of its table - the word, then scope descriptors, then a zero. A descriptor
+// is two halves, the range's length and its offset in the function (+2), whose low bits tell a cleanup (0) from a catch (2); then the pad, and a catch's type.
 
-// A throw walks the frames twice, as TI's runtime does: phase one scans
-// each frame's catch descriptors for one whose type takes the exception -
-// the barrier, remembered as the frame and the descriptor - and an uncaught
-// exception terminates with nothing unwound; phase two scans again, landing
-// on every cleanup on the way and on the barrier's pad. A cleanup pad ends
-// in _Unwind_Resume, which carries on from the descriptor after it.
-
-// Landing is a return to the pad with A15 the frame's, B15 as the frame's
-// throwing call left it, B3 the pad, and for a catch A4 the exception - a
-// cleanup gets nothing, as TI's does not, and ends with __cxa_end_cleanup.
+// A throw walks the frames twice, as TI's runtime does: phase one finds the barrier - the frame
+// and catch descriptor whose type takes the exception, none terminating with nothing unwound -
+// and phase two lands on every cleanup on the way and on the barrier's pad. README.md, "Exceptions", has the landing state.
 void Runtime::loadExidx(Cpu &c) {
     if (ehLoaded_) return;
     ehLoaded_ = true;
@@ -342,11 +330,9 @@ const Runtime::ExidxEntry *Runtime::entryFor(uint32_t pc) const {
     for (const ExidxEntry &x : exidx_) { if (x.func > pc) break; e = &x; }
     return e;
 }
-// The frame above (pc, fp), read the way TI's unwinder would: the unwind
-// word - inline, or the first of the table - compact form pr3 with SP
-// restored from A15, then the saved registers a word each below A15 in the
-// bitmask's order, A15 first and B3 after the B-file registers. False when
-// pc has no entry, which ends the walk.
+// The frame above (pc, fp), read the way TI's unwinder would: the unwind word - inline, or the
+// first of the table - compact form pr3 with SP restored from A15, then the saved registers a word
+// each below A15 in the bitmask's order, A15 first and B3 after the B-file registers. False when pc has no entry, which ends the walk.
 bool Runtime::callerOf(Cpu &c, uint32_t pc, uint32_t fp, uint32_t &callerPc, uint32_t &callerFp) {
     const ExidxEntry *e = entryFor(pc);
     if (e == nullptr) return false;
@@ -373,11 +359,9 @@ Runtime::Exc *Runtime::excFor(uint32_t obj) {
 // the adjusted pointer a handler for the base receives.
 bool Runtime::matches(Cpu &c, uint32_t obj, uint32_t thrownTi, uint32_t catchTi, uint32_t &adjusted) {
     if (catchTi == 0) { adjusted = obj; return true; }          // catch (...)
-    // A pointer thrown - the type_info's vtable says so - is matched by
-    // [except.handle]/3: the same pointee, a more qualified one, void, or a
-    // public base of a class pointee. What the handler receives is the
-    // pointer itself, adjusted to the base, which is what __cxa_begin_catch
-    // returns for a pointer on the real runtimes.
+    // A pointer thrown - the type_info's vtable says so - is matched by [except.handle]/3: the
+    // same pointee, a more qualified one, void, or a public base of a class pointee. What the
+    // handler receives is the pointer itself, adjusted to the base, which is what __cxa_begin_catch returns for a pointer on the real runtimes.
     const uint32_t thrownKind = c.load32(c.load32(thrownTi)), catchKind = c.load32(c.load32(catchTi));
     if (thrownKind == 5 && catchKind == 5) {
         const uint32_t tFlags = c.load32(thrownTi + 8), cFlags = c.load32(catchTi + 8);
@@ -407,8 +391,7 @@ void Runtime::land(Cpu &c, uint32_t fp, uint32_t sp, uint32_t obj, uint32_t pad,
     else cleanupExc_ = obj;
     c.setReg(Cpu::B3, pad);
 }
-// One descriptor at `at`: its kind and range, the pad, a catch's type, and
-// where the next one starts. False at the list's end.
+// One descriptor at `at`: its kind and range, the pad, a catch's type, and where the next one starts. False at the list's end.
 namespace {
 // Kind 0 a cleanup (the pad), 2 a catch (the pad, the type), 1 an
 // exception specification (a count of allowed types, then those, then a
@@ -460,10 +443,9 @@ void Runtime::throwFrom(Cpu &c, uint32_t obj, uint32_t pc, uint32_t fp, uint32_t
 found:
     unwindTo(c, *e, pc, fp, sp, 0);
 }
-// Phase two, from the frame at (pc, fp, sp) and, when resuming after a
-// cleanup, from the descriptor `from`: land on the first cleanup whose
-// range holds pc, or on the barrier; otherwise on to the caller, whose SP
-// is this frame's A15.
+// Phase two, from the frame at (pc, fp, sp) and, when resuming after a cleanup, from the
+// descriptor `from`: land on the first cleanup whose range holds pc, or on the barrier;
+// otherwise on to the caller, whose SP is this frame's A15.
 void Runtime::unwindTo(Cpu &c, Exc &e, uint32_t pc, uint32_t fp, uint32_t sp, uint32_t from) {
     uint32_t p = pc, f = fp, s = sp;
     while (f != 0) {
@@ -591,10 +573,9 @@ bool Runtime::call(const std::string &n, Cpu &c) {
     }
     if (n == "fflush") { std::fflush(stdout); ret(c, 0); return true; }
     if (n == "sscanf" || n == "fscanf") {
-        // sscanf(str, fmt, ...) and fscanf(stream, fmt, ...): the first in
-        // A4, the format and the pointers on the stack. The conversions the
-        // streams' own parsing needs, over a string - a file's rest, for
-        // fscanf, which then advances by what was consumed.
+        // sscanf(str, fmt, ...) and fscanf(stream, fmt, ...): the first in A4, the format and the
+        // pointers on the stack. The conversions the streams' own parsing needs, over a string -
+        // a file's rest, for fscanf, which then advances by what was consumed.
         File *fs = n == "fscanf" ? streamFile(streamNumber(c, arg(c, 0))) : nullptr;
         if (n == "fscanf" && fs == nullptr) { ret(c, 0xffffffffu); return true; }
         std::string in = fs != nullptr ? fs->data.substr(fs->pos) : c.readString(arg(c, 0));
@@ -1055,10 +1036,9 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         return true;
     }
     if (n == "_Unwind_Resume" || n == "__cxa_end_cleanup") {
-        // A cleanup pad is done: carry on with the descriptor after its own,
-        // in the frame the pad ran in - A15's, with B15 as the pad left it.
-        // TI's entry takes nothing and resumes the exception the landing
-        // recorded; the Itanium one is given it.
+        // A cleanup pad is done: carry on with the descriptor after its own, in the frame the pad
+        // ran in - A15's, with B15 as the pad left it. TI's entry takes nothing and resumes the
+        // exception the landing recorded; the Itanium one is given it.
         uint32_t obj = n[0] == '_' && n[1] == 'U' ? arg(c, 0) : cleanupExc_;
         Exc *e = excFor(obj);
         if (e == nullptr) c.fault("_Unwind_Resume of an unknown exception");

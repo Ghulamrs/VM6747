@@ -1,10 +1,8 @@
 #pragma once
 
-// What the assembler produces and the CPU runs: a flat byte memory holding
-// the data sections, and the instructions - kept as parsed operands rather
-// than encoded, since nothing here reads C6000 machine code - laid out at
-// real addresses four bytes apart, so that a label's value, a function
-// pointer and the PC are ordinary numbers.
+// What the assembler produces and the CPU runs: a flat byte memory holding the data sections,
+// and the instructions - kept as parsed operands rather than encoded, since nothing here reads
+// C6000 machine code - laid out at real addresses four bytes apart, so that a label's value, a function pointer and the PC are ordinary numbers.
 
 #include <cstdint>
 #include <map>

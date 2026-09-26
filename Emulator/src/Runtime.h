@@ -1,12 +1,8 @@
 #pragma once
 
-// The C library and the EABI helpers, provided natively: a call to one of
-// these names lands on a stub below the text base and is answered here,
-// reading its arguments by the C6000 convention the compilers emit - A4, B4,
-// A6 ... then the stack from B15+4, and for a variadic function the last
-// named argument and everything after it on the stack, 8-byte values at an
-// 8-byte boundary - and returning in A4 (A5:A4). Memory the library hands
-// out comes from a heap above the program's data.
+// The C library and the EABI helpers, provided natively: a call to one of these names lands on a stub below the text
+// base and is answered here, reading its arguments by the C6000 convention the compilers emit (README.md, "The C
+// library, natively") and returning in A4 (A5:A4). Memory the library hands out comes from a heap above the program's data.
 
 #include <cstdint>
 #include <string>
@@ -23,8 +19,7 @@ public:
     // typeinfo vtables, __dso_handle.
     static std::string prelude();
     static std::string fundamentalTypeInfos();
-    // After main returns or exit is called: the __cxa_atexit registrations,
-    // last first.
+    // After main returns or exit is called: the __cxa_atexit registrations, last first.
     void runAtExit(Cpu &cpu);
 
 private:
@@ -55,10 +50,9 @@ private:
     std::vector<AtExit> atExit_;
     uint32_t dynamicCast(Cpu &cpu, uint32_t sub, uint32_t src, uint32_t dst);
 
-    // Exceptions: TI's index, one entry per function - its address and the
-    // frame's compact unwind word, or the address of its table - sorted so
-    // a return address finds its own; the exceptions in flight or caught;
-    // and the unwinder, which reads the tables as TI's personality would.
+    // Exceptions: TI's index, one entry per function - its address and the frame's compact unwind
+    // word, or the address of its table - sorted so a return address finds its own; the exceptions
+    // in flight or caught; and the unwinder, which reads the tables as TI's personality would.
     struct ExidxEntry { uint32_t func, word; };
     std::vector<ExidxEntry> exidx_;
     bool ehLoaded_ = false;

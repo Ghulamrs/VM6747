@@ -82,3 +82,39 @@ new`, the `__cxa_*` family) is the next piece.
 
 Built like the compilers: C++14, `-Wall -Wextra -Werror -pedantic`, clang++
 on the Mac and g++ on the box, objects outside the checkout.
+
+## Exceptions
+
+**The tables are TI's** (`lib/src/tdeh_pr_common.cpp` in the C6000 runtime).
+The index gives a function's compact unwind word, or the address of its table -
+the word, then scope descriptors, then a zero. A descriptor is two halves, the
+range's length and its offset in the function (+2), whose low bits tell a
+cleanup (0) from a catch (2); then the pad, and a catch's type. Kind 1 is an
+exception specification - a count of allowed types, then those, then a pad when
+the count's top bit says so; the compilers write a count of 0.
+
+**A throw walks the frames twice, as TI's runtime does.** Phase one scans each
+frame's catch descriptors for one whose type takes the exception - the barrier,
+remembered as the frame and the descriptor - and an uncaught exception
+terminates with nothing unwound. Phase two scans again, landing on every cleanup
+on the way and on the barrier's pad. A cleanup pad ends in `_Unwind_Resume`
+(TI's entry takes nothing and resumes the exception the landing recorded; the
+Itanium one is given it), which carries on from the descriptor after its own, in
+the frame the pad ran in - A15's, with B15 as the pad left it.
+
+**Landing is a return to the pad** with A15 the frame's, B15 as the frame's
+throwing call left it, B3 the pad, and for a catch A4 the exception; a cleanup
+gets nothing, as TI's does not, and ends with `__cxa_end_cleanup`. The frame
+above a (pc, fp) is read the way TI's unwinder would: the unwind word - inline,
+or the first of the table - is compact form pr3 with SP restored from A15, then
+the saved registers a word each below A15 in the bitmask's order, A15 first and
+B3 after the B-file registers. A pc with no entry ends the walk.
+
+**A thrown pointer** - the type_info's vtable says so - is matched by
+[except.handle]/3: the same pointee, a more qualified one, `void`, or a public
+base of a class pointee. What the handler receives is the pointer itself,
+adjusted to the base, which is what `__cxa_begin_catch` returns for a pointer on
+the real runtimes.
+
+The source comments that carried this were cut to the house cap of three lines
+on 2026-09-26; this section is their long form.

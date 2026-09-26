@@ -142,10 +142,9 @@ uint32_t Cpu::address(const Instr &in, const Operand &o, int size, std::vector<P
 }
 
 static float asFloat(uint32_t v) { float f; std::memcpy(&f, &v, 4); return f; }
-// A NaN result is the canonical quiet NaN with the sign clear, whichever
-// NaN the host's arithmetic produced: the host varies (Windows gives the
-// sign bit), and a program's output must not depend on where the emulator
-// runs.
+// A NaN result is the canonical quiet NaN with the sign clear, whichever NaN the host's
+// arithmetic produced: the host varies (Windows gives the sign bit), and a program's output
+// must not depend on where the emulator runs.
 static uint32_t fromFloat(float f) { if (f != f) return 0x7fc00000u; uint32_t v; std::memcpy(&v, &f, 4); return v; }
 static double asDouble(uint64_t v) { double d; std::memcpy(&d, &v, 8); return d; }
 static uint64_t fromDouble(double d) { if (d != d) return 0x7ff8000000000000ULL; uint64_t v; std::memcpy(&v, &d, 8); return v; }
@@ -279,10 +278,9 @@ void Cpu::execute(const Instr &in, std::vector<Pending> &w, bool &branched, uint
         return;
     case Op::ADDKPC: write(w, o[1].reg, s1, 0); return;
     case Op::CALLP:
-        // Protected call: B3 gets the return address and the branch takes
-        // effect at once, the pipeline stalling through the delay slots. The
-        // return is to the packet after this one - cl6x writes the CALLP
-        // beside an argument move, and it is not the first of the pair.
+        // Protected call: B3 gets the return address and the branch takes effect at once, the
+        // pipeline stalling through the delay slots. The return is to the packet after this one -
+        // cl6x writes the CALLP beside an argument move, and it is not the first of the pair.
         write(w, B3, packetEnd_, 0);
         branchValid_ = true; branchAt_ = cycle_ + 1; branchTarget_ = s1;
         return;

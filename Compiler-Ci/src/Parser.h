@@ -74,10 +74,9 @@ private:
     struct TypedefName {
         std::string name;
         const Type *type;
-        // The typedefIndex_ entry this one hid, so leaving the block can put it
-        // back - or noShadow() when the name was free. C90 6.1.2.1: a typedef
-        // declared in a block is a new declaration in that block's scope which
-        // hides an outer one, not a collision with it.
+        // The typedefIndex_ entry this one hid, so leaving the block can put it back - or
+        // noShadow() when the name was free. C90 6.1.2.1: a typedef declared in a block is a
+        // new declaration in that block's scope which hides an outer one, not a collision with it.
         std::size_t shadowed;
     };
 
@@ -132,10 +131,9 @@ private:
     std::unordered_map<std::string, std::size_t> globalIndex_;
     std::vector<TypedefName> typedefs_;
     std::unordered_map<std::string, std::size_t> typedefIndex_;
-    // Where each open scope's typedefs begin, exactly as scopeStarts_ marks
-    // locals_. Without it the table was one flat map: an inner typedef could
-    // not hide an outer one, AND a block's typedef stayed visible after the
-    // block closed. Both were wrong, and both were this missing vector.
+    // Where each open scope's typedefs begin, exactly as scopeStarts_ marks locals_. Without it
+    // the table was one flat map: an inner typedef could not hide an outer one, AND a block's
+    // typedef stayed visible after the block closed. Both were wrong, and both were this missing vector.
     std::vector<std::size_t> typedefStarts_;
     std::vector<EnumConst> enums_;
     std::unordered_map<std::string, std::size_t> enumIndex_;
