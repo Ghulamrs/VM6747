@@ -32,7 +32,7 @@ stage "$HERE/../Compiler-Ci/tests/out-tms6747" "$WORK/tisweep/c"
 stage "$HERE/../Compiler-Cppi/tests/out-tms6747" "$WORK/tisweep/cxx"
 stage "$HERE/../Compiler-Si/tests/out-tms6747" "$WORK/tisweep/shm"
 stage "$SHMRT" "$WORK/tisweep/shmrt"
-cp "$HERE/tests/ti-sweep.cmd" "$HERE/tests/ti-link.cmd" "$WORK/tisweep/"
+cp "$HERE/tests/ti-sweep.cmd" "$HERE/tests/ti-link.cmd" "$HERE/tests/par.cmd" "$WORK/tisweep/"
 total=$(ls "$WORK"/tisweep/*/*.s | wc -l | tr -d ' ')
 ( cd "$WORK" && COPYFILE_DISABLE=1 tar czf tisweep.tgz --exclude "._*" tisweep )
 ssh windows "if not exist C:\\Users\\GRA\\Documents\\VM6747 mkdir C:\\Users\\GRA\\Documents\\VM6747" || exit 1

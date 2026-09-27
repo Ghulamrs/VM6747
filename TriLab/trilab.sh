@@ -48,19 +48,33 @@ compare() {   # compare <lab> <candidate output> <judge output> <judge name>
 case $leg in
 mac)
     echo "TriLab, macOS: RIDE against Xcode"
+    # The judges' projects first, then every lab built both ways at once - RIDE and Xcode side by
+    # side - and the comparisons after all of them are done.
+    for entry in $labs; do
+        d=${entry%%:*}
+        python3 "$HERE/tools/make-xcode.py" "$d" > /dev/null || { echo "  make-xcode.py failed - the judge's project is not current"; exit 2; }
+    done
     for entry in $labs; do
         d=${entry%%:*}; rest=${entry#*:}; n=${rest%%:*}; flag=${rest#*:}
+        rm -f "$OUT/$d-ride.say" "$OUT/$d-xcode.say"
         # the candidate: RIDE builds and runs the lab's own project file
-        ( cd "$HERE/$d" && "$RIDE" "$n.pro" "${flag%%=*}" "${flag#*=}" --arch arm64-darwin --build > "$OUT/$d-ride.build" 2>&1 ) \
-            || { echo "  $d: RIDE did not build it:"; tail -5 "$OUT/$d-ride.build"; status=1; continue; }
-        prog=$(sed -n 's/^\[built \(.*\)\]$/\1/p' "$OUT/$d-ride.build" | tail -1)
-        ( cd "$HERE/$d" && "$prog" > "$OUT/$d-ride.out" 2>&1 ); echo "  $d: RIDE's program returned $?"
+        ( if ( cd "$HERE/$d" && "$RIDE" "$n.pro" "${flag%%=*}" "${flag#*=}" --arch arm64-darwin --build > "$OUT/$d-ride.build" 2>&1 ); then
+              prog=$(sed -n 's/^\[built \(.*\)\]$/\1/p' "$OUT/$d-ride.build" | tail -1)
+              ( cd "$HERE/$d" && "$prog" > "$OUT/$d-ride.out" 2>&1 < /dev/null ); echo "  $d: RIDE's program returned $?" > "$OUT/$d-ride.say"
+          fi ) &
         # the judge: Xcode's own project, Apple clang, built out of the tree
-        python3 "$HERE/tools/make-xcode.py" "$d" > /dev/null || { echo "  make-xcode.py failed - the judge's project is not current"; exit 2; }
-        xcodebuild -project "$HERE/$d/xcode/$n.xcodeproj" -target "$n" -configuration Release ARCHS=arm64 \
-            SYMROOT="$OUT/xcode-$n" OBJROOT="$OUT/xcode-$n/obj" build > "$OUT/$d-xcode.build" 2>&1 \
-            || { echo "  $d: Xcode did not build it:"; grep -E "error:" "$OUT/$d-xcode.build" | head -5; status=1; continue; }
-        ( cd "$HERE/$d" && "$OUT/xcode-$n/Release/$n" > "$OUT/$d-xcode.out" 2>&1 ); echo "  $d: Xcode's program returned $?"
+        ( if xcodebuild -project "$HERE/$d/xcode/$n.xcodeproj" -target "$n" -configuration Release ARCHS=arm64 \
+                 SYMROOT="$OUT/xcode-$n" OBJROOT="$OUT/xcode-$n/obj" build > "$OUT/$d-xcode.build" 2>&1; then
+              ( cd "$HERE/$d" && "$OUT/xcode-$n/Release/$n" > "$OUT/$d-xcode.out" 2>&1 < /dev/null ); echo "  $d: Xcode's program returned $?" > "$OUT/$d-xcode.say"
+          fi ) &
+    done
+    wait
+    for entry in $labs; do
+        d=${entry%%:*}
+        [ -f "$OUT/$d-ride.say" ] || { echo "  $d: RIDE did not build it:"; tail -5 "$OUT/$d-ride.build"; status=1; continue; }
+        cat "$OUT/$d-ride.say"
+        [ -f "$OUT/$d-xcode.say" ] || { echo "  $d: Xcode did not build it:"; grep -E "error:" "$OUT/$d-xcode.build" | head -5; status=1; continue; }
+        cat "$OUT/$d-xcode.say"
         compare "$d" "$OUT/$d-ride.out" "$OUT/$d-xcode.out" Xcode
     done
     ;;
@@ -114,6 +128,11 @@ ccs)
         -czf "$OUT/trilab.tgz" c cpp tools expected 2>/dev/null || { echo "  cannot pack the lab"; exit 2; }
     ssh -n -o BatchMode=yes "$BOX" "if not exist $W mkdir $W" > /dev/null || exit 2
     scp -q "$OUT/trilab.tgz" "$BOX:$BOXLAB/trilab.tgz" || exit 2
+    # Xcode's native run of the C++ lab is the judge for that one; it builds here while the box works.
+    ( xcodebuild -project "$HERE/cpp/xcode/CXX1Lab.xcodeproj" -target CXX1Lab -configuration Release ARCHS=arm64 \
+          SYMROOT="$OUT/xcode-CXX1Lab" OBJROOT="$OUT/xcode-CXX1Lab/obj" build > "$OUT/cpp-xcode.build" 2>&1
+      echo $? > "$OUT/cpp-xcode.rc" ) &
+    xcode=$!
     ssh -n -o BatchMode=yes "$BOX" "cd /d $W & tar xzf trilab.tgz & $W\\tools\\ccs-leg.cmd $W $(echo "$BOXRIDE" | sed 's|/|\\|g') $(echo "$BOXVM" | sed 's|/|\\|g')" \
         | grep -vE "^\s*$" | sed 's/^/  /'
     mkdir -p "$OUT/win" && scp -q "$BOX:$BOXLAB/out/*.out" "$OUT/win/" || { echo "  no outputs came back"; exit 1; }
@@ -129,9 +148,8 @@ ccs)
             # available for C++; the judge is TI accepting and linking both
             # sides (the box says TI-LINKED for each), and the output is held to
             # Xcode's native run of the same sources, built here.
-            xcodebuild -project "$HERE/cpp/xcode/CXX1Lab.xcodeproj" -target CXX1Lab -configuration Release ARCHS=arm64 \
-                SYMROOT="$OUT/xcode-CXX1Lab" OBJROOT="$OUT/xcode-CXX1Lab/obj" build > "$OUT/cpp-xcode.build" 2>&1 \
-                || { echo "  cpp: Xcode did not build the native reference"; status=1; continue; }
+            wait "$xcode"
+            [ "$(cat "$OUT/cpp-xcode.rc")" = 0 ] || { echo "  cpp: Xcode did not build the native reference"; status=1; continue; }
             ( cd "$HERE/cpp" && "$OUT/xcode-CXX1Lab/Release/CXX1Lab" > "$OUT/cpp-xcode.out" 2>&1 )
             echo "  cpp: cl6x's own program cannot run on vm6747 (STLport's runtime); the judge is TI linking both sides"
             compare cpp "$OUT/cpp-ride-ccs.out" "$OUT/cpp-xcode.out" "Xcode's native run"
