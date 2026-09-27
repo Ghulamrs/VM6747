@@ -479,7 +479,7 @@ std::vector<std::string> Runtime::names() {
         "fprintf", "vfprintf", "fputs", "fputc", "putc", "fwrite", "fflush", "fopen", "fclose",
         "fgetc", "getc", "getchar", "fgets", "fread", "ftell", "fseek", "rewind", "feof", "remove",
         "perror", "ferror", "clearerr", "__errno_location", "__c6xabi_errno_addr", "__assert_fail", "__assert_rtn", "_assert", "__c6xabi_abort_msg",
-        "sscanf", "fscanf", "ungetc",
+        "sscanf", "fscanf", "scanf", "ungetc", "gets",
         "exit", "abort", "atexit", "close", "malloc", "calloc", "realloc", "free",
         "memcpy", "memmove", "memset", "memcmp", "memchr",
         "strlen", "strcpy", "strncpy", "strcat", "strncat", "strcmp", "strncmp", "strchr", "strrchr",
@@ -572,14 +572,14 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         return true;
     }
     if (n == "fflush") { std::fflush(stdout); ret(c, 0); return true; }
-    if (n == "sscanf" || n == "fscanf") {
+    if (n == "sscanf" || n == "fscanf" || n == "scanf") {
         // sscanf(str, fmt, ...) and fscanf(stream, fmt, ...): the first in A4, the format and the
-        // pointers on the stack. The conversions the streams' own parsing needs, over a string -
-        // a file's rest, for fscanf, which then advances by what was consumed.
-        File *fs = n == "fscanf" ? streamFile(streamNumber(c, arg(c, 0))) : nullptr;
-        if (n == "fscanf" && fs == nullptr) { ret(c, 0xffffffffu); return true; }
+        // pointers on the stack; scanf(fmt, ...) is fscanf on stdin, its format the stack's first word.
+        // Parsed over a string - a stream's rest, which then advances by what was consumed.
+        File *fs = n == "fscanf" ? streamFile(streamNumber(c, arg(c, 0))) : n == "scanf" ? streamFile(1) : nullptr;
+        if (n != "sscanf" && fs == nullptr) { ret(c, 0xffffffffu); return true; }
         std::string in = fs != nullptr ? fs->data.substr(fs->pos) : c.readString(arg(c, 0));
-        Args a = { c, variadicAt(c, 2) };
+        Args a = { c, variadicAt(c, n == "scanf" ? 1 : 2) };
         std::string fmt = c.readString(a.word());
         size_t i = 0;
         int assigned = 0;
@@ -708,6 +708,18 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         int ch = -1;
         if (f != nullptr && f->pos < f->data.size()) ch = static_cast<unsigned char>(f->data[f->pos++]);
         ret(c, static_cast<uint32_t>(ch));
+        return true;
+    }
+    if (n == "gets") {
+        // C90's gets: a line from stdin with no bound, the newline read and not stored.
+        uint32_t buf = arg(c, 0);
+        File *f = streamFile(1);
+        if (f == nullptr || f->pos >= f->data.size()) { ret(c, 0); return true; }
+        std::string line;
+        while (f->pos < f->data.size()) { char ch = f->data[f->pos++]; if (ch == '\n') break; line += ch; }
+        c.writeBytes(buf, line.data(), static_cast<uint32_t>(line.size()));
+        c.store8(buf + static_cast<uint32_t>(line.size()), 0);
+        ret(c, buf);
         return true;
     }
     if (n == "fgets") {
