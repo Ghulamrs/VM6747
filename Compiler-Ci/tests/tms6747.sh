@@ -23,55 +23,54 @@ if [ ! -x "$VM" ]; then
 fi
 if command -v clang >/dev/null 2>&1; then HOST=clang; else HOST=gcc; fi
 
-rm -rf "$OUT" && mkdir -p "$OUT"
-pass=0
-fail=0
-skip=0
-only="${1:-}"
+# One case by name, or all of them; a worker is handed the name it was asked for after --one.
+if [ "${1:-}" = --one ]; then only=$2; else only="${1:-}"; fi
 # The cases whose reference needs a 64-bit long or pointer - see the file.
 LP64="$ROOT/tests/tms6747-lp64.txt"
 
-for src in "$SRC"/*.c; do
-    name=$(basename "$src" .c)
-    [ -n "$only" ] && [ "$name" != "$only" ] && continue
-    if [ -z "$only" ] && grep -q "^$name[[:space:]]" "$LP64"; then
-        skip=$((skip + 1))
-        continue
-    fi
+# One case, its report and verdict written beside its output. c90 and the emulator on one side,
+# the host compiler and its native run on the other - the program under test and the reference
+# at once - and the cases themselves JOBS at a time.
+one() {
+    name=$1; src="$SRC/$name.c"
+    if [ -z "$only" ] && grep -q "^$name[[:space:]]" "$LP64"; then echo skip > "$OUT/$name.verdict"; return; fi
     expect=$(sed -n 's|^// expect: *||p' "$src" | head -1)
-
-    if ! "$CC1" -S -arch tms6747 "$src" -o "$OUT/$name.s" 2> "$OUT/$name.cc1.err"; then
+    ( if "$CC1" -S -arch tms6747 "$src" -o "$OUT/$name.s" 2> "$OUT/$name.cc1.err"; then
+          "$VM" "$OUT/$name.s" > "$OUT/$name.ours" 2>&1 < /dev/null; echo $? > "$OUT/$name.ours.rc"
+      else echo refused > "$OUT/$name.ours.rc"; fi ) &
+    ( $HOST -w "$src" -o "$OUT/$name.ref" -lm 2> /dev/null
+      "$OUT/$name.ref" > "$OUT/$name.theirs" 2>&1 < /dev/null; echo $? > "$OUT/$name.theirs.rc" ) &
+    wait
+    if [ "$(cat "$OUT/$name.ours.rc")" = refused ]; then
         echo "FAIL $name - c90 refused it:"
         sed 's/^/       /' "$OUT/$name.cc1.err" | head -3
-        fail=$((fail + 1))
-        continue
+        echo fail > "$OUT/$name.verdict"; return
     fi
-    $HOST -w "$src" -o "$OUT/$name.ref" -lm 2> /dev/null
-
-    ours_out=$("$VM" "$OUT/$name.s" 2>&1 < /dev/null); ours_rc=$?
-    ref_out=$("$OUT/$name.ref" 2>&1 < /dev/null);  ref_rc=$?
-    # glibc's printf spells a null %p "(nil)" and a NaN with its sign bit set
-    # "-nan"; clang's libc and the emulator, which prints canonically, say
-    # "0x0" and "nan". The reference is brought to the emulator's spelling
-    # rather than the other way round, because the emulator's is the one that
-    # is the same on every machine - and it is the reference's libc talking,
-    # not the program under test. Found on the Linux box, 2 of 425.
+    ours_out=$(cat "$OUT/$name.ours"); ours_rc=$(cat "$OUT/$name.ours.rc")
+    ref_out=$(cat "$OUT/$name.theirs"); ref_rc=$(cat "$OUT/$name.theirs.rc")
     ref_out=$(printf '%s' "$ref_out" | sed 's/(nil)/0x0/g; s/-nan/nan/g')
 
     if [ "$ours_out" != "$ref_out" ] || [ "$ours_rc" != "$ref_rc" ]; then
         echo "FAIL $name - disagrees with $HOST"
         echo "       ours: rc=$ours_rc out=[$(printf '%s' "$ours_out" | head -c 300)]"
         echo "       ref : rc=$ref_rc out=[$(printf '%s' "$ref_out" | head -c 300)]"
-        fail=$((fail + 1))
-        continue
+        echo fail > "$OUT/$name.verdict"; return
     fi
     if [ -n "$expect" ] && [ "$ours_rc" != "$expect" ]; then
         echo "FAIL $name - both agree on $ours_rc, but the case expects $expect"
-        fail=$((fail + 1))
-        continue
+        echo fail > "$OUT/$name.verdict"; return
     fi
-    pass=$((pass + 1))
-done
+    echo pass > "$OUT/$name.verdict"
+}
+if [ "${1:-}" = --one ]; then one "$3" > "$OUT/$3.report" 2>&1; exit 0; fi
+
+rm -rf "$OUT" && mkdir -p "$OUT"
+cases() { for src in "$SRC"/*.c; do n=$(basename "$src" .c); [ -n "$only" ] && [ "$n" != "$only" ] && continue; echo "$n"; done; }
+JOBS=${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}
+cases | xargs -P "$JOBS" -I{} sh "$0" --one "$only" {}
+for n in $(cases); do cat "$OUT/$n.report"; done
+count() { cat "$OUT"/*.verdict 2>/dev/null | grep -cx "$1" || true; }
+pass=$(count pass); fail=$(count fail); skip=$(count skip)
 
 echo
 echo "tms6747  PASS: $pass   FAIL: $fail   SKIP: $skip (need a 64-bit long or pointer - tests/tms6747-lp64.txt)"

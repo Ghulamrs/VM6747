@@ -81,8 +81,7 @@ x86_64-windows:-masm=gnu
 arm64-darwin:
 tms6747:"
 
-rm -rf "$WORK"
-mkdir -p "$WORK"
+if [ "${1:-}" != --one ]; then rm -rf "$WORK"; mkdir -p "$WORK"; fi
 
 # A case whose assembly contains the time it was compiled cannot have a stable
 # digest. It is recorded as TIMEBOUND rather than skipped, for the reason a
@@ -102,34 +101,35 @@ timebound() {
     esac
 }
 
+# One case for one spelling - its digest line - so that all of them run at once, JOBS at a time.
+one() {
+    spelling=$1; src=$2
+    arch="${spelling%%:*}"
+    flag="${spelling#*:}"
+    tag="$arch"
+    [ -n "$flag" ] && tag="$arch$flag"
+    case_name="$(basename "$src" .c)"
+    out="$WORK/$case_name.$tag.s"
+    if timebound "$case_name"; then
+        digest="TIMEBOUND"
+    elif "$CC1" -arch "$arch" $flag -S "$src" -o "$out" >/dev/null 2>&1; then
+        digest="$($HASH "$out" | cut -d' ' -f1)"
+    else
+        digest="REFUSED"
+    fi
+    rm -f "$out"
+    printf '%s  %s.%s\n' "$digest" "$case_name" "$tag"
+}
+if [ "${1:-}" = --one ]; then one "$2" "$3"; exit 0; fi
+
 generate() {
+    JOBS=${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}
     for spelling in $SPELLINGS; do
-        arch="${spelling%%:*}"
-        flag="${spelling#*:}"
-        tag="$arch"
-        [ -n "$flag" ] && tag="$arch$flag"
-        for src in tests/cases/*.c; do
-            case_name="$(basename "$src" .c)"
-            out="$WORK/one.s"
-            # A refusal is recorded rather than skipped. What the compiler
-            # declines to compile is as much a fact about it as what it emits,
-            # and a refactor that silently starts accepting - or refusing -
-            # a case should show up here as loudly as changed instructions.
-            if timebound "$case_name"; then
-                digest="TIMEBOUND"
-            elif "$CC1" -arch "$arch" $flag -S "$src" -o "$out" >/dev/null 2>&1; then
-                digest="$($HASH "$out" | cut -d' ' -f1)"
-            else
-                digest="REFUSED"
-            fi
-            printf '%s  %s.%s\n' "$digest" "$case_name" "$tag"
-        done
-    done
+        for src in tests/cases/*.c; do printf '%s %s\n' "$spelling" "$src"; done
+    done | xargs -P "$JOBS" -n 2 bash "$ROOT/tests/fingerprint.sh" --one > "$WORK/lines.txt"
+    cat "$WORK/lines.txt"
 }
 
-# Sorted by name, not by digest. A digest sort scatters the whole file when
-# one case changes, and this is meant to be read as a diff: one case that
-# moved should be one line that moved.
 generate | LC_ALL=C sort -k2 > "$WORK/now.txt"
 count=$(wc -l < "$WORK/now.txt" | tr -d ' ')
 

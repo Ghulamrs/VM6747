@@ -29,45 +29,50 @@ if [ "$(uname -m)-$(uname -s)" != "arm64-Darwin" ]; then
     exit 1
 fi
 
-rm -rf "$OUT" && mkdir -p "$OUT"
-pass=0
-fail=0
-
-for src in "$SRC"/*.c; do
-    name=$(basename "$src" .c)
+# One case, its report and verdict beside its output: c90 and the assembler on one side, clang's
+# own build of the source on the other - the program under test and the reference at once - and
+# the cases JOBS at a time.
+one() {
+    name=$1; src="$SRC/$name.c"
     expect=$(sed -n 's|^// expect: *||p' "$src" | head -1)
-
+    ( clang -w "$src" -o "$OUT/$name.ref" -lm 2> /dev/null ) &
     if ! "$CC1" -S -arch arm64-darwin "$src" -o "$OUT/$name.s" 2> "$OUT/$name.cc1.err"; then
-        echo "FAIL $name - cc1 refused it:"
+        wait; echo "FAIL $name - cc1 refused it:"
         sed 's/^/       /' "$OUT/$name.cc1.err"
-        fail=$((fail + 1))
-        continue
+        echo fail > "$OUT/$name.verdict"; return
     fi
     if ! clang "$OUT/$name.s" -o "$OUT/$name.ours" -lm 2> "$OUT/$name.as.err"; then
-        echo "FAIL $name - the assembler refused what cc1 emitted:"
+        wait; echo "FAIL $name - the assembler refused what cc1 emitted:"
         sed 's/^/       /' "$OUT/$name.as.err" | head -5
-        fail=$((fail + 1))
-        continue
+        echo fail > "$OUT/$name.verdict"; return
     fi
-    clang -w "$src" -o "$OUT/$name.ref" -lm 2> /dev/null
-
-    ours_out=$("$OUT/$name.ours" 2>&1); ours_rc=$?
-    ref_out=$("$OUT/$name.ref" 2>&1);  ref_rc=$?
+    wait
+    ( "$OUT/$name.ours" > "$OUT/$name.ours.out" 2>&1 < /dev/null; echo $? > "$OUT/$name.ours.rc" ) &
+    ( "$OUT/$name.ref" > "$OUT/$name.ref.out" 2>&1 < /dev/null; echo $? > "$OUT/$name.ref.rc" ) &
+    wait
+    ours_out=$(cat "$OUT/$name.ours.out"); ours_rc=$(cat "$OUT/$name.ours.rc")
+    ref_out=$(cat "$OUT/$name.ref.out"); ref_rc=$(cat "$OUT/$name.ref.rc")
 
     if [ "$ours_out" != "$ref_out" ] || [ "$ours_rc" != "$ref_rc" ]; then
         echo "FAIL $name - disagrees with clang"
         echo "       ours: rc=$ours_rc out=[$ours_out]"
         echo "       ref : rc=$ref_rc out=[$ref_out]"
-        fail=$((fail + 1))
-        continue
+        echo fail > "$OUT/$name.verdict"; return
     fi
     if [ -n "$expect" ] && [ "$ours_rc" != "$expect" ]; then
         echo "FAIL $name - both agree on $ours_rc, but the case expects $expect"
-        fail=$((fail + 1))
-        continue
+        echo fail > "$OUT/$name.verdict"; return
     fi
-    pass=$((pass + 1))
-done
+    echo pass > "$OUT/$name.verdict"
+}
+if [ "${1:-}" = --one ]; then one "$2" > "$OUT/$2.report" 2>&1; exit 0; fi
+
+rm -rf "$OUT" && mkdir -p "$OUT"
+JOBS=${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}
+for src in "$SRC"/*.c; do basename "$src" .c; done | xargs -P "$JOBS" -n 1 sh "$ROOT/tests/arm64.sh" --one
+for src in "$SRC"/*.c; do cat "$OUT/$(basename "$src" .c).report"; done
+pass=$(cat "$OUT"/*.verdict 2>/dev/null | grep -cx pass || true)
+fail=$(cat "$OUT"/*.verdict 2>/dev/null | grep -cx fail || true)
 
 echo
 echo "arm64-darwin  PASS: $pass   FAIL: $fail"
