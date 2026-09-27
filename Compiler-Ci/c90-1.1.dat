@@ -1,7 +1,7 @@
 ©2026 G. R. Akhtar - ISO C 90
 Release seal, version 1.1, sealed 27-09-2026
 Written by tools/seal; check it with `tools/seal check`.
-CRC32  size  file - 86 files, seal F44ECEC6
+CRC32  size  file - 86 files, seal 87E259F4
 ------------------------------------------------------------------
 CB7B0DCF      9572  Makefile
 8262F74B      3886  examples/CC1Lab.xcodeproj/project.pbxproj
@@ -41,7 +41,7 @@ FDFC6107      2808  lib/limits.h
 1BE93BD7      1653  lib/signal.h
 B8CC27C7      3079  lib/stdarg.h
 58B2FF54      2432  lib/stddef.h
-DA324EA5      6069  lib/stdio.h
+0229682D      6174  lib/stdio.h
 9FECF4A2      1878  lib/stdlib.h
 789D7D34      2214  lib/string.h
 D822292C      3007  lib/time.h
@@ -55,14 +55,14 @@ F091405C     10404  msvc/cc1.vcxproj
 F97E6338     10010  msvc/readme.txt
 033FA1DE      6067  msvc/run-corpus.ps1
 EA66D133     16155  src/Ast.h
-65F93CEA     38976  src/Driver.cpp
+207D3729     39154  src/Driver.cpp
 9E61BCC2      2195  src/Driver.h
 1424D482      8857  src/Lexer.cpp
 779AEACA       994  src/Lexer.h
 7DBE9C6A       483  src/Name.h
 BAD64C33    107000  src/Parser.cpp
 D838E7F7     11345  src/Parser.h
-A40019C8     35302  src/Preprocessor.cpp
+C688369D     35786  src/Preprocessor.cpp
 BCA01EF2      2886  src/Preprocessor.h
 5538DB98      3134  src/Source.cpp
 181237A8      1017  src/Source.h
