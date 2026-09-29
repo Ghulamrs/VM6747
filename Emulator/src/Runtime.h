@@ -75,6 +75,7 @@ private:
     void unwindTo(Cpu &cpu, Exc &e, uint32_t pc, uint32_t fp, uint32_t sp, uint32_t from);
     uint32_t descriptors(const ExidxEntry &e);
     void land(Cpu &cpu, uint32_t fp, uint32_t sp, uint32_t obj, uint32_t pad, bool withObject);
+    void popSaved(Cpu &cpu, uint32_t pc, uint32_t fp);
     [[noreturn]] void terminate(Cpu &cpu, const char *why);
     uint32_t errnoAt(Cpu &cpu);
     void setErrno(Cpu &cpu, uint32_t v);

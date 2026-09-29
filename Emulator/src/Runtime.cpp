@@ -467,9 +467,28 @@ void Runtime::unwindTo(Cpu &c, Exc &e, uint32_t pc, uint32_t fp, uint32_t sp, ui
         from = 0;
         if (f == e.barrierFp) c.fault("the handler frame's descriptors ran out before the barrier");
         s = f;
+        popSaved(c, p, f);
         if (!callerOf(c, p, f, p, f)) break;
     }
     c.fault("the unwinder ran past the handler frame");
+}
+// Leaving the frame at (pc, fp) in phase two: its callee-saved registers come back off its save
+// area, as TI's unwinder pops them into the register set it installs at the pad - a landing
+// frame's own locals in A10-A13 and B10-B13 are what the frames below it saved.
+void Runtime::popSaved(Cpu &c, uint32_t pc, uint32_t fp) {
+    const ExidxEntry *e = entryFor(pc);
+    if (e == nullptr) return;
+    uint32_t word = (e->word & 0x80000000u) != 0 ? e->word : c.load32(e->word);
+    if ((word >> 24) != 0x83 || (word >> 17 & 0x7f) != 0x7f) return;
+    uint32_t mask = word >> 4 & 0x1fff;
+    static const int regOfBit[13] = { 10, 11, 12, 13, 14, 32 + 3, 32 + 10, 32 + 11, 32 + 12, 32 + 13, 32 + 14, 32 + 15, 15 };
+    int at = 0;
+    for (int bit = 12; bit >= 0; bit--) {
+        if ((mask & 1u << bit) == 0) continue;
+        const int reg = regOfBit[bit];
+        if (reg != 15 && reg != 32 + 3 && reg != 32 + 15) c.setReg(reg, c.load32(fp - 4 * static_cast<uint32_t>(at)));
+        at++;
+    }
 }
 
 // ---- the library -----------------------------------------------------------------
