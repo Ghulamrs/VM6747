@@ -64,6 +64,7 @@ static std::vector<std::string> assemblyIn(const std::string &dir) {
 int main(int argc, char **argv) {
     std::vector<std::string> files, args;
     bool trace = false;
+    bool counts = false;
     Layout layout;
     bool rest = false;
     for (int i = 1; i < argc; i++) {
@@ -71,9 +72,13 @@ int main(int argc, char **argv) {
         if (rest) { args.push_back(a); continue; }
         if (a == "--") { rest = true; continue; }
         if (a == "-t") { trace = true; continue; }
+        if (a == "-c") { counts = true; continue; }
         if (a == "-m" && i + 1 < argc) { layout.memoryBytes = static_cast<uint32_t>(std::atoi(argv[++i])) << 20; continue; }
         if (a == "-h" || a == "--help") {
-            std::printf("usage: vm6747 [-t] [-m megabytes] file.s ... [-- args]\n");
+            std::printf("usage: vm6747 [-t] [-c] [-m megabytes] file.s ... [-- args]\n"
+                        "  -c  on exit, a line on stderr: the cycles from main, as TI's simulator\n"
+                        "      counts them (cycle.CPU: no memory stalls), and the packets and\n"
+                        "      native library calls among them\n");
             return 0;
         }
         if (a == "--version") {
@@ -136,9 +141,19 @@ int main(int argc, char **argv) {
             uint32_t fn = cpu.load32(a);
             if (fn != 0) cpu.callback(fn, 0, 0);
         }
+    // From main, as TI's simulator counts once the load has run to main; through the atexit
+    // handlers, which run before its C$$EXIT.
+    const uint64_t cycle0 = cpu.cycle(), packets0 = cpu.packets(), natives0 = cpu.nativeCalls();
     int status = cpu.run(m->second, trace);
     rt.runAtExit(cpu);
     status = cpu.exitCode();
+    if (counts) {
+        std::fflush(stdout);
+        std::fprintf(stderr, "CYCLES count=%llu packets=%llu natives=%llu\n",
+                     static_cast<unsigned long long>(cpu.cycle() - cycle0),
+                     static_cast<unsigned long long>(cpu.packets() - packets0),
+                     static_cast<unsigned long long>(cpu.nativeCalls() - natives0));
+    }
     std::fflush(stdout);
     return status & 0xff;
 }

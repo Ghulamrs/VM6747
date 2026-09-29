@@ -66,10 +66,44 @@ standard streams are data the emulator contributes before assembly.
 ## What it does not model
 
 Machine encoding and fetch packets; functional-unit assignment and the
-resource rules of a parallel packet; the memory system (caches, EDMA);
+resource rules of a parallel packet; the memory system (caches, EDMA,
+and so the stalls TI's `cycle.Total` counts beyond `cycle.CPU`);
 interrupts; the 40-bit forms beyond ADD/SUB into a pair; and any instruction
 the compilers do not emit and the table in `src/Isa.cpp` does not list —
 such a one is an assembly error, by line.
+
+## Cycles, counted always
+
+The core is counted as it issues: one cycle a packet, n for a `NOP n` (the
+cycles a `BNOP` or `ADDKPC` folds in likewise), and a branch's five delay slots
+are the packets already in them. `-c` prints, on stderr after the program and
+its atexit handlers,
+
+    CYCLES count=<cycles from main> packets=<n> natives=<library calls>
+
+from main, as TI's simulator counts once its load has run to main. Without
+`-c` the output is what it was, and the counting costs nothing measurable:
+the six kernels of C++Optimize's `tools/c6747/bench` run in the same time
+before and after, to 0.03 s.
+
+**It is TI's `cycle.CPU`, and not its `cycle.Total`.** Measured 2026-09-29 on
+the C6747 cycle-accurate simulator (CCS 5.5), the kernels as cpp11 -O2 builds
+them, linked with rts6740_elf_eh.lib:
+
+| kernel | vm6747 -c | TI cycle.CPU | | library calls |
+| --- | --- | --- | --- | --- |
+| fib | 4,355,822 | 4,359,843 | -0.09% | 1 |
+| sieve | 12,700,543 | 12,704,800 | -0.03% | 1 |
+| virt | 3,580,521 | 3,584,835 | -0.12% | 1 |
+| isort | 10,127,100 | 10,145,081 | -0.18% | 601 |
+| matmul | 2,715,090 | 2,745,133 | -1.09% | 1,153 |
+| hash | 22,314,120 | 25,090,974 | -11.1% | 126,001 |
+
+What is left is the library: a native call is one cycle here and about 22
+in rts6740, so hash's 2.78 M is its 126,001 calls. On generated code the
+count is within 0.2%. TI's `cycle.Total` adds the memory stalls this does not
+model - for fib 11.03 M of L1D stalls over its 4.36 M - so the stack traffic of
+code that keeps its locals in memory shows there and not here.
 
 ## Verification
 

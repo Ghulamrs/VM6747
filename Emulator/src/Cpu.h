@@ -43,7 +43,11 @@ public:
     uint32_t callback(uint32_t fn, uint32_t a4, uint32_t b4);
     [[noreturn]] void fault(const std::string &what);
     Program &program() { return prog_; }
+    // Counted always: cycles as the core issues them - one a packet, n for a NOP n - and the
+    // packets and native library calls among them. A native call is one cycle, not TI's rts6740.
     uint64_t cycle() const { return cycle_; }
+    uint64_t packets() const { return packets_; }
+    uint64_t nativeCalls() const { return nativeCalls_; }
     std::string where(uint32_t pc) const;
 
     // The C674x file: A0-A31 and B0-B31. The compilers here use the first
@@ -58,6 +62,8 @@ private:
     uint32_t pc_ = 0;
     uint32_t packetEnd_ = 0;       // the address after the packet executing - a call's return
     uint64_t cycle_ = 0;
+    uint64_t packets_ = 0;
+    uint64_t nativeCalls_ = 0;
     bool running_ = true;
     int exitCode_ = 0;
     bool trace_ = false;

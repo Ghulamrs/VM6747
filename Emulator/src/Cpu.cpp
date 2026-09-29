@@ -361,6 +361,7 @@ void Cpu::executePacket() {
     }
     for (const Pending &p : writes) pending_.push_back(p);
     pc_ = next;
+    packets_++;
     cycle_++;
     applyPending();
     completeDeferred();
@@ -383,6 +384,7 @@ void Cpu::step() {
     for (const Pending &p : pending_) r_[p.reg] = p.value;
     pending_.clear();
     branchValid_ = false;
+    nativeCalls_++;
     if (!rt_.call(name, *this)) fault("'" + name + "' is not provided by the runtime");
     if (!running_) return;
     pc_ = r_[B3];
