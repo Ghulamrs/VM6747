@@ -105,6 +105,19 @@ count is within 0.2%. TI's `cycle.Total` adds the memory stalls this does not
 model - for fib 11.03 M of L1D stalls over its 4.36 M - so the stack traffic of
 code that keeps its locals in memory shows there and not here.
 
+`-p` charges the same cycles to functions: each packet to the function it ran
+in (the names on code that are not labels - cpp11's `L.<fn>.<kind>N`, TI's
+`$C$L<n>` and `.L` temporaries are), each native library call to its name,
+from main. Its rows sum to `-c`'s count, and it costs nothing measurable
+either - the kernels run in the same time with `-p` as without:
+
+    PROFILE         cycles      %      packets    entries  function
+    PROFILE       22188066  99.44     14546045          1  _ZL6hashesi
+    PROFILE         126000   0.56            0     126000  [native] __c6xabi_remi
+    PROFILE             53   0.00           34          1  main
+
+(hash at cpp11 -O2: its 126,000 library calls are all `%`.)
+
 ## Verification
 
 `Compiler-Ci/tests/tms6747.sh` runs the whole C corpus through it: 399 of

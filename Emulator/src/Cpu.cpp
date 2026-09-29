@@ -1,7 +1,10 @@
 #include "Cpu.h"
+
+#include <algorithm>
 #include "Isa.h"
 #include "Runtime.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -372,6 +375,61 @@ void Cpu::executePacket() {
 // main returns to and 0xF8 where a callback's callee does; a native name is
 // answered by the runtime and returns through B3.
 void Cpu::step() {
+    if (!profiling_) { stepOne(); return; }
+    const uint64_t c0 = cycle_, p0 = packets_;
+    const uint32_t pc0 = pc_;
+    lastNative_.clear();
+    stepOne();
+    if (!lastNative_.empty()) {
+        ProfileRow &r = nativeRows_[lastNative_];
+        r.name = lastNative_; r.native = true;
+        r.cycles += cycle_ - c0; r.entries++;
+        return;
+    }
+    const size_t f = functionAt(pc0);
+    if (f >= fnRows_.size()) return;
+    ProfileRow &r = fnRows_[f];
+    r.cycles += cycle_ - c0;
+    r.packets += packets_ - p0;
+    if (pc0 == fnStart_[f]) r.entries++;
+}
+
+// The function holding pc: the last one tried first, since packets run in runs.
+size_t Cpu::functionAt(uint32_t pc) {
+    if (lastFn_ < fnStart_.size() && pc >= fnStart_[lastFn_] &&
+        (lastFn_ + 1 == fnStart_.size() || pc < fnStart_[lastFn_ + 1]))
+        return lastFn_;
+    std::vector<uint32_t>::const_iterator i = std::upper_bound(fnStart_.begin(), fnStart_.end(), pc);
+    if (i == fnStart_.begin()) return fnStart_.size();
+    lastFn_ = static_cast<size_t>(i - fnStart_.begin()) - 1;
+    return lastFn_;
+}
+
+// A name on code is a function unless it is a label: cpp11's L.<fn>.<kind><n> and L.return.<fn>,
+// TI's $C$L<n>, and .L temporaries.
+void Cpu::startProfile() {
+    fnStart_.clear(); fnRows_.clear(); nativeRows_.clear(); lastFn_ = 0;
+    for (std::map<uint32_t, std::string>::const_iterator n = prog_.names.begin(); n != prog_.names.end(); ++n) {
+        const std::string &s = n->second;
+        if (!prog_.code.count(n->first)) continue;
+        if (s.compare(0, 2, "L.") == 0 || s.compare(0, 2, "L$") == 0 || s[0] == '$' || s[0] == '.') continue;
+        fnStart_.push_back(n->first);
+        ProfileRow r; r.name = s;
+        fnRows_.push_back(r);
+    }
+    profiling_ = true;
+}
+
+std::vector<Cpu::ProfileRow> Cpu::profile() const {
+    std::vector<ProfileRow> rows;
+    for (const ProfileRow &r : fnRows_) if (r.cycles != 0) rows.push_back(r);
+    for (std::map<std::string, ProfileRow>::const_iterator n = nativeRows_.begin(); n != nativeRows_.end(); ++n)
+        rows.push_back(n->second);
+    std::stable_sort(rows.begin(), rows.end(), [](const ProfileRow &a, const ProfileRow &b) { return a.cycles > b.cycles; });
+    return rows;
+}
+
+void Cpu::stepOne() {
     if (pc_ >= prog_.textBase) { executePacket(); return; }
     if (pc_ == 0xFC) { exitWith(static_cast<int>(r_[A4])); return; }
     std::string name;
@@ -385,6 +443,7 @@ void Cpu::step() {
     pending_.clear();
     branchValid_ = false;
     nativeCalls_++;
+    if (profiling_) lastNative_ = name;
     if (!rt_.call(name, *this)) fault("'" + name + "' is not provided by the runtime");
     if (!running_) return;
     pc_ = r_[B3];

@@ -7,6 +7,7 @@
 #include "Program.h"
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -48,6 +49,12 @@ public:
     uint64_t cycle() const { return cycle_; }
     uint64_t packets() const { return packets_; }
     uint64_t nativeCalls() const { return nativeCalls_; }
+
+    // -p: cycles, packets and entries charged to the function each packet ran in - the names on
+    // code that are not labels - and native library calls by name. Nothing is charged unless on.
+    struct ProfileRow { std::string name; uint64_t cycles = 0, packets = 0, entries = 0; bool native = false; };
+    void startProfile();
+    std::vector<ProfileRow> profile() const;
     std::string where(uint32_t pc) const;
 
     // The C674x file: A0-A31 and B0-B31. The compilers here use the first
@@ -84,6 +91,14 @@ private:
     uint32_t branchTarget_ = 0;
 
     void step();
+    void stepOne();
+    bool profiling_ = false;
+    std::vector<uint32_t> fnStart_;            // function entry addresses, ascending
+    std::vector<ProfileRow> fnRows_;           // one per entry above
+    std::map<std::string, ProfileRow> nativeRows_;
+    size_t lastFn_ = 0;
+    std::string lastNative_;
+    size_t functionAt(uint32_t pc);
     void applyPending();
     void tick();                       // one idle cycle
     void executePacket();

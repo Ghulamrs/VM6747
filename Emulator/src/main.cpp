@@ -65,6 +65,7 @@ int main(int argc, char **argv) {
     std::vector<std::string> files, args;
     bool trace = false;
     bool counts = false;
+    bool profile = false;
     Layout layout;
     bool rest = false;
     for (int i = 1; i < argc; i++) {
@@ -73,12 +74,15 @@ int main(int argc, char **argv) {
         if (a == "--") { rest = true; continue; }
         if (a == "-t") { trace = true; continue; }
         if (a == "-c") { counts = true; continue; }
+        if (a == "-p") { profile = true; continue; }
         if (a == "-m" && i + 1 < argc) { layout.memoryBytes = static_cast<uint32_t>(std::atoi(argv[++i])) << 20; continue; }
         if (a == "-h" || a == "--help") {
-            std::printf("usage: vm6747 [-t] [-c] [-m megabytes] file.s ... [-- args]\n"
+            std::printf("usage: vm6747 [-t] [-c] [-p] [-m megabytes] file.s ... [-- args]\n"
                         "  -c  on exit, a line on stderr: the cycles from main, as TI's simulator\n"
                         "      counts them (cycle.CPU: no memory stalls), and the packets and\n"
-                        "      native library calls among them\n");
+                        "      native library calls among them\n"
+                        "  -p  on exit, the cycles from main charged to each function, and\n"
+                        "      native library calls by name: PROFILE lines on stderr\n");
             return 0;
         }
         if (a == "--version") {
@@ -144,9 +148,20 @@ int main(int argc, char **argv) {
     // From main, as TI's simulator counts once the load has run to main; through the atexit
     // handlers, which run before its C$$EXIT.
     const uint64_t cycle0 = cpu.cycle(), packets0 = cpu.packets(), natives0 = cpu.nativeCalls();
+    if (profile) cpu.startProfile();
     int status = cpu.run(m->second, trace);
     rt.runAtExit(cpu);
     status = cpu.exitCode();
+    if (profile) {
+        std::fflush(stdout);
+        const uint64_t total = cpu.cycle() - cycle0;
+        std::fprintf(stderr, "PROFILE %14s %6s %12s %10s  %s\n", "cycles", "%", "packets", "entries", "function");
+        for (const Cpu::ProfileRow &r : cpu.profile())
+            std::fprintf(stderr, "PROFILE %14llu %6.2f %12llu %10llu  %s%s\n",
+                         static_cast<unsigned long long>(r.cycles), total ? 100.0 * r.cycles / total : 0.0,
+                         static_cast<unsigned long long>(r.packets), static_cast<unsigned long long>(r.entries),
+                         r.native ? "[native] " : "", r.name.c_str());
+    }
     if (counts) {
         std::fflush(stdout);
         std::fprintf(stderr, "CYCLES count=%llu packets=%llu natives=%llu\n",
