@@ -41,7 +41,7 @@
 # CC1_AS_CLANG_VERBOSE=1 prints what it decided, per file.
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-CC1="$ROOT/cc1"
+CC1="${CC1:-$ROOT/c90.exe}"   # what make builds; CC1 names another
 REAL=${CC1_REAL_CLANG:-$(xcrun --find clang 2>/dev/null || echo /usr/bin/clang)}
 
 say() { [ -n "${CC1_AS_CLANG_VERBOSE:-}" ] && echo "cc1-as-clang: $*" >&2; return 0; }

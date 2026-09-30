@@ -23,8 +23,8 @@ param(
 # it prints something else here - which is why cl is run too, and why a case
 # both compilers get "wrong" together is a fact about the data model.
 #
-#   .\msvc\run-corpus.ps1
-#   .\msvc\run-corpus.ps1 -Filter "ld_*"
+#   .\tests\windows\run-corpus.ps1
+#   .\tests\windows\run-corpus.ps1 -Filter "ld_*"
 
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $vsRoot  = & $vswhere -latest -products * -property installationPath
@@ -36,10 +36,10 @@ cmd /c "`"$vcvars`" >nul 2>&1 && set" | ForEach-Object {
 }
 
 if ($Cases -eq "") { $Cases = Join-Path $Root "tests\cases" }
-$cc1  = Join-Path $Root "msvc\x64\Release\cc1.exe"
+$cc1  = Join-Path $Root "ide\build\Release\c90.exe"   # what ide\cc1.sln builds
 $work = "C:\cc1work\corpus-run"
 
-if (-not (Test-Path $cc1))  { "run-corpus: no cc1.exe at $cc1"; exit 2 }
+if (-not (Test-Path $cc1))  { "run-corpus: no c90.exe at $cc1 - build ide\cc1.sln"; exit 2 }
 if (-not (Test-Path $Cases)){ "run-corpus: no cases at $Cases"; exit 2 }
 
 Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue

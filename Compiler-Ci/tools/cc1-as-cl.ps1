@@ -8,10 +8,10 @@
 #   a .c file   -> cc1 -S, then ml64 on the assembly, giving the .obj
 #   anything else (.cpp, .rc, a link step) -> the real cl.exe, untouched
 #
-# Wire it up by setting two properties in the .vcxproj - see demo\hello.vcxproj:
+# Wire it up by setting two properties in the .vcxproj - see examples\cc1-in-visual-studio\hello.vcxproj:
 #
 #   <CLToolExe>cc1-as-cl.bat</CLToolExe>
-#   <CLToolPath>..\path\to\msvc</CLToolPath>
+#   <CLToolPath>..\path\to\tools</CLToolPath>
 #
 # **The response file is the part that is not obvious.** MSBuild does not pass
 # sixty flags on the command line the way Xcode does; it writes them to a file
@@ -110,9 +110,9 @@ if (-not $compiling -or $sources.Count -eq 0 -or $nonC) {
 
 # --- compile ---------------------------------------------------------------
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$cc1  = if ($env:CC1) { $env:CC1 } else { Join-Path $root "x64\Release\cc1.exe" }
+$cc1  = if ($env:CC1) { $env:CC1 } else { Join-Path $root "..\ide\build\Release\c90.exe" }   # what ide\cc1.sln builds
 if (-not (Test-Path $cc1)) {
-    [Console]::Error.WriteLine("cc1-as-cl: no cc1.exe at $cc1 - build msvc\cc1.vcxproj, or set CC1")
+    [Console]::Error.WriteLine("cc1-as-cl: no c90.exe at $cc1 - build ide\cc1.sln, or set CC1")
     exit 1
 }
 

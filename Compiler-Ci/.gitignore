@@ -24,8 +24,9 @@ examples/**/xcuserdata/
 # Where CC1Lab/on-windows.sh leaves the assembly before relaying it.
 examples/CC1Lab/.windows-out/
 # MSBuild's output, and what Visual Studio leaves beside a solution.
-msvc/x64/
-msvc/demo/x64/
+ide/build/
+ide/x64/
+examples/cc1-in-visual-studio/x64/
 *.vcxproj.user
 .vs/
 demo/*.ours

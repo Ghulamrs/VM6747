@@ -30,20 +30,20 @@
 
 
 --------------------------------------------------------------------------------
- 1.  BUILD cc1.exe
+ 1.  BUILD c90.exe, THE COMPILER CALLED cc1
 --------------------------------------------------------------------------------
 
  From the repository root, in a Developer Command Prompt:
 
-     msbuild msvc\cc1.vcxproj /p:Configuration=Release /p:Platform=x64
+     msbuild ide\cc1.sln /p:Configuration=Release /p:Platform=x64
 
  1a. The result lands here, and this path matters later:
 
-     msvc\x64\Release\cc1.exe
+     ide\build\Release\c90.exe
 
  1b. Check it runs. With no arguments it prints its usage:
 
-     msvc\x64\Release\cc1.exe
+     ide\build\Release\c90.exe
 
  1c. If msbuild says
 
@@ -54,7 +54,7 @@
      from your command line or from a newer/older Visual Studio. Name one you
      actually have:
 
-     msbuild msvc\cc1.vcxproj /p:Configuration=Release /p:Platform=x64 ^
+     msbuild ide\cc1.sln /p:Configuration=Release /p:Platform=x64 ^
              /p:PlatformToolset=v143
 
  1d. Nothing in src\ is modified to build here. The one thing MSVC lacks is
@@ -70,7 +70,7 @@
  Before wiring it into a project, prove the compiler works on its own. In a
  Developer Command Prompt:
 
-     msvc\x64\Release\cc1.exe -S msvc\demo\hello.c -o hello.asm
+     ide\build\Release\c90.exe -S examples\cc1-in-visual-studio\hello.c -o hello.asm
      ml64.exe /nologo /c /Fo hello.obj hello.asm
      link.exe /nologo /subsystem:console /out:hello.exe hello.obj ^
               libcmt.lib libucrt.lib libvcruntime.lib kernel32.lib ^
@@ -99,7 +99,7 @@
  PropertyGroup after the Microsoft.Cpp.props import:
 
      <CLToolExe>cc1-as-cl.bat</CLToolExe>
-     <CLToolPath>C:\path\to\repo\msvc\</CLToolPath>
+     <CLToolPath>C:\path\to\repo\tools\</CLToolPath>
 
  MSBuild then runs $(CLToolPath)\$(CLToolExe) wherever it would have run
  cl.exe. The trailing backslash on CLToolPath is required.
@@ -112,7 +112,7 @@
        <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
      </Link>
 
- msvc\demo\hello.vcxproj is a complete, working example of exactly this. Copy
+ examples\cc1-in-visual-studio\hello.vcxproj is a complete, working example of exactly this. Copy
  it if that is easier than editing your own.
 
 
@@ -120,8 +120,8 @@
  4.  BUILD AND RUN THE DEMO
 --------------------------------------------------------------------------------
 
-     msbuild msvc\demo\hello.vcxproj /p:Configuration=Release /p:Platform=x64
-     msvc\demo\x64\Release\hello.exe
+     msbuild examples\cc1-in-visual-studio\hello.vcxproj /p:Configuration=Release /p:Platform=x64
+     examples\cc1-in-visual-studio\x64\Release\hello.exe
 
  Expected output:
 
@@ -178,12 +178,12 @@
      /d - so if you see this, a new flag has appeared that needs handling in
      cc1-as-cl.ps1. The fix goes in the argument loop there.
 
- "no cc1.exe at ..."
+ "no c90.exe at ..."
      Step 1 has not been done, or the shim is looking in the wrong place. It
-     expects msvc\x64\Release\cc1.exe. Override with the CC1 environment
+     expects ide\build\Release\c90.exe. Override with the CC1 environment
      variable:
 
-         set CC1=D:\somewhere\cc1.exe
+         set CC1=D:\somewhere\c90.exe
 
  "ml64 is not recognised" / "link is not recognised"
      You are not in a Developer Command Prompt. See step 0. This bites at BUILD
@@ -221,14 +221,16 @@
  8.  WHAT IS IN THIS DIRECTORY
 --------------------------------------------------------------------------------
 
- cc1.vcxproj        builds cc1.exe from ..\src with MSVC
- cc1.sln            solution wrapper, if you would rather open it in the IDE
- compat\unistd.h    the one header MSVC lacks; see the note inside it
- cc1-as-cl.bat      what MSBuild invokes in place of cl.exe
- cc1-as-cl.ps1      the translator: cl's command line into cc1's
- demo\hello.vcxproj a complete project wired up as in step 3
- demo\hello.c       C90 exercising setjmp, long double, structs and printf
- readme.txt         this file
+ Where the pieces are, from the repository root (they were all in msvc\ until
+ 2026-09-30, when the projects moved to ide\ beside cc1's Xcode ones):
+
+ ide\cc1.sln, ide\cc1.vcxproj    build c90.exe from src\ with MSVC, into ide\build\Release
+ msvc\compat\unistd.h            the one header MSVC lacks; see the note inside it
+ tools\cc1-as-cl.bat             what MSBuild invokes in place of cl.exe
+ tools\cc1-as-cl.ps1             the translator: cl's command line into cc1's
+ examples\cc1-in-visual-studio\hello.vcxproj   a complete project wired up as in step 3
+ examples\cc1-in-visual-studio\hello.c         C90 exercising setjmp, long double, structs and printf
+ examples\cc1-in-visual-studio\README.txt      this file
 
  The equivalent for Xcode on macOS is tools\cc1-as-clang, and the two are the
  same idea: let the IDE believe it is running the compiler it expects.

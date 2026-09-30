@@ -7,9 +7,9 @@
   looks like anyway - which is the point: a project is switched over to this
   compiler by naming it, not by being rewritten.
 
-    msbuild msvc\demo\hello.vcxproj /p:Configuration=Release /p:Platform=x64
+    msbuild examples\cc1-in-visual-studio\hello.vcxproj /p:Configuration=Release /p:Platform=x64
 
-  Build cc1.exe first; the shim looks for it at msvc\x64\Release\cc1.exe, or
+  Build c90.exe first (ide\cc1.sln); the shim looks for it at ide\build\Release\c90.exe, or
   wherever the CC1 environment variable says.
 
   What a project has to keep to, to build this way: C90, and the fifteen
@@ -57,7 +57,7 @@
       MSBuild writes rather than passing the flags directly.
     -->
     <CLToolExe>cc1-as-cl.bat</CLToolExe>
-    <CLToolPath>$(ProjectDir)..\</CLToolPath>
+    <CLToolPath>$(ProjectDir)..\..\tools\</CLToolPath>
 
     <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)$(Platform)\$(Configuration)\obj\</IntDir>

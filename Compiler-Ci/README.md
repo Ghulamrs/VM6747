@@ -34,9 +34,10 @@ environment every C compiler reference assumes.
 ./build clean
 ```
 
-[`msvc/`](msvc) builds it with MSVC instead, so the compiler runs on the
-target it generates for — and lets Visual Studio compile C with cc1 in
-`cl.exe`'s place. [`msvc/readme.txt`](msvc/readme.txt) is the procedure.
+[`ide/`](ide) builds it with MSVC instead, so the compiler runs on the
+target it generates for, and with Xcode on the Mac; the same projects are the
+ones RIDE builds. [`examples/cc1-in-visual-studio`](examples/cc1-in-visual-studio/README.txt)
+lets Visual Studio compile C with cc1 in `cl.exe`'s place.
 Nothing in `src/` is restructured for it: the dependencies outside C++14 are
 `getpid` and `getcwd`.
 
@@ -210,7 +211,7 @@ struct came back in `%rdx` where both conventions say `%rax`, the caller read
 `%rdx` too, and 421 cases passed over it for as long as it existed. This is the
 only check here that puts two compilers' output into one program.
 
-`msvc/run-corpus.ps1` runs all 412 cases natively on Windows with `cl` as the
+`tests/windows/run-corpus.ps1` runs all 412 cases natively on Windows with `cl` as the
 reference — a question `tests/windows.sh` cannot ask, since it takes only the
 18 that survive running under a foreign convention on Linux. It has found five
 bugs — three read off its output the first day, and two more sitting unread in
