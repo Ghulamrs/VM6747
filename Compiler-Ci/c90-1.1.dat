@@ -1,7 +1,7 @@
 ©2026 G. R. Akhtar - ISO C 90
-Release seal, version 1.1, sealed 27-09-2026
+Release seal, version 1.1, sealed 30-09-2026
 Written by tools/seal; check it with `tools/seal check`.
-CRC32  size  file - 86 files, seal 87E259F4
+CRC32  size  file - 91 files, seal 78192CC3
 ------------------------------------------------------------------
 CB7B0DCF      9572  Makefile
 8262F74B      3886  examples/CC1Lab.xcodeproj/project.pbxproj
@@ -11,6 +11,9 @@ EC35CF7B      2883  examples/CC1Lab.xcodeproj/xcshareddata/xcschemes/CC1Lab.xcsc
 AF26CD99      2591  examples/CC1Lab/on-windows.sh
 81CED533       160  examples/CC1Lab/test.dat
 26848BC1      3763  examples/README.md
+6969C777     10337  examples/cc1-in-visual-studio/README.txt
+178DD59E      1479  examples/cc1-in-visual-studio/hello.c
+ED246259      3997  examples/cc1-in-visual-studio/hello.vcxproj
 E924E98A      1699  examples/ex01_arithmetic.c
 8EAD2BB4      1547  examples/ex02_control.c
 D82559FE      1438  examples/ex03_pointers.c
@@ -29,6 +32,16 @@ F9463F99      1760  examples/shalimar-library/README.md
 43FCEC72      2426  examples/shalimar-library/stats.c
 4AAFC20D      1922  examples/shalimar-library/tally.c
 CE69547F      2753  examples/shalimar-library/text.c
+382B69B3      2204  ide/README.md
+A41347D2      1024  ide/build-vs.cmd
+2EDE6E98       832  ide/cc1.sln
+B3A54FEF      5747  ide/cc1.vcxproj
+B641C93F      4070  ide/cc1.vcxproj.filters
+D72D8C2F     16725  ide/cc1.xcodeproj/project.pbxproj
+C97296A9      1712  ide/cc1.xcodeproj/xcshareddata/xcschemes/cc1.xcscheme
+96FE25BE       136  ide/cc1.xcworkspace/contents.xcworkspacedata
+E260A312       787  ide/check-vs.cmd
+550398F6     22580  ide/generate.py
 65B6BFC3      2538  lib/assert.h
 978C1DCB      1245  lib/ctype.h
 9ECB2F97      2128  lib/errno.h
@@ -45,15 +58,7 @@ B8CC27C7      3079  lib/stdarg.h
 9FECF4A2      1878  lib/stdlib.h
 789D7D34      2214  lib/string.h
 D822292C      3007  lib/time.h
-192BF154       609  msvc/cc1-as-cl.bat
-76ABC033      6535  msvc/cc1-as-cl.ps1
-9043DE8F       908  msvc/cc1.sln
-F091405C     10404  msvc/cc1.vcxproj
 8C8B02D6      1547  msvc/compat/unistd.h
-178DD59E      1479  msvc/demo/hello.c
-5EA44C8F      3953  msvc/demo/hello.vcxproj
-F97E6338     10010  msvc/readme.txt
-033FA1DE      6067  msvc/run-corpus.ps1
 EA66D133     16155  src/Ast.h
 207D3729     39154  src/Driver.cpp
 9E61BCC2      2195  src/Driver.h
@@ -90,4 +95,4 @@ E9EF76FA      2102  src/backend/X86_64Windows.cpp
 2465340E      1013  src/backend/X86_64Windows.h
 3F12405D       111  src/main.cpp
 ------------------------------------------------------------------
-Sealed on 27-09-2026
+Sealed on 30-09-2026
