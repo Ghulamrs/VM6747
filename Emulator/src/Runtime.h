@@ -73,7 +73,7 @@ private:
     bool matches(Cpu &cpu, uint32_t obj, uint32_t thrownTi, uint32_t catchTi, uint32_t &adjusted);
     void throwFrom(Cpu &cpu, uint32_t obj, uint32_t pc, uint32_t fp, uint32_t sp);
     void unwindTo(Cpu &cpu, Exc &e, uint32_t pc, uint32_t fp, uint32_t sp, uint32_t from);
-    uint32_t descriptors(const ExidxEntry &e);
+    uint32_t descriptors(Cpu &cpu, const ExidxEntry &e);
     void land(Cpu &cpu, uint32_t fp, uint32_t sp, uint32_t obj, uint32_t pad, bool withObject);
     void popSaved(Cpu &cpu, uint32_t pc, uint32_t fp);
     [[noreturn]] void terminate(Cpu &cpu, const char *why);

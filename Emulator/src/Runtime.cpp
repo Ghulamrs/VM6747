@@ -333,12 +333,12 @@ const Runtime::ExidxEntry *Runtime::entryFor(uint32_t pc) const {
 // The frame above (pc, fp), read the way TI's unwinder would: the unwind word - inline, or the
 // first of the table - compact form pr3 with SP restored from A15, then the saved registers a word
 // each below A15 in the bitmask's order, A15 first and B3 after the B-file registers. False when pc has no entry, which ends the walk.
+namespace { bool frameMask(Cpu &c, uint32_t entryWord, uint32_t &mask); bool wideTable(Cpu &c, uint32_t entryWord); }
 bool Runtime::callerOf(Cpu &c, uint32_t pc, uint32_t fp, uint32_t &callerPc, uint32_t &callerFp) {
     const ExidxEntry *e = entryFor(pc);
     if (e == nullptr) return false;
-    uint32_t word = (e->word & 0x80000000u) != 0 ? e->word : c.load32(e->word);
-    if ((word >> 24) != 0x83 || (word >> 17 & 0x7f) != 0x7f) return false;
-    uint32_t mask = word >> 4 & 0x1fff;
+    uint32_t mask = 0;
+    if (!frameMask(c, e->word, mask)) return false;
     if ((mask & 1u << 12) == 0 || (mask & 1u << 5) == 0) return false;    // A15 and B3 saved
     int before = 0;
     for (int bit = 12; bit > 5; bit--) if (mask & 1u << bit) before++;   // A15, B15-B10
@@ -347,8 +347,8 @@ bool Runtime::callerOf(Cpu &c, uint32_t pc, uint32_t fp, uint32_t &callerPc, uin
     return true;
 }
 // Where a function's descriptors begin, or 0 for an inline entry.
-uint32_t Runtime::descriptors(const ExidxEntry &e) {
-    return (e.word & 0x80000000u) != 0 ? 0 : e.word + 4;
+uint32_t Runtime::descriptors(Cpu &c_, const ExidxEntry &e) {
+    return (e.word & 0x80000000u) != 0 ? 0 : e.word + 4 + (wideTable(c_, e.word) ? 4 * (c_.load32(e.word) >> 16 & 0xff) : 0);
 }
 Runtime::Exc *Runtime::excFor(uint32_t obj) {
     for (Exc &e : excs_) if (e.obj == obj) return &e;
@@ -397,18 +397,39 @@ namespace {
 // exception specification (a count of allowed types, then those, then a
 // pad when the count's top bit says so; this line writes a count of 0).
 struct Descriptor { int kind; uint32_t begin, end, pad, rtti, count, next; };
-bool readDescriptor(Cpu &c, uint32_t at, uint32_t func, Descriptor &d) {
+bool readDescriptor(Cpu &c, uint32_t at, uint32_t func, Descriptor &d, bool wide) {
     if (at == 0 || c.load32(at) == 0) return false;
-    uint32_t len = c.load16(at), off = c.load16(at + 2);
+    const uint32_t w = wide ? 4 : 0;           // pr2: 32-bit length and offset
+    uint32_t len = wide ? c.load32(at) : c.load16(at), off = wide ? c.load32(at + 4) : c.load16(at + 2);
     d.kind = static_cast<int>(((len & 1) << 1) | (off & 1));
     d.begin = func + (off & ~1u);
     d.end = d.begin + (len & ~1u);
-    d.pad = c.load32(at + 4);
-    d.rtti = d.kind == 2 ? c.load32(at + 8) : 0;
-    d.count = d.kind == 1 ? c.load32(at + 4) : 0;
-    d.next = d.kind == 1 ? at + 8 + 4 * (d.count & 0x7fffffffu) + ((d.count & 0x80000000u) != 0 ? 4 : 0)
-           : at + (d.kind == 2 ? 12 : 8);
+    d.pad = c.load32(at + 4 + w);
+    d.rtti = d.kind == 2 ? c.load32(at + 8 + w) : 0;
+    d.count = d.kind == 1 ? c.load32(at + 4 + w) : 0;
+    d.next = d.kind == 1 ? at + 8 + w + 4 * (d.count & 0x7fffffffu) + ((d.count & 0x80000000u) != 0 ? 4 : 0)
+           : at + w + (d.kind == 2 ? 12 : 8);
     return true;
+}
+// The frame's pop mask: pr3's compact word, or pr2's byte-codes MV FP,SP; pop; RETURN.
+bool frameMask(Cpu &c, uint32_t entryWord, uint32_t &mask) {
+    const bool inl = (entryWord & 0x80000000u) != 0;
+    const uint32_t word = inl ? entryWord : c.load32(entryWord);
+    if ((word >> 24) == 0x83) {
+        if ((word >> 17 & 0x7f) != 0x7f) return false;
+        mask = word >> 4 & 0x1fff;
+        return true;
+    }
+    if ((word >> 24) != 0x82 || inl) return false;
+    std::vector<uint32_t> ops = { word >> 8 & 0xff, word & 0xff };
+    for (uint32_t k = 1; k <= (word >> 16 & 0xff); k++)
+        for (int s = 24; s >= 0; s -= 8) ops.push_back(c.load32(entryWord + 4 * k) >> s & 0xff);
+    if (ops.size() < 4 || ops[0] != 0xd0 || (ops[1] & 0xe0) != 0x80 || ops[3] != 0xe7) return false;
+    mask = (ops[1] & 0x1f) << 8 | ops[2];
+    return true;
+}
+bool wideTable(Cpu &c, uint32_t entryWord) {
+    return (entryWord & 0x80000000u) == 0 && (c.load32(entryWord) >> 24) == 0x82;
 }
 }
 void Runtime::throwFrom(Cpu &c, uint32_t obj, uint32_t pc, uint32_t fp, uint32_t sp) {
@@ -423,7 +444,7 @@ void Runtime::throwFrom(Cpu &c, uint32_t obj, uint32_t pc, uint32_t fp, uint32_t
         const ExidxEntry *x = entryFor(p);
         if (x == nullptr) break;
         Descriptor d;
-        for (uint32_t at = descriptors(*x); readDescriptor(c, at, x->func, d); at = d.next) {
+        for (uint32_t at = descriptors(c, *x); readDescriptor(c, at, x->func, d, wideTable(c, x->word)); at = d.next) {
             if (p < d.begin || p >= d.end) continue;
             // An exception specification allowing nothing is a barrier too:
             // the cleanups below it run, then unexpected() ends the program.
@@ -452,7 +473,7 @@ void Runtime::unwindTo(Cpu &c, Exc &e, uint32_t pc, uint32_t fp, uint32_t sp, ui
         const ExidxEntry *x = entryFor(p);
         if (x == nullptr) break;
         Descriptor d;
-        for (uint32_t at = from != 0 ? from : descriptors(*x); readDescriptor(c, at, x->func, d); at = d.next) {
+        for (uint32_t at = from != 0 ? from : descriptors(c, *x); readDescriptor(c, at, x->func, d, wideTable(c, x->word)); at = d.next) {
             if (d.kind == 0 && p >= d.begin && p < d.end) {
                 e.cleanupPc = p; e.cleanupNext = d.next;
                 land(c, f, s, e.obj, d.pad, false);
@@ -478,9 +499,8 @@ void Runtime::unwindTo(Cpu &c, Exc &e, uint32_t pc, uint32_t fp, uint32_t sp, ui
 void Runtime::popSaved(Cpu &c, uint32_t pc, uint32_t fp) {
     const ExidxEntry *e = entryFor(pc);
     if (e == nullptr) return;
-    uint32_t word = (e->word & 0x80000000u) != 0 ? e->word : c.load32(e->word);
-    if ((word >> 24) != 0x83 || (word >> 17 & 0x7f) != 0x7f) return;
-    uint32_t mask = word >> 4 & 0x1fff;
+    uint32_t mask = 0;
+    if (!frameMask(c, e->word, mask)) return;
     static const int regOfBit[13] = { 10, 11, 12, 13, 14, 32 + 3, 32 + 10, 32 + 11, 32 + 12, 32 + 13, 32 + 14, 32 + 15, 15 };
     int at = 0;
     for (int bit = 12; bit >= 0; bit--) {
