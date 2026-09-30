@@ -4,7 +4,6 @@
 #include "Isa.h"
 #include "Runtime.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
