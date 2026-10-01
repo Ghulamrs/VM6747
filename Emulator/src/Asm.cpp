@@ -273,6 +273,9 @@ struct Assembler {
         if (regNumber(u, s, r)) { op.kind = Operand::Reg; op.reg = r; return true; }
         if (s[0] == '*') return memOperand(u, ln, s, resolve, op);
         op.kind = Operand::Imm;
+        // cl6x's `ADDAW DP,(sym),B5`: the symbol's displacement from DP in bytes, the relocation
+        // doing the instruction's scaling - so here the symbol's address, added as it stands.
+        if (s.size() > 2 && s[0] == '(' && s.back() == ')') { op.dpByte = true; s = trim(s.substr(1, s.size() - 2)); }
         bool hadSym = false;
         long long v;
         if (!evaluate(u, ln, s, resolve, v, &hadSym)) return false;

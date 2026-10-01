@@ -45,9 +45,13 @@ labels, function pointers and the PC behave.
 sixty-four registers, `.asg`'s FP/DP/SP, `BNOP`/`RETNOP`/`CALL`+`ADDKPC` with
 their folded NOPs (unconditional, as the manual says), `ADDAD`, `ANDN`, the
 ucst15 address-adds from DP or SP, `.bits`/`.field`, `.group` as a COMDAT
-(one definition kept, like `.weak`), `.string` with byte values, and a
-directory of `.asm` files. What it does not run is cl6x's C++: STLport's
-streams call into TI's compiled runtime, which is machine code.
+(one definition kept, like `.weak`), `.string` with byte values, `(sym)` as
+`ADDAW DP,(sym),B5`'s byte displacement (the relocation's scaling, not the
+instruction's), `CALLP` with its five protected slots - a load issued just
+before it lands in them, as cl6x's `LDW; CALLP` relies on - and a directory
+of `.asm` files. What it does not run is TI's compiled C++ runtime, which is
+machine code; what cl6x's `<iostream>` wants of it is supplied natively
+("cl6x's streams" below), so `cout << x` runs here as it does on the part.
 
 **The C library, natively.** A call to a library name lands on a stub below
 the text base and is answered on the host, reading its arguments by the
@@ -75,8 +79,8 @@ such a one is an assembly error, by line.
 ## Cycles, counted always
 
 The core is counted as it issues: one cycle a packet, n for a `NOP n` (the
-cycles a `BNOP` or `ADDKPC` folds in likewise), and a branch's five delay slots
-are the packets already in them. `-c` prints, on stderr after the program and
+cycles a `BNOP` or `ADDKPC` folds in likewise, and `CALLP`'s five), and a
+branch's five delay slots are the packets already in them. `-c` prints, on stderr after the program and
 its atexit handlers,
 
     CYCLES count=<cycles from main> packets=<n> natives=<library calls>
@@ -129,6 +133,43 @@ new`, the `__cxa_*` family) is the next piece.
 
 Built like the compilers: C++14, `-Wall -Wextra -Werror -pedantic`, clang++
 on the Mac and g++ on the box, objects outside the checkout.
+
+## cl6x's streams
+
+cl6x compiles `cout << 1.5` almost entirely from STLport's headers: the
+sentry, `operator<<`, `num_put::put`, `sputc` and `sputn` are all in the
+program's own assembly, reading `cout`'s fields at the offsets the headers
+give them and reaching TI's compiled runtime through eleven names - the
+`cout` object itself, `ios_base::Init`, `locale`'s copy and destructor,
+`locale::_M_use_facet`, `_GetFacetId` for `num_put<char>`,
+`_M_throw_failure` - and through two vtables: the streambuf's (`sync`,
+`xsputn`, `_M_xsputnc`, `overflow`: slots 5, 11, 12, 13) and the facet's
+(`do_put` for bool, long, unsigned long, double, long double, long long,
+unsigned long long and `const void *`: slots 2 to 9). The runtime lays out
+`_ZSt4cout`, `_ZSt4cerr` and `_ZSt4clog` in its prelude as STLport's
+`basic_ostream<char>` over `basic_ios` (its offset at vptr-12; flags at +4,
+state +8, mask +20, precision +24, width +28, locale +32, fill +68, rdbuf
++72, tie +76 of that), each over a streambuf with no put area - so every
+character reaches `overflow` and every run `xsputn`, which are natives on the
+host's stdout or stderr - and one `num_put` facet whose virtuals format by
+STLport's own rules (`num_put_float.cpp`'s `%g` with a default precision of 6,
+fixed and scientific, the base, sign and case flags, and the width consumed
+with the fill after a sign or a `0x` under `internal`). `cin` is not there.
+
+Measured against clang's libc++ on a probe of forty insertions - widths,
+fills, the three adjustments, hex, oct, showbase, showpos, boolalpha, fixed,
+scientific, precision, 64-bit values, `cerr` - cl6x's assembly on the
+emulator prints byte for byte what the native program prints, and RIDE
+4.51's Sample (`cout << q << v << m` over its vector, matrix and quaternion
+templates) what RIDE's own cpp11 build prints. The oracle TI's own program
+cannot give: on the C6747 simulator CCS 7.4's Sample reaches `C$$EXIT` with
+an empty console, the stdio streambuf's `fwrite` never surfacing; the
+`-D_STD_IO_` build of the same source, which prints through `printf`, is the
+hard oracle for the values and agrees to the byte. `__cxa_vec_ctor`, which
+cl6x calls for a member array of class type, and its family (`new`, `cctor`,
+`dtor`, `cleanup`, `delete`, Itanium 3.3.3 as the C6000 EABI reads it - ctor
+and cctor answer the array) came with it; a constructor that throws inside
+one terminates here rather than unwinding the elements built so far.
 
 ## Exceptions
 

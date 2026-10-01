@@ -1,37 +1,9 @@
 ©2026 G. R. Akhtar - ISO C 90
-Release seal, version 1.1, sealed 30-09-2026
+Release seal, version 1.1, sealed 02-10-2026
 Written by tools/seal; check it with `tools/seal check`.
-CRC32  size  file - 91 files, seal 78192CC3
+CRC32  size  file - 63 files, seal E6C9124C
 ------------------------------------------------------------------
 CB7B0DCF      9572  Makefile
-8262F74B      3886  examples/CC1Lab.xcodeproj/project.pbxproj
-EC35CF7B      2883  examples/CC1Lab.xcodeproj/xcshareddata/xcschemes/CC1Lab.xcscheme
-05CC6388      1465  examples/CC1Lab/main.c
-8520E22B      2354  examples/CC1Lab/on-windows.ps1
-AF26CD99      2591  examples/CC1Lab/on-windows.sh
-81CED533       160  examples/CC1Lab/test.dat
-26848BC1      3763  examples/README.md
-6969C777     10337  examples/cc1-in-visual-studio/README.txt
-178DD59E      1479  examples/cc1-in-visual-studio/hello.c
-ED246259      3997  examples/cc1-in-visual-studio/hello.vcxproj
-E924E98A      1699  examples/ex01_arithmetic.c
-8EAD2BB4      1547  examples/ex02_control.c
-D82559FE      1438  examples/ex03_pointers.c
-B4231967      1613  examples/ex04_structs.c
-3F1EB107      1496  examples/ex05_bitfields.c
-C5AF34E0      1138  examples/ex06_strings.c
-95B6CBEA      1298  examples/ex07_floats.c
-01DDF526      1657  examples/ex08_fnptr.c
-D837235E      1990  examples/ex09_initialisers.c
-4F102BA2      1764  examples/ex10_fileio.c
-212F15B7       569  examples/examples.h
-543E3D15     29099  examples/heavy.c
-AB381356      1163  examples/main.c
-F9463F99      1760  examples/shalimar-library/README.md
-53933A9B      1542  examples/shalimar-library/build.sh
-43FCEC72      2426  examples/shalimar-library/stats.c
-4AAFC20D      1922  examples/shalimar-library/tally.c
-CE69547F      2753  examples/shalimar-library/text.c
 382B69B3      2204  ide/README.md
 A41347D2      1024  ide/build-vs.cmd
 2EDE6E98       832  ide/cc1.sln
@@ -60,7 +32,7 @@ B8CC27C7      3079  lib/stdarg.h
 D822292C      3007  lib/time.h
 8C8B02D6      1547  msvc/compat/unistd.h
 EA66D133     16155  src/Ast.h
-207D3729     39154  src/Driver.cpp
+C479B064     39760  src/Driver.cpp
 9E61BCC2      2195  src/Driver.h
 1424D482      8857  src/Lexer.cpp
 779AEACA       994  src/Lexer.h
@@ -95,4 +67,4 @@ E9EF76FA      2102  src/backend/X86_64Windows.cpp
 2465340E      1013  src/backend/X86_64Windows.h
 3F12405D       111  src/main.cpp
 ------------------------------------------------------------------
-Sealed on 30-09-2026
+Sealed on 02-10-2026

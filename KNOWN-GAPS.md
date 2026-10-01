@@ -30,3 +30,11 @@ Same setup (cl6x 8.2.2, `-n --symdebug:none`, no `-O`), C++Optimize's
 `matmul.c` and `sieve.c` print nothing; all three exit 0. `fib.c`, `hash.c` and
 `virt.cpp` are right. TI's C6747 cycle-accurate simulator runs all six, built by cl6x
 7.4.4 at -O2, with the right output. Not yet narrowed down; recorded, not mended.
+
+**Re-measured 2026-10-01** with CCS 7.4's cl6x 8.2.2 at its default optimization, after
+the emulator learned `CALLP`'s five protected delay slots (a load issued just before the
+call had not been landing before the callee ran - which is how RIDE 4.51's Sample, cl6x's
+`LDW *SP(12),A4; CALLP`, read a `this` of 3): `isort`, `matmul` and `sieve` print what they
+printed before, so this is not their cause. `fib`, `hash`, `hello`, `arith`, `floats` and
+`structs` are right as before. At `-O2` those six stop at the assembler on `SPLOOPD` and
+`SPLOOPW`, which the table in `src/Isa.cpp` does not list.

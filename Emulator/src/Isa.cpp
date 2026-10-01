@@ -69,6 +69,7 @@ static bool isaRanges(const Instr &in, std::string &why) {
     case Op::ADDAW: case Op::ADDAH: case Op::ADDAB:
         // ucst5, or the C64x+ form from DP or SP with a ucst15
         if (isImm(o[1])) ok = fits(o[1].imm, 0, isReg(o[0]) && (o[0].reg == Cpu::B + 14 || o[0].reg == Cpu::B15) ? 32767 : 31);
+        if (isImm(o[1]) && o[1].dpByte) ok = fits(o[1].imm, 0, 32767 * (e->op == Op::ADDAW ? 4 : e->op == Op::ADDAH ? 2 : 1));
         break;
     case Op::SHL: case Op::SHR: case Op::SHRU: case Op::ADDAD: case Op::SUBAW:
         if (isImm(o[1])) ok = fits(o[1].imm, 0, 31);
