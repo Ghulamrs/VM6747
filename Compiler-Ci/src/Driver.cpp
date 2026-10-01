@@ -273,8 +273,14 @@ static int runTool(const std::string &command) {
 #endif
 }
 
-static void noteWindowsToolchain() {
+// Only where the tool was asked for by name, as Visual Studio's ml64 and link are: a tool named by
+// its path - RIDE's own masm and link - was found and ran, and its messages above are the answer.
+static void noteWindowsToolchain(const std::string &command) {
     if (!hostIsWindows()) return;
+    const std::string::size_type start = command.find_first_not_of("\" ");
+    const std::string::size_type end = command.find_first_of(command[0] == '"' ? "\"" : " ", start);
+    const std::string program = command.substr(start, end == std::string::npos ? end : end - start);
+    if (program.find_first_of("/\\") != std::string::npos) return;
     std::fprintf(stderr, "  ml64 and link ship with Visual Studio and reach "
                          "PATH only after vcvars64.bat has run - a Developer "
                          "Command Prompt is that same environment.\n");
@@ -500,7 +506,7 @@ bool Driver::assembleObjects() {
         if (runTool(command) != 0) {
             std::fprintf(stderr, "%s: the assembler failed - the command was:\n"
                                  "  %s\n", program_.c_str(), lastToolCommand.c_str());
-            noteWindowsToolchain();
+            noteWindowsToolchain(lastToolCommand);
             return false;
         }
     }
@@ -582,7 +588,7 @@ bool Driver::link() {
                 std::fprintf(stderr, "%s: the assembler failed - the command "
                                      "was:\n  %s\n", program_.c_str(),
                              lastToolCommand.c_str());
-                noteWindowsToolchain();
+                noteWindowsToolchain(lastToolCommand);
                 return false;
             }
             objects.push_back(obj);
@@ -609,7 +615,7 @@ bool Driver::link() {
     if (rc != 0) {
         std::fprintf(stderr, "%s: the assembler or linker failed - the command "
                              "was:\n  %s\n", program_.c_str(), command.c_str());
-        noteWindowsToolchain();
+        noteWindowsToolchain(command);
         return false;
     }
     return true;

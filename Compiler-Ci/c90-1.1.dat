@@ -1,7 +1,7 @@
 ©2026 G. R. Akhtar - ISO C 90
-Release seal, version 1.1, sealed 30-09-2026
+Release seal, version 1.1, sealed 01-10-2026
 Written by tools/seal; check it with `tools/seal check`.
-CRC32  size  file - 91 files, seal 78192CC3
+CRC32  size  file - 91 files, seal 00D03BD6
 ------------------------------------------------------------------
 CB7B0DCF      9572  Makefile
 8262F74B      3886  examples/CC1Lab.xcodeproj/project.pbxproj
@@ -60,7 +60,7 @@ B8CC27C7      3079  lib/stdarg.h
 D822292C      3007  lib/time.h
 8C8B02D6      1547  msvc/compat/unistd.h
 EA66D133     16155  src/Ast.h
-207D3729     39154  src/Driver.cpp
+C479B064     39760  src/Driver.cpp
 9E61BCC2      2195  src/Driver.h
 1424D482      8857  src/Lexer.cpp
 779AEACA       994  src/Lexer.h
@@ -95,4 +95,4 @@ E9EF76FA      2102  src/backend/X86_64Windows.cpp
 2465340E      1013  src/backend/X86_64Windows.h
 3F12405D       111  src/main.cpp
 ------------------------------------------------------------------
-Sealed on 30-09-2026
+Sealed on 01-10-2026
