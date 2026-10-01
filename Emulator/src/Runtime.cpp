@@ -199,7 +199,42 @@ std::string Runtime::prelude() {
         "_ZTVN10__cxxabiv119__pointer_type_infoE:\t.word 0, 0, 5, 0, 0, 0, 0, 0\n"
         "\t.global _ZTVN10__cxxabiv116__enum_type_infoE\n"
         "_ZTVN10__cxxabiv116__enum_type_infoE:\t.word 0, 0, 6, 0, 0, 0, 0, 0\n"
-        + fundamentalTypeInfos();
+        + fundamentalTypeInfos() + streamObjects();
+}
+
+// Each stream is STLport's basic_ostream as cl6x 8.2.2 lays it out: its vptr, whose table holds
+// the basic_ios offset (4) at -12; then ios_base - vptr, flags (skipws|dec, unitbuf for cerr),
+// state, modes, mask, precision 6, width, locale, callbacks, iwords, pwords - ctype, fill, rdbuf, tie.
+std::string Runtime::streamObjects() {
+    std::string s =
+        "\t.data\n\t.align 8\n"
+        // basic_streambuf<char>'s fifteen virtuals behind a two-word header: sync is the sixth,
+        // xsputn, _M_xsputnc and overflow the twelfth to fourteenth; the rest are never reached.
+        "__vm6747_sb_vtbl:\t.word 0, 0\n"
+        "__vm6747_sb_virt:\t.word 0, 0, 0, 0, 0, __vm6747_sb_sync, 0, 0, 0, 0, 0, __vm6747_sb_xsputn, __vm6747_sb_xsputnc, __vm6747_sb_overflow, 0\n"
+        "__vm6747_os_vtbl:\t.word 4, 0, 0\n"
+        "__vm6747_os_virt:\t.word 0, 0\n"
+        // num_put<char>'s virtuals: the destructor pair, then bool, long, unsigned long, double,
+        // long double, long long, unsigned long long, const void *. The facet: vptr, refcount.
+        "__vm6747_np_vtbl:\t.word 0, 0\n"
+        "__vm6747_np_virt:\t.word 0, 0, __vm6747_num_put_bool, __vm6747_num_put_long, __vm6747_num_put_ulong, "
+        "__vm6747_num_put_double, __vm6747_num_put_ldouble, __vm6747_num_put_llong, __vm6747_num_put_ullong, __vm6747_num_put_pointer\n"
+        "\t.global __vm6747_num_put\n__vm6747_num_put:\t.word __vm6747_np_virt, 1\n"
+        "\t.global __vm6747_num_put_id\n__vm6747_num_put_id:\t.word 1\n"
+        "\t.global __vm6747_locale\n__vm6747_locale:\t.word 0\n";
+    static const struct { const char *name, *stream; int flags; const char *tie; } streams[] = {
+        { "_ZSt4cout", "2", 4104, "0" }, { "_ZSt4cerr", "3", 12296, "_ZSt4cout" }, { "_ZSt4clog", "3", 4104, "0" },
+    };
+    for (size_t i = 0; i < 3; i++) {
+        std::string sb = std::string("__vm6747_sb_") + streams[i].name;
+        // The streambuf: vptr, the six get and put pointers (none, so every character reaches
+        // overflow and every run xsputn), the locale, and the stream number the natives write to.
+        s += "\t.align 8\n" + sb + ":\t.word __vm6747_sb_virt, 0, 0, 0, 0, 0, 0, 0, " + streams[i].stream + "\n";
+        s += "\t.align 8\n\t.global " + std::string(streams[i].name) + "\n" + streams[i].name + ":\t.word __vm6747_os_virt\n";
+        s += "\t.word 0, " + std::to_string(streams[i].flags) + ", 0, 0, 0, 0, 6, 0, __vm6747_locale, 0, 0, 0, 0, 0, 0, 0\n";
+        s += "\t.word 0, 32, " + sb + ", " + streams[i].tie + "\n";
+    }
+    return s;
 }
 
 // The typeinfo objects the standard library carries for the fundamental types, and for pointers
@@ -232,6 +267,94 @@ void Runtime::runAtExit(Cpu &cpu) {
 FILE *Runtime::host(int fd) const {
     if (fd < 1 || fd > 2 || closed_[fd]) return nullptr;
     return fd == 1 ? stdout : stderr;
+}
+
+// ---- cl6x's streams: what the num_put facet writes, by STLport's rules ----
+FILE *Runtime::hostOf(Cpu &c, uint32_t sb) {
+    uint32_t stream = sb == 0 ? 0 : c.load32(sb + 32);
+    if (stream < 2 || stream > 3) c.fault("a streambuf the runtime did not make: cl6x's streams here are cout, cerr and clog");
+    return host(static_cast<int>(stream) - 1);
+}
+
+static uint32_t symbolAt(Cpu &c, const char *name) {
+    std::map<std::string, uint32_t>::const_iterator s = c.program().symbols.find(name);
+    if (s == c.program().symbols.end()) c.fault(std::string("'") + name + "' is not in the runtime's prelude");
+    return s->second;
+}
+
+// An integer as num_put writes it: hex and oct take the value's bits unsigned, with 0x or 0 under
+// showbase; decimal takes a sign, or + under showpos; uppercase lifts the digits and the X.
+static std::string integerText(int64_t v, bool isSigned, int bits, uint32_t flags) {
+    const bool upper = (flags & 0x4000) != 0, showbase = (flags & 0x200) != 0;
+    char buf[32];
+    std::string s;
+    if ((flags & 0x38) == 0x10) {
+        uint64_t mag = bits == 32 ? static_cast<uint32_t>(v) : static_cast<uint64_t>(v);
+        std::snprintf(buf, sizeof buf, upper ? "%llX" : "%llx", static_cast<unsigned long long>(mag));
+        s = buf;
+        if (showbase) s = (upper ? "0X" : "0x") + s;
+    } else if ((flags & 0x38) == 0x20) {
+        uint64_t mag = bits == 32 ? static_cast<uint32_t>(v) : static_cast<uint64_t>(v);
+        std::snprintf(buf, sizeof buf, "%llo", static_cast<unsigned long long>(mag));
+        s = buf;
+        if (showbase && s != "0") s = "0" + s;
+    } else {
+        const bool negative = isSigned && v < 0;
+        uint64_t mag = negative ? 0 - static_cast<uint64_t>(v) : static_cast<uint64_t>(v);
+        std::snprintf(buf, sizeof buf, "%llu", static_cast<unsigned long long>(mag));
+        s = buf;
+        if (negative) s = "-" + s;
+        else if (isSigned && (flags & 0x800)) s = "+" + s;
+    }
+    return s;
+}
+
+// A double as STLport's __write_float: %f under fixed, %e under scientific, else %g with a
+// precision of 6 unless one was set or showpoint is on (then at least 1); + and # as flagged.
+static std::string floatText(double x, uint32_t flags, int precision) {
+    const bool upper = (flags & 0x4000) != 0, showpos = (flags & 0x800) != 0, showpoint = (flags & 0x400) != 0;
+    if (std::isnan(x) || std::isinf(x)) {
+        std::string s = std::isnan(x) ? "nan" : x < 0 ? "-inf" : showpos ? "+inf" : "inf";
+        if (upper) for (char &ch : s) ch = static_cast<char>(std::toupper(ch));
+        return x != x && showpos ? "+" + s : s;
+    }
+    std::string fmt = "%";
+    if (showpos) fmt += '+';
+    if (showpoint) fmt += '#';
+    fmt += ".*";
+    const uint32_t field = flags & 0xC0;
+    if (field == 0x40) fmt += upper ? 'F' : 'f';
+    else if (field == 0x80) fmt += upper ? 'E' : 'e';
+    else {
+        if (showpoint || precision > 0) { if (precision == 0) precision = 1; } else precision = 6;
+        fmt += upper ? 'G' : 'g';
+    }
+    if (precision < 0) precision = 6;
+    std::vector<char> buf(static_cast<size_t>(precision) + 400);
+    std::snprintf(buf.data(), buf.size(), fmt.c_str(), precision, x);
+    return std::string(buf.data());
+}
+
+// The ostreambuf_iterator arrives in B5:B4 (streambuf, ok), the ios_base in A6, the fill in B6; the
+// text is padded to the width - which this consumes - after a sign or a 0x under internal, and goes back as the iterator.
+void Runtime::numPut(Cpu &c, const std::string &text, bool hexPrefixed) {
+    const uint32_t buf = c.reg(Cpu::B4), ok = c.reg(Cpu::B4 + 1) & 0xff, ios = arg(c, 2);
+    const uint32_t flags = c.load32(ios + 4);
+    const int32_t width = static_cast<int32_t>(c.load32(ios + 28));
+    c.store32(ios + 28, 0);
+    const char fill = static_cast<char>(arg(c, 3));
+    std::string s = text;
+    if (width > static_cast<int32_t>(text.size())) {
+        std::string pad(static_cast<size_t>(width) - text.size(), fill);
+        const uint32_t dir = flags & 7;
+        if (dir == 1) s = text + pad;
+        else if (dir == 4 && !text.empty() && (text[0] == '+' || text[0] == '-')) s = text.substr(0, 1) + pad + text.substr(1);
+        else if (dir == 4 && hexPrefixed && text.size() >= 2) s = text.substr(0, 2) + pad + text.substr(2);
+        else s = pad + text;
+    }
+    if (ok) { if (FILE *f = hostOf(c, buf)) std::fwrite(s.data(), 1, s.size(), f); }
+    c.setReg(Cpu::A4, buf);
+    c.setReg(Cpu::A4 + 1, ok);
 }
 // With no reason given it ends as abort does, silently: what a terminate
 // scope in the tables asks for, and what the hosts' pads do.
@@ -543,6 +666,17 @@ std::vector<std::string> Runtime::names() {
         "__gxx_personality_v0", "__cxa_bad_cast", "__cxa_bad_typeid", "_ZSt9terminatev",
         "_ZNKSt9type_infoeqERKS_", "_ZNKSt9type_infoneERKS_", "_ZNKSt9type_info4nameEv",
         "_ZNKSt9type_info6beforeERKS_",
+        "__cxa_vec_new", "__cxa_vec_new2", "__cxa_vec_new3", "__cxa_vec_ctor", "__cxa_vec_cctor",
+        "__cxa_vec_dtor", "__cxa_vec_cleanup", "__cxa_vec_delete", "__cxa_vec_delete2", "__cxa_vec_delete3",
+        // cl6x's <iostream>: what its compiled runtime holds and the program's inlined STLport calls
+        "_ZNSt8ios_base4InitC1Ev", "_ZNSt8ios_base4InitC2Ev", "_ZNSt8ios_base4InitD1Ev", "_ZNSt8ios_base4InitD2Ev",
+        "_ZNSt6localeC1ERKS_", "_ZNSt6localeC2ERKS_", "_ZNSt6localeD1Ev", "_ZNSt6localeD2Ev",
+        "_ZNKSt6locale12_M_use_facetERKNS_2idE", "_ZNKSt6locale11_M_get_facetERKNS_2idE",
+        "_ZNSt4priv11_GetFacetIdEPKSt7num_putIcSt19ostreambuf_iteratorIcSt11char_traitsIcEEE",
+        "_ZNSt8ios_base16_M_throw_failureEv",
+        "__vm6747_sb_sync", "__vm6747_sb_xsputn", "__vm6747_sb_xsputnc", "__vm6747_sb_overflow",
+        "__vm6747_num_put_bool", "__vm6747_num_put_long", "__vm6747_num_put_ulong", "__vm6747_num_put_double",
+        "__vm6747_num_put_ldouble", "__vm6747_num_put_llong", "__vm6747_num_put_ullong", "__vm6747_num_put_pointer",
         "__c6xabi_divi", "__c6xabi_divu", "__c6xabi_remi", "__c6xabi_remu",
         "__c6xabi_divlli", "__c6xabi_divull", "__c6xabi_remlli", "__c6xabi_remull",
         "__c6xabi_divf", "__c6xabi_divd", "__c6xabi_fixfu", "__c6xabi_fixdu",
@@ -1119,6 +1253,78 @@ bool Runtime::call(const std::string &n, Cpu &c) {
             for (size_t i = 0; i < excs_.size(); i++) if (excs_[i].obj == obj) { excs_.erase(excs_.begin() + static_cast<long>(i)); break; }
             release(c, obj - 32);
         }
+        return true;
+    }
+    // ---- arrays, Itanium 3.3.3 as the C6000 EABI takes it: ctor and cctor answer the array ----
+    if (n == "__cxa_vec_ctor" || n == "__cxa_vec_cctor") {
+        const bool copy = n == "__cxa_vec_cctor";
+        uint32_t base = arg(c, 0), src = copy ? arg(c, 1) : 0, count = arg(c, copy ? 2 : 1), size = arg(c, copy ? 3 : 2), ctor = arg(c, copy ? 4 : 3);
+        for (uint32_t i = 0; i < count && ctor != 0; i++) c.callback(ctor, base + i * size, src + i * size);
+        ret(c, base);
+        return true;
+    }
+    if (n == "__cxa_vec_dtor" || n == "__cxa_vec_cleanup") {
+        uint32_t base = arg(c, 0), count = arg(c, 1), size = arg(c, 2), dtor = arg(c, 3);
+        for (uint32_t i = count; i-- > 0 && dtor != 0; ) c.callback(dtor, base + i * size, 0);
+        return true;
+    }
+    // The cookie is the count in the word before the array, inside the padding the caller sized.
+    if (n == "__cxa_vec_new" || n == "__cxa_vec_new2" || n == "__cxa_vec_new3") {
+        uint32_t count = arg(c, 0), size = arg(c, 1), pad = arg(c, 2), ctor = arg(c, 3), alloc = n.size() > 13 ? arg(c, 5) : 0;
+        uint32_t block = alloc != 0 ? c.callback(alloc, count * size + pad, 0) : allocate(c, count * size + pad);
+        uint32_t base = block + pad;
+        if (pad != 0) c.store32(base - 4, count);
+        for (uint32_t i = 0; i < count && ctor != 0; i++) c.callback(ctor, base + i * size, 0);
+        ret(c, base);
+        return true;
+    }
+    if (n == "__cxa_vec_delete" || n == "__cxa_vec_delete2" || n == "__cxa_vec_delete3") {
+        uint32_t base = arg(c, 0), size = arg(c, 1), pad = arg(c, 2), dtor = arg(c, 3), dealloc = n.size() > 16 ? arg(c, 4) : 0;
+        if (base == 0) return true;
+        uint32_t count = pad != 0 ? c.load32(base - 4) : 0;
+        for (uint32_t i = count; i-- > 0 && dtor != 0; ) c.callback(dtor, base + i * size, 0);
+        if (dealloc != 0) c.callback(dealloc, base - pad, count * size + pad); else release(c, base - pad);
+        return true;
+    }
+    // ---- cl6x's <iostream>, over the objects streamObjects() lays out ----
+    if (n == "_ZNSt8ios_base4InitC1Ev" || n == "_ZNSt8ios_base4InitC2Ev") return true;
+    if (n == "_ZNSt8ios_base4InitD1Ev" || n == "_ZNSt8ios_base4InitD2Ev") { std::fflush(stdout); std::fflush(stderr); return true; }
+    if (n == "_ZNSt6localeC1ERKS_" || n == "_ZNSt6localeC2ERKS_") { c.store32(arg(c, 0), c.load32(arg(c, 1))); return true; }
+    if (n == "_ZNSt6localeD1Ev" || n == "_ZNSt6localeD2Ev") return true;
+    if (n == "_ZNSt4priv11_GetFacetIdEPKSt7num_putIcSt19ostreambuf_iteratorIcSt11char_traitsIcEEE") { ret(c, symbolAt(c, "__vm6747_num_put_id")); return true; }
+    if (n == "_ZNKSt6locale12_M_use_facetERKNS_2idE" || n == "_ZNKSt6locale11_M_get_facetERKNS_2idE") {
+        if (c.load32(arg(c, 1)) == 1) { ret(c, symbolAt(c, "__vm6747_num_put")); return true; }
+        if (n[14] == '1') { ret(c, 0); return true; }   // _M_get_facet answers null
+        terminate(c, "use_facet of a facet the runtime does not provide: num_put<char> is the one here");
+    }
+    if (n == "_ZNSt8ios_base16_M_throw_failureEv") terminate(c, "ios_base::failure");
+    if (n == "__vm6747_sb_sync") { if (FILE *f = hostOf(c, arg(c, 0))) std::fflush(f); ret(c, 0); return true; }
+    if (n == "__vm6747_sb_overflow") {
+        uint32_t ch = arg(c, 1);
+        if (ch != 0xffffffffu) { if (FILE *f = hostOf(c, arg(c, 0))) std::fputc(static_cast<int>(ch & 0xff), f); }
+        ret(c, ch == 0xffffffffu ? 0 : ch & 0xff);
+        return true;
+    }
+    if (n == "__vm6747_sb_xsputn" || n == "__vm6747_sb_xsputnc") {
+        uint32_t k = arg(c, 2);
+        std::string s;
+        if (n.size() == 19) s.assign(k, static_cast<char>(arg(c, 1)));
+        else for (uint32_t i = 0; i < k; i++) s += static_cast<char>(c.load8(arg(c, 1) + i));
+        if (FILE *f = hostOf(c, arg(c, 0))) std::fwrite(s.data(), 1, s.size(), f);
+        ret(c, k);
+        return true;
+    }
+    if (n.compare(0, 17, "__vm6747_num_put_") == 0) {
+        const std::string kind = n.substr(17);
+        const uint32_t ios = arg(c, 2), flags = c.load32(ios + 4);
+        const bool hex = (flags & 0x238) == 0x210;    // showbase and hex: internal padding goes after the 0x
+        if (kind == "bool" && (flags & 0x100)) numPut(c, arg(c, 4) & 0xff ? "true" : "false", false);
+        else if (kind == "bool" || kind == "long") numPut(c, integerText(static_cast<int32_t>(arg(c, 4)), true, 32, flags), hex);
+        else if (kind == "ulong") numPut(c, integerText(arg(c, 4), false, 32, flags), hex);
+        else if (kind == "llong") numPut(c, integerText(static_cast<int64_t>(argWide(c, 4)), true, 64, flags), hex);
+        else if (kind == "ullong") numPut(c, integerText(static_cast<int64_t>(argWide(c, 4)), false, 64, flags), hex);
+        else if (kind == "pointer") { char b[16]; std::snprintf(b, sizeof b, "0x%08x", arg(c, 4)); numPut(c, b, true); }
+        else numPut(c, floatText(argDouble(c, 4), flags, static_cast<int32_t>(c.load32(ios + 24))), false);
         return true;
     }
     if (n == "__cxa_get_exception_ptr") { Exc *e = excFor(arg(c, 0)); ret(c, e != nullptr ? e->adjusted : arg(c, 0)); return true; }

@@ -19,11 +19,18 @@ public:
     // typeinfo vtables, __dso_handle.
     static std::string prelude();
     static std::string fundamentalTypeInfos();
+    // cl6x's <iostream>: cout, cerr and clog laid out as STLport's basic_ostream, each over a
+    // streambuf and a num_put facet whose virtuals are natives (README.md, "cl6x's streams").
+    static std::string streamObjects();
     // After main returns or exit is called: the __cxa_atexit registrations, last first.
     void runAtExit(Cpu &cpu);
 
 private:
     uint32_t heap_ = 0, heapEnd_ = 0;
+    // A streambuf the runtime made carries its stream number at +32; a num_put virtual pads its
+    // text by the ios_base's width and adjustfield, writes it there, and answers the iterator in A5:A4.
+    FILE *hostOf(Cpu &cpu, uint32_t sb);
+    void numPut(Cpu &cpu, const std::string &text, bool hexPrefixed);
     struct Block { uint32_t at, size; bool used; };
     std::vector<Block> blocks_;
     uint32_t allocate(Cpu &cpu, uint32_t size);

@@ -237,9 +237,9 @@ void Cpu::execute(const Instr &in, std::vector<Pending> &w, bool &branched, uint
     case Op::CMPGT:  write(w, dst, static_cast<int32_t>(s1) > static_cast<int32_t>(s2), 0); return;
     case Op::CMPLTU: write(w, dst, s1 < s2, 0); return;
     case Op::CMPGTU: write(w, dst, s1 > s2, 0); return;
-    case Op::ADDAW: write(w, dst, s1 + s2 * 4, 0); return;
+    case Op::ADDAW: write(w, dst, s1 + (o[1].dpByte ? s2 : s2 * 4), 0); return;
     case Op::ADDAD: write(w, dst, s1 + s2 * 8, 0); return;
-    case Op::ADDAH: write(w, dst, s1 + s2 * 2, 0); return;
+    case Op::ADDAH: write(w, dst, s1 + (o[1].dpByte ? s2 : s2 * 2), 0); return;
     case Op::ADDAB: write(w, dst, s1 + s2, 0); return;
     case Op::SUBAW: write(w, dst, s1 - s2 * 4, 0); return;
     case Op::MVC: fault("MVC: control registers are not modelled"); return;
@@ -280,11 +280,12 @@ void Cpu::execute(const Instr &in, std::vector<Pending> &w, bool &branched, uint
         return;
     case Op::ADDKPC: write(w, o[1].reg, s1, 0); return;
     case Op::CALLP:
-        // Protected call: B3 gets the return address and the branch takes effect at once, the
-        // pipeline stalling through the delay slots. The return is to the packet after this one -
-        // cl6x writes the CALLP beside an argument move, and it is not the first of the pair.
+        // Protected call: B3 gets the return address - the packet after this one, cl6x writing
+        // the CALLP beside an argument move - and the five delay slots are the packet's NOPs,
+        // in which a load issued before the call lands, as cl6x's `LDW; CALLP` relies on.
         write(w, B3, packetEnd_, 0);
-        branchValid_ = true; branchAt_ = cycle_ + 1; branchTarget_ = s1;
+        branched = true;
+        target = s1;
         return;
 
     // ---- single precision -------------------------------------------------
@@ -348,6 +349,7 @@ void Cpu::executePacket() {
         if (in->mnem == "NOP" && !in->ops.empty()) nops = static_cast<int>(in->ops[0].imm);
         else if (in->mnem == "BNOP" || in->mnem == "RETNOP" || in->mnem == "ADDKPC")
             nops = static_cast<int>(in->ops.back().imm) + 1;
+        else if (in->mnem == "CALLP") nops = 6;
         if (in->pred >= 0) {
             bool on = r_[in->pred] != 0;
             if (in->predNeg) on = !on;

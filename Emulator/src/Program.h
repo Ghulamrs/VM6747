@@ -24,6 +24,7 @@ struct Operand {
     bool scaled = false;   // [n] rather than (n): scaled by the access size
     int mode = 0;          // 0 none, 1 pre-inc, 2 pre-dec, 3 post-inc, 4 post-dec
     bool negative = false; // *-base(off)
+    bool dpByte = false;   // (sym): cl6x's byte displacement from DP, which an address add takes unscaled
 };
 
 struct Instr {
