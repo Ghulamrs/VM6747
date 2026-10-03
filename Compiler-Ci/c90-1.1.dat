@@ -1,7 +1,7 @@
 ©2026 G. R. Akhtar - ISO C 90
 Release seal, version 1.1, sealed 03-10-2026
 Written by tools/seal; check it with `tools/seal check`.
-CRC32  size  file - 63 files, seal E19589F1
+CRC32  size  file - 63 files, seal DEFE1A43
 ------------------------------------------------------------------
 CB7B0DCF      9572  Makefile
 382B69B3      2204  ide/README.md
@@ -32,8 +32,8 @@ B8CC27C7      3079  lib/stdarg.h
 D822292C      3007  lib/time.h
 8C8B02D6      1547  msvc/compat/unistd.h
 EA66D133     16155  src/Ast.h
-679F49ED     39776  src/Driver.cpp
-9E61BCC2      2195  src/Driver.h
+330308BF     40128  src/Driver.cpp
+B34E4069      2602  src/Driver.h
 1424D482      8857  src/Lexer.cpp
 779AEACA       994  src/Lexer.h
 7DBE9C6A       483  src/Name.h
@@ -65,6 +65,6 @@ C29D3444      6795  src/backend/Tms6747.h
 1BDC6B64      5186  src/backend/X86_64Linux.h
 E9EF76FA      2102  src/backend/X86_64Windows.cpp
 2465340E      1013  src/backend/X86_64Windows.h
-3F12405D       111  src/main.cpp
+2D5FF95D      1133  src/main.cpp
 ------------------------------------------------------------------
 Sealed on 03-10-2026

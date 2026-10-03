@@ -973,6 +973,19 @@ bool Driver::runJobs() {
     return ok.load();
 }
 
+std::vector<std::string> Driver::produced() const {
+    std::vector<std::string> out;
+    if (assemblyOnly_) {
+        if (!toStdout_)
+            for (const Job &job : jobs_) out.push_back(job.output);
+    } else if (objectOnly_) {
+        out = objects_;
+    } else {
+        out.push_back(linkTo_);
+    }
+    return out;
+}
+
 int Driver::run(int argc, char **argv) {
     program_ = argv[0];
 
@@ -994,6 +1007,7 @@ int Driver::run(int argc, char **argv) {
     if (!parseArguments(argc, argv)) return answered_ ? 0 : 1;
 
     // **Before each compile, once the arguments are known good.** cxx1 prints its banner the same way; -nologo omits it.
+    saysDone_ = !quiet_;
     if (!quiet_) std::fprintf(stderr, "%s\n", bannerLine());
 
     std::atexit([] {
