@@ -772,9 +772,9 @@ bool Driver::parseArguments(int argc, char **argv) {
         if (suffix == ".cpp" || suffix == ".cc" || suffix == ".cxx" ||
             suffix == ".C" || suffix == ".hpp" || suffix == ".hh" || suffix == ".hxx") {
             std::fprintf(stderr,
-                "%s: %s looks like C++ (%s), and cc1 compiles C, not C++ - "
-                "compile it with cxx1\n",
-                argv[0], inputs[k].c_str(), suffix.c_str());
+                "%s: %s looks like C++ (%s), and %s compiles C, not C++ - "
+                "compile it with cpp11\n",
+                argv[0], inputs[k].c_str(), suffix.c_str(), program::kName);
             return false;
         }
     }
