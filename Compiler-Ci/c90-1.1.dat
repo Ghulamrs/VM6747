@@ -1,19 +1,8 @@
 ©2026 G. R. Akhtar - ISO C 90
-Release seal, version 1.1, sealed 03-10-2026
+Release seal, version 1.1, sealed 05-10-2026
 Written by tools/seal; check it with `tools/seal check`.
-CRC32  size  file - 63 files, seal DEFE1A43
+CRC32  size  file - 52 files, seal A82CC072
 ------------------------------------------------------------------
-CB7B0DCF      9572  Makefile
-382B69B3      2204  ide/README.md
-A41347D2      1024  ide/build-vs.cmd
-2EDE6E98       832  ide/cc1.sln
-B3A54FEF      5747  ide/cc1.vcxproj
-B641C93F      4070  ide/cc1.vcxproj.filters
-D72D8C2F     16725  ide/cc1.xcodeproj/project.pbxproj
-C97296A9      1712  ide/cc1.xcodeproj/xcshareddata/xcschemes/cc1.xcscheme
-96FE25BE       136  ide/cc1.xcworkspace/contents.xcworkspacedata
-E260A312       787  ide/check-vs.cmd
-550398F6     22580  ide/generate.py
 65B6BFC3      2538  lib/assert.h
 978C1DCB      1245  lib/ctype.h
 9ECB2F97      2128  lib/errno.h
@@ -67,4 +56,4 @@ E9EF76FA      2102  src/backend/X86_64Windows.cpp
 2465340E      1013  src/backend/X86_64Windows.h
 2D5FF95D      1133  src/main.cpp
 ------------------------------------------------------------------
-Sealed on 03-10-2026
+Sealed on 05-10-2026
