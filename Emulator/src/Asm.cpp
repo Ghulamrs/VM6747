@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 
@@ -15,8 +16,8 @@ enum Section { Text, Data, Const, Bss, Init, Exidx, SectionCount };
 struct Sym { int section; uint32_t offset; bool defined = false; bool weak = false; };
 
 struct Line {
-    std::string label, pred, mnem;
-    bool predNeg = false, parallel = false;
+    std::string label, pred, mnem, unit;
+    bool predNeg = false, parallel = false, caret = false;
     std::vector<std::string> operands;
     std::string text;
     int number = 0;
@@ -109,7 +110,7 @@ struct Assembler {
             ln.label = first.substr(0, first.size() - 1);
             s = sp == std::string::npos ? std::string() : trim(s.substr(sp));
         } else if (!raw.empty() && !std::isspace(static_cast<unsigned char>(raw[0])) &&
-                   first[0] != '.' && first[0] != '[' && first != "||" &&
+                   first[0] != '.' && first[0] != '[' && first.compare(0, 2, "||") != 0 && first[0] != '^' &&
                    !isaKnown(upper(first))) {
             ln.label = first;
             s = sp == std::string::npos ? std::string() : trim(s.substr(sp));
@@ -123,6 +124,7 @@ struct Assembler {
             s = trim(s.substr(close + 1));
         }
         if (s.compare(0, 2, "||") == 0) { ln.parallel = true; s = trim(s.substr(2)); }
+        if (!s.empty() && s[0] == '^') { ln.caret = true; s = trim(s.substr(1)); }
         if (!s.empty() && s[0] == '[') {                 // || [A1] B ... is written both ways
             size_t close = s.find(']');
             std::string p = trim(s.substr(1, close - 1));
@@ -134,14 +136,19 @@ struct Assembler {
             sp = s.find_first_of(" \t");
             ln.mnem = s.substr(0, sp);
             std::string rest = sp == std::string::npos ? std::string() : trim(s.substr(sp));
-            // A unit specifier: .L1 .S2X .D1T2 .M1 - accepted and ignored.
+            // A unit specifier: .L1 .S2X .D1T2 .M1 - kept as its unit and side, which SPMASK masks by.
             if (ln.mnem[0] != '.') {
                 size_t dot = ln.mnem.find('.');
-                if (dot != std::string::npos) ln.mnem = ln.mnem.substr(0, dot);
+                std::string spec;
+                if (dot != std::string::npos) { spec = ln.mnem.substr(dot + 1); ln.mnem = ln.mnem.substr(0, dot); }
                 else if (!rest.empty() && rest[0] == '.') {
                     size_t e = rest.find_first_of(" \t");
+                    spec = rest.substr(1, e == std::string::npos ? std::string::npos : e - 1);
                     rest = e == std::string::npos ? std::string() : trim(rest.substr(e));
                 }
+                spec = upper(spec);
+                if (spec.size() >= 2 && std::strchr("LSDM", spec[0]) && (spec[1] == '1' || spec[1] == '2'))
+                    ln.unit = spec.substr(0, 2);
                 ln.mnem = upper(ln.mnem);
             } else {
                 ln.mnem = "." + lowerOf(ln.mnem.substr(1));
@@ -251,6 +258,8 @@ struct Assembler {
         // has a plain symbol called fp.
         std::map<std::string, std::string>::const_iterator a = u.asg.find(s);
         if (a != u.asg.end()) s = a->second;
+        if (s == "ILC") { r = Cpu::ILC; return true; }      // the loop buffer's control registers, for MVC
+        if (s == "RILC") { r = Cpu::RILC; return true; }
         if (s.size() < 2 || (s[0] != 'A' && s[0] != 'B')) return false;
         for (size_t i = 1; i < s.size(); i++) if (!std::isdigit(static_cast<unsigned char>(s[i]))) return false;
         int n = std::atoi(s.c_str() + 1);
@@ -522,6 +531,8 @@ struct Assembler {
             Instr in;
             in.mnem = mn;
             in.parallel = ln.parallel;
+            in.caret = ln.caret;
+            in.unit = ln.unit;
             in.file = u.path;
             in.line = ln.number;
             if (!ln.pred.empty()) {
@@ -530,7 +541,10 @@ struct Assembler {
                 if ((r % Cpu::B) > 2) return fail(u, ln, "only A0-A2 and B0-B2 can predicate; '" + ln.pred + "' cannot");
                 in.pred = r; in.predNeg = ln.predNeg;
             }
-            for (const std::string &o : ln.operands) {
+            // SPMASK(R)'s operands are units, not values: D1, L2 ...
+            if (mn == "SPMASK" || mn == "SPMASKR") {
+                for (const std::string &o : ln.operands) in.maskUnits.push_back(upper(o));
+            } else for (const std::string &o : ln.operands) {
                 Operand op;
                 if (!operand(u, ln, o, true, op)) return false;
                 in.ops.push_back(op);

@@ -53,6 +53,20 @@ of `.asm` files. What it does not run is TI's compiled C++ runtime, which is
 machine code; what cl6x's `<iostream>` wants of it is supplied natively
 ("cl6x's streams" below), so `cout << x` runs here as it does on the part.
 
+**The software pipelined loop buffer**, as SPRUFE8 chapter 7 specifies it, since 2026-10-05 - which is
+what cl6x writes for nearly every loop at `-O2`. An `SPLOOP`, `SPLOOPD` or `SPLOOPW` starts loading:
+each cycle's program instructions run and are stored at the loop buffer count (LBC) with their loading
+counter, and from the next cycle the buffer replays them every `ii` cycles beside whatever program
+memory supplies. ILC counts the iterations down at each stage boundary, four cycles after `MVC` wrote it
+(`SPLOOPD` looks at it only after its first three); `SPLOOPW` ends on its predicate as it stood three
+cycles before the boundary, with no epilog. `SPKERNEL fstg,fcyc` ends the loading and delays program
+fetch that far into the epilog, which drains instructions in the order they were loaded; `SPMASK` and
+`^` run an instruction once without storing it and inhibit the buffer's on the same unit. A conditional
+`SPLOOP(D)` whose condition holds four cycles before its last kernel boundary reloads: the buffer stays
+active until `SPMASKR`, then re-enables its instructions in load order while the previous invocation's
+epilog drains on a second LBC, ILC taking RILC - 1, and a branch landing then stops fetch at its target
+instead of idling the buffer.
+
 **The C library, natively.** A call to a library name lands on a stub below
 the text base and is answered on the host, reading its arguments by the
 convention the compilers emit — A4, B4, A6, B6, A8, B8, A10, B10, A12, B12,
@@ -72,7 +86,7 @@ standard streams are data the emulator contributes before assembly.
 Machine encoding and fetch packets; functional-unit assignment and the
 resource rules of a parallel packet; the memory system (caches, EDMA,
 and so the stalls TI's `cycle.Total` counts beyond `cycle.CPU`);
-interrupts; the 40-bit forms beyond ADD/SUB into a pair; and any instruction
+interrupts (so `DINT`/`RINT` do nothing, and a loop is never interrupt-drained); the 40-bit forms beyond ADD/SUB into a pair; and any instruction
 the compilers do not emit and the table in `src/Isa.cpp` does not list —
 such a one is an assembly error, by line.
 

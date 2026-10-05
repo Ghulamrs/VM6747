@@ -32,6 +32,9 @@ struct Instr {
     int pred = -1;         // predicate register, or -1
     bool predNeg = false;
     bool parallel = false; // || with the previous instruction: same packet
+    bool caret = false;    // ^: masked by the packet's SPMASK - executed once, not loaded into the loop buffer
+    std::string unit;      // the functional unit written, L1 S2 D1 M2 (sides and cross paths dropped), or empty
+    std::vector<std::string> maskUnits;   // SPMASK(R)'s explicit unit list
     std::vector<Operand> ops;
     std::string file;
     int line = 0;

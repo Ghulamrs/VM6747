@@ -17,12 +17,16 @@ static const IsaEntry kIsa[] = {
     { "MPY32", Op::MPY32, 3 }, { "MPY32U", Op::MPY32U, 3 }, { "MPY32SU", Op::MPY32SU, 3 }, { "MPY32US", Op::MPY32US, 3 },
     { "MPY", Op::MPY, 1 }, { "MPYU", Op::MPYU, 1 }, { "MPYSU", Op::MPYSU, 1 }, { "MPYUS", Op::MPYUS, 1 },
     { "MPYLH", Op::MPYLH, 1 }, { "MPYHL", Op::MPYHL, 1 }, { "MPYH", Op::MPYH, 1 }, { "MPYHU", Op::MPYHU, 1 },
+    { "MPYLI", Op::MPYLI, 3 },
     { "LDB", Op::LDB, 4 }, { "LDBU", Op::LDBU, 4 }, { "LDH", Op::LDH, 4 }, { "LDHU", Op::LDHU, 4 },
     { "LDW", Op::LDW, 4 }, { "LDDW", Op::LDDW, 4 }, { "LDNW", Op::LDNW, 4 }, { "LDNDW", Op::LDNDW, 4 },
     { "STB", Op::STB, 0 }, { "STH", Op::STH, 0 }, { "STW", Op::STW, 0 }, { "STDW", Op::STDW, 0 },
     { "STNW", Op::STNW, 0 }, { "STNDW", Op::STNDW, 0 },
     { "B", Op::B, 5 }, { "CALLP", Op::CALLP, 0 }, { "NOP", Op::NOP, 0 }, { "SWE", Op::SWE, 0 }, { "IDLE", Op::IDLE, 0 },
+    { "DINT", Op::DINT, 0 }, { "RINT", Op::RINT, 0 }, { "MVD", Op::MVD, 3 },
     { "BNOP", Op::BNOP, 5 }, { "RETNOP", Op::RETNOP, 5 }, { "RET", Op::RET, 5 }, { "CALL", Op::CALL, 5 }, { "CALLRET", Op::B, 5 }, { "ADDKPC", Op::ADDKPC, 0 },
+    { "SPLOOP", Op::SPLOOP, 0 }, { "SPLOOPD", Op::SPLOOPD, 0 }, { "SPLOOPW", Op::SPLOOPW, 0 },
+    { "SPKERNEL", Op::SPKERNEL, 0 }, { "SPKERNELR", Op::SPKERNELR, 0 }, { "SPMASK", Op::SPMASK, 0 }, { "SPMASKR", Op::SPMASKR, 0 },
     { "ADDSP", Op::ADDSP, 3 }, { "SUBSP", Op::SUBSP, 3 }, { "MPYSP", Op::MPYSP, 3 },
     { "CMPEQSP", Op::CMPEQSP, 1 }, { "CMPLTSP", Op::CMPLTSP, 1 }, { "CMPGTSP", Op::CMPGTSP, 1 },
     { "ABSSP", Op::ABSSP, 1 }, { "INTSP", Op::INTSP, 3 }, { "INTSPU", Op::INTSPU, 3 },
@@ -110,7 +114,8 @@ bool isaCheck(const Instr &in, std::string &why) {
     bool ok = true;
     switch (e->op) {
     case Op::NOP: ok = n <= 1 && (n == 0 || isImm(o[0])); break;
-    case Op::SWE: case Op::IDLE: ok = n == 0; break;
+    case Op::SWE: case Op::IDLE: case Op::DINT: case Op::RINT: ok = n == 0; break;
+    case Op::MVD: ok = n == 2 && isReg(o[0]) && isReg(o[1]); break;
     case Op::B: case Op::CALLP: case Op::RET: case Op::CALL: ok = n >= 1 && (isImm(o[0]) || isReg(o[0])); break;
     case Op::BNOP: case Op::RETNOP: ok = n == 2 && (isImm(o[0]) || isReg(o[0])) && isImm(o[1]); break;
     case Op::ADDKPC: ok = n == 3 && isImm(o[0]) && isReg(o[1]) && isImm(o[2]); break;
@@ -118,7 +123,11 @@ bool isaCheck(const Instr &in, std::string &why) {
     case Op::MV: case Op::NEG: case Op::NOT: case Op::ABS:
         ok = n == 2 && (isReg(o[0]) || isPair(o[0])) && (isReg(o[1]) || isPair(o[1])); break;
     case Op::ZERO: ok = n == 1 && (isReg(o[0]) || isPair(o[0])); break;
-    case Op::MVC: ok = n == 2 && isReg(o[0]) && isReg(o[1]); break;
+    case Op::MVC: ok = n == 2 && isReg(o[0]) && isReg(o[1]) &&
+                       (o[0].reg >= Cpu::ILC || o[1].reg >= Cpu::ILC); break;   // to or from ILC or RILC
+    case Op::SPLOOP: case Op::SPLOOPD: case Op::SPLOOPW: ok = n == 1 && isImm(o[0]) && fits(o[0].imm, 1, 14); break;
+    case Op::SPKERNEL: ok = n == 0 || (n == 2 && isImm(o[0]) && isImm(o[1])); break;
+    case Op::SPKERNELR: case Op::SPMASK: case Op::SPMASKR: ok = n == 0; break;
     case Op::ADDK: ok = n == 2 && isImm(o[0]) && isReg(o[1]); break;
     case Op::EXT: case Op::EXTU: case Op::SET: case Op::CLR:
         ok = (n == 4 && isReg(o[0]) && isImm(o[1]) && isImm(o[2]) && isReg(o[3])) ||
@@ -130,7 +139,7 @@ bool isaCheck(const Instr &in, std::string &why) {
     case Op::STB: case Op::STH: case Op::STW: case Op::STNW:
         ok = n == 2 && isReg(o[0]) && isMem(o[1]); break;
     case Op::STDW: case Op::STNDW: ok = n == 2 && isPair(o[0]) && isMem(o[1]); break;
-    case Op::MPY32U: case Op::MPY32SU: case Op::MPY32US:
+    case Op::MPY32U: case Op::MPY32SU: case Op::MPY32US: case Op::MPYLI:
         ok = n == 3 && isReg(o[0]) && isReg(o[1]) && isPair(o[2]); break;
     case Op::ADDU: case Op::SUBU:
         ok = n == 3 && (isReg(o[0]) || isImm(o[0]) || isPair(o[0])) && (isReg(o[1]) || isImm(o[1]) || isPair(o[1])) && isPair(o[2]); break;

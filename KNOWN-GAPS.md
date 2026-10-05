@@ -1,6 +1,36 @@
 # Known gaps
 
-## main's status is lost in cl6x -O2 code, 2026-09-28
+## Mended 2026-10-05: cl6x 8.2.2's code at -O2 and at its default level runs
+
+The two entries below are history now. With the software pipelined loop buffer modelled
+(`SPLOOP`/`SPLOOPD`/`SPLOOPW`, `SPKERNEL(R)`, `SPMASK(R)`, reload - SPRUFE8 chapter 7) and three
+emulator faults found and fixed - `.usect` reserved its alignment as its size and left its label in
+the section before it; `MPY32`'s 64-bit form wrote only the low word; a branch issued in another's
+delay slots faulted instead of queueing - all ten of C++Optimize's `tools/c6747` programs built by
+CCS 7.4's cl6x 8.2.2 print their `.expected` on vm6747, at `-O2` and without `-O`, exit status
+included (`structs`' 7). Also new: `CALLRET`, `DINT`/`RINT`, `MVD`, `MPYLI`, `MVC` to and from
+ILC/RILC.
+
+Swept 2026-10-05 over Compiler-Ci's 431 cases (the 26 that assume a 64-bit long left out), each built
+by cl6x 8.2.2 and held to the host's build of the same C: at `-O2` 374 of 400 now agree where 316 did,
+at its default level 380 where 377 did, and none that agreed before disagrees. 32 of the agreeing
+`-O2` cases run loops from the buffer - `SPLOOP`, `SPLOOPD` and conditional `SPLOOPW`; reload
+(`[cond] SPLOOPD` with `SPMASKR`) is exercised by `matmul` alone.
+
+## What cl6x's code still meets here, 2026-10-05
+
+From the same sweep; none is in the loop buffer, and each stops at assembly or at entry:
+- `.nearcommon` / `.farcommon` (cl6x's common symbols): 12 cases;
+- TI's hex spelling `03fd55555h` as an operand: 3 cases;
+- `PACK2`, `SUBAH` not in the instruction table; `MVK` refusing a constant cl6x writes in range for
+  it (`struct_small_return`, `ll_switch_bitfield`);
+- `__c6xabi_llshl` and `_ctypes_` not provided by the runtime;
+- three cases (`fn_call`, `fn_void_params`, `pd_parenthesised_name`) branch to 0 at entry;
+- `ce_unsigned_long_div` and `fp_float_arithmetic` print a different value - not yet narrowed.
+The reload model refuses by name two shapes no sample has: a reload with RILC 0, and a reloaded
+loop that ends before its reload completes.
+
+## (mended) main's status is lost in cl6x -O2 code, 2026-09-28
 
 Measured from C++Optimize (`tools/c6747-three`), with CCS 7.4's cl6x 8.2.2 compiling to
 assembly (`-n -O2 --symdebug:none`) and `vm6747.exe` from RIDE-4.5's bin running it on the
@@ -23,7 +53,7 @@ default optimization both programs' exit status is right.
 Reproduce: `cl6x -mv6740 --abi=eabi -n -O2 --symdebug:none structs.c`, then
 `vm6747 structs.asm; echo %errorlevel%` - C++Optimize's `tools/c6747/programs/structs.c`.
 
-## Wrong output from cl6x code at its default optimization, 2026-09-28
+## (mended) Wrong output from cl6x code at its default optimization, 2026-09-28
 
 Same setup (cl6x 8.2.2, `-n --symdebug:none`, no `-O`), C++Optimize's
 `tools/c6747/bench`: `isort.c` prints one garbage byte instead of `isort 344346`, and

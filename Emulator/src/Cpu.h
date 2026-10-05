@@ -61,11 +61,13 @@ public:
     // sixteen of each; cl6x uses all of them.
     static const int A = 0, B = 32;
     static const int A4 = 4, B3 = 32 + 3, B4 = 32 + 4, B15 = 32 + 15, A15 = 15;
+    // The loop buffer's inner loop count and its reload copy, numbered after the files for MVC.
+    static const int ILC = 64, RILC = 65;
 
 private:
     Program &prog_;
     Runtime &rt_;
-    uint32_t r_[64];
+    uint32_t r_[66];
     uint32_t pc_ = 0;
     uint32_t packetEnd_ = 0;       // the address after the packet executing - a call's return
     uint64_t cycle_ = 0;
@@ -90,6 +92,32 @@ private:
     // legal on the C674x and cl6x writes them, so they are a queue rather than one pending target.
     struct Branch { uint64_t at; uint32_t target; };
     std::vector<Branch> branches_;
+
+    // The software pipelined loop buffer (SPRUFE8 chapter 7), active from an SPLOOP(D/W) packet until it goes idle.
+    // Each entry is an instruction loaded from the first iteration, at its LBC slot with its loading counter; `valid` is
+    // the running invocation's bit and `next` the bit a reload sets for the invocation that overlaps its epilog.
+    struct LoopEntry { const Instr *in; int slot; int load; bool valid; bool next; uint64_t from; };
+    struct Loop {
+        bool active = false;
+        int kind = 0;                  // 0 SPLOOP, 1 SPLOOPD, 2 SPLOOPW
+        int ii = 1, lbc = 0, load = 0, dynlen = -1;
+        bool loading = false, kernelDone = false, initialTerm = false, termPending = false;
+        bool draining = false; int drain = 0; int fetchDelay = 0; bool spkernelR = false;
+        bool fetch = true; int progLeft = 0;  // program memory fetch, and the cycles its current packet still takes
+        uint64_t start = 0;            // the cycle the SPLOOP(D/W) packet issued
+        int predReg = -1; bool predNeg = false;   // SPLOOPW's continue condition, or SPLOOP(D)'s reload condition
+        std::map<uint64_t, bool> cond; // that condition as each cycle's instructions saw it
+        // A reload: the running invocation is the reloaded one, its valid bits set in load order (rload); the one it
+        // replaced keeps draining its epilog on an LBC of its own - prev*, with each entry's `next` as its valid bit.
+        bool reloadArmed = false, reloadStart = false, reloading = false; int rload = 0;
+        bool prevActive = false; int plbc = 0, pdrain = 0;
+        std::vector<LoopEntry> buf;
+    };
+    Loop lp_;
+    void loopCycle();
+    void loopStart(const Instr &in);
+    bool loopBoundary(int &lbc, bool reloadInvocation);
+    void loopIdle();
 
     void step();
     void stepOne();
