@@ -14,6 +14,8 @@
 #include <vector>
 
 #ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
 #include <windows.h>
 #else
 #include <dirent.h>
@@ -62,6 +64,11 @@ static std::vector<std::string> assemblyIn(const std::string &dir) {
 }
 
 int main(int argc, char **argv) {
+#ifdef _WIN32
+    // The program's output byte for byte, as on Linux and TI's simulator: text mode wrote CRLF on Windows (T6).
+    _setmode(_fileno(stdout), _O_BINARY);
+    _setmode(_fileno(stderr), _O_BINARY);
+#endif
     std::vector<std::string> files, args;
     bool trace = false;
     bool counts = false;
