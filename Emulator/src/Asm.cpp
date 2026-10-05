@@ -378,18 +378,19 @@ struct Assembler {
                 } else if (m == ".weak") {
                     for (const std::string &n : ln.operands) { u.exported.push_back(n); u.weak.push_back(n); }
                 } else if (m == ".bss" || m == ".usect") {
-                    // .bss sym, size[, align]   .usect "name", size[, align] (treated as bss)
-                    size_t k = m == ".usect" ? 1 : 0;
-                    if (ln.operands.size() < k + 2) return fail(u, ln, m + " needs a size");
+                    // .bss sym, size[, align] and .usect "name", size[, align]: the size second in both, and
+                    // the symbol - .bss's first operand, .usect's label - names the reserved block (cl6x's `comp: .usect`).
+                    if (ln.operands.size() < 2) return fail(u, ln, m + " needs a size");
                     long long size, align = 4;
-                    if (!evaluate(u, ln, ln.operands[k + 1], false, size)) return false;
-                    if (ln.operands.size() > k + 2 && !evaluate(u, ln, ln.operands[k + 2], false, align)) return false;
+                    if (!evaluate(u, ln, ln.operands[1], false, size)) return false;
+                    if (ln.operands.size() > 2 && !evaluate(u, ln, ln.operands[2], false, align)) return false;
                     if (align <= 0) align = 1;
                     if (static_cast<uint32_t>(align) > u.align[Bss]) u.align[Bss] = static_cast<uint32_t>(align);
                     u.size[Bss] = alignUp(u.size[Bss], static_cast<uint32_t>(align));
-                    if (m == ".bss") {
+                    const std::string name = m == ".bss" ? ln.operands[0] : ln.label;
+                    if (!name.empty()) {
                         Sym s; s.section = Bss; s.offset = u.size[Bss]; s.defined = true;
-                        u.locals[ln.operands[0]] = s;
+                        u.locals[name] = s;
                     }
                     u.size[Bss] += static_cast<uint32_t>(size);
                 } else if (m == ".align") {
@@ -511,10 +512,9 @@ struct Assembler {
                         for (char c : bytes) m[at[sec]++] = static_cast<uint8_t>(c);
                     }
                 } else if (mn == ".bss" || mn == ".usect") {
-                    size_t k = mn == ".usect" ? 1 : 0;
                     long long size, align = 4;
-                    evaluate(u, ln, ln.operands[k + 1], true, size);
-                    if (ln.operands.size() > k + 2) evaluate(u, ln, ln.operands[k + 2], true, align);
+                    evaluate(u, ln, ln.operands[1], true, size);
+                    if (ln.operands.size() > 2) evaluate(u, ln, ln.operands[2], true, align);
                     at[Bss] = alignUp(at[Bss], static_cast<uint32_t>(align)) + static_cast<uint32_t>(size);
                 }
                 continue;

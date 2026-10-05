@@ -81,7 +81,10 @@ void Cpu::applyPending() {
             pending_.pop_back();
         } else i++;
     }
-    if (branchValid_ && branchAt_ <= cycle_) { pc_ = branchTarget_; branchValid_ = false; }
+    while (!branches_.empty() && branches_.front().at <= cycle_) {
+        pc_ = branches_.front().target;
+        branches_.erase(branches_.begin());
+    }
 }
 
 void Cpu::writePairSplit(std::vector<Pending> &w, int lo, uint64_t v, int delay) {
@@ -244,7 +247,9 @@ void Cpu::execute(const Instr &in, std::vector<Pending> &w, bool &branched, uint
     case Op::SUBAW: write(w, dst, s1 - s2 * 4, 0); return;
     case Op::MVC: fault("MVC: control registers are not modelled"); return;
 
-    case Op::MPY32:   write(w, dst, s1 * s2, d); return;
+    case Op::MPY32:   // the 64-bit form, MPY32 src1, src2, dst_o:dst_e: a signed product in the pair
+        if (dstPair) { writePair(w, dst, static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(s1)) * static_cast<int32_t>(s2)), d); return; }
+        write(w, dst, s1 * s2, d); return;
     case Op::MPY32U:  writePair(w, dst, uint64_t(s1) * uint64_t(s2), d); return;
     case Op::MPY32SU: writePair(w, dst, static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(s1)) * static_cast<int64_t>(s2)), d); return;
     case Op::MPY32US: writePair(w, dst, static_cast<uint64_t>(static_cast<int64_t>(s1) * static_cast<int64_t>(static_cast<int32_t>(s2))), d); return;
@@ -359,8 +364,8 @@ void Cpu::executePacket() {
         uint32_t target = 0;
         execute(*in, writes, branched, target);
         if (branched) {
-            if (branchValid_) fault("a branch issued while another is pending");
-            branchValid_ = true; branchAt_ = cycle_ + 6; branchTarget_ = target;
+            Branch b; b.at = cycle_ + 6; b.target = target;
+            branches_.push_back(b);
         }
     }
     for (const Pending &p : writes) pending_.push_back(p);
@@ -442,7 +447,7 @@ void Cpu::stepOne() {
     completeDeferred();
     for (const Pending &p : pending_) r_[p.reg] = p.value;
     pending_.clear();
-    branchValid_ = false;
+    branches_.clear();
     nativeCalls_++;
     if (profiling_) lastNative_ = name;
     if (!rt_.call(name, *this)) fault("'" + name + "' is not provided by the runtime");

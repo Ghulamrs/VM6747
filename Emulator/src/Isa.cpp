@@ -22,7 +22,7 @@ static const IsaEntry kIsa[] = {
     { "STB", Op::STB, 0 }, { "STH", Op::STH, 0 }, { "STW", Op::STW, 0 }, { "STDW", Op::STDW, 0 },
     { "STNW", Op::STNW, 0 }, { "STNDW", Op::STNDW, 0 },
     { "B", Op::B, 5 }, { "CALLP", Op::CALLP, 0 }, { "NOP", Op::NOP, 0 }, { "SWE", Op::SWE, 0 }, { "IDLE", Op::IDLE, 0 },
-    { "BNOP", Op::BNOP, 5 }, { "RETNOP", Op::RETNOP, 5 }, { "RET", Op::RET, 5 }, { "CALL", Op::CALL, 5 }, { "ADDKPC", Op::ADDKPC, 0 },
+    { "BNOP", Op::BNOP, 5 }, { "RETNOP", Op::RETNOP, 5 }, { "RET", Op::RET, 5 }, { "CALL", Op::CALL, 5 }, { "CALLRET", Op::B, 5 }, { "ADDKPC", Op::ADDKPC, 0 },
     { "ADDSP", Op::ADDSP, 3 }, { "SUBSP", Op::SUBSP, 3 }, { "MPYSP", Op::MPYSP, 3 },
     { "CMPEQSP", Op::CMPEQSP, 1 }, { "CMPLTSP", Op::CMPLTSP, 1 }, { "CMPGTSP", Op::CMPGTSP, 1 },
     { "ABSSP", Op::ABSSP, 1 }, { "INTSP", Op::INTSP, 3 }, { "INTSPU", Op::INTSPU, 3 },

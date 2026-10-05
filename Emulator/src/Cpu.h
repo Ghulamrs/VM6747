@@ -86,9 +86,10 @@ private:
     uint32_t deferLo1_ = 0, deferLo2_ = 0;
     void completeDeferred();
     void writePairSplit(std::vector<Pending> &w, int lo, uint64_t v, int delay);
-    bool branchValid_ = false;
-    uint64_t branchAt_ = 0;
-    uint32_t branchTarget_ = 0;
+    // Branches in flight, each landing five packets after it issued: a branch in another's delay slots is
+    // legal on the C674x and cl6x writes them, so they are a queue rather than one pending target.
+    struct Branch { uint64_t at; uint32_t target; };
+    std::vector<Branch> branches_;
 
     void step();
     void stepOne();
