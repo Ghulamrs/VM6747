@@ -495,11 +495,14 @@ bool Runtime::matches(Cpu &c, uint32_t obj, uint32_t thrownTi, uint32_t catchTi,
         adjusted = obj;
         if (c.readString(c.load32(cPointee + 4)) == "v") return true;
         if (sameType(c, tPointee, cPointee)) return true;
+        // A pointer to a public base matches and is handed over UNADJUSTED - rts6740 does that
+        // (C1b, measured 2026-10-05: cl6x 7.4.4's own build of `D : A, B` thrown as `D *`,
+        // caught as `B *`, prints A's member on TI's C6747 simulator), so this does the same.
         if (value == 0) return publicBase(c, tPointee, cPointee, 0);
         std::vector<Sub> subs;
         walk(c, tPointee, value, true, subs, 0);
         for (const Sub &s : subs)
-            if (s.pub && sameType(c, s.ti, cPointee)) { c.store32(obj, s.addr); return true; }
+            if (s.pub && sameType(c, s.ti, cPointee)) return true;
         return false;
     }
     if (thrownKind == 5 || catchKind == 5) return false;
