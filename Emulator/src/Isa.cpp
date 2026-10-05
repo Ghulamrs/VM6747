@@ -30,7 +30,7 @@ static const IsaEntry kIsa[] = {
     { "ADDDP", Op::ADDDP, 6 }, { "SUBDP", Op::SUBDP, 6 }, { "MPYDP", Op::MPYDP, 9 },
     { "CMPEQDP", Op::CMPEQDP, 1 }, { "CMPLTDP", Op::CMPLTDP, 1 }, { "CMPGTDP", Op::CMPGTDP, 1 },
     { "ABSDP", Op::ABSDP, 1 }, { "INTDP", Op::INTDP, 4 }, { "INTDPU", Op::INTDPU, 4 },
-    { "DPINT", Op::DPINT, 3 }, { "DPTRUNC", Op::DPTRUNC, 3 }, { "DPSP", Op::DPSP, 1 }, { "RCPDP", Op::RCPDP, 1 },
+    { "DPINT", Op::DPINT, 3 }, { "DPTRUNC", Op::DPTRUNC, 3 }, { "DPSP", Op::DPSP, 3 }, { "RCPDP", Op::RCPDP, 1 },
 };
 
 const IsaEntry *isaLookup(const std::string &mnem) {
