@@ -65,8 +65,26 @@ void Cpu::fault(const std::string &what) {
 // ---- the pipeline --------------------------------------------------------------
 void Cpu::write(std::vector<Pending> &w, int reg, uint32_t v, int delay) {
     if (delay < 0) { r_[reg] = v; return; }        // a low word already due
-    Pending p; p.at = cycle_ + 1 + delay; p.reg = reg; p.value = v;
+    Pending p; p.at = cycle_ + 1 + delay; p.reg = reg; p.value = v; p.by = issuing_;
+    checkConflict(p, w);
+    checkConflict(p, pending_);
     w.push_back(p);
+}
+
+static std::string regName(int r) {
+    if (r == Cpu::ILC) return "ILC";
+    if (r == Cpu::RILC) return "RILC";
+    return (r < Cpu::B ? "A" : "B") + std::to_string(r % Cpu::B);
+}
+static std::string lineOf(const Instr *in) {
+    return in == nullptr ? std::string("?") : in->mnem + " at " + in->file + ":" + std::to_string(in->line);
+}
+
+void Cpu::checkConflict(const Pending &p, const std::vector<Pending> &others) {
+    for (const Pending &q : others)
+        if (q.at == p.at && q.reg == p.reg)
+            fault("two results land in " + regName(p.reg) + " in one cycle (SPRUFE8 3.8.8): " + lineOf(q.by) +
+                  " and " + lineOf(p.by));
 }
 void Cpu::writePair(std::vector<Pending> &w, int lo, uint64_t v, int delay) {
     write(w, lo, uint32_t(v), delay);
@@ -173,6 +191,7 @@ static int32_t roundToInt(double d) {
 }
 
 void Cpu::execute(const Instr &in, std::vector<Pending> &w, bool &branched, uint32_t &target) {
+    issuing_ = &in;
     const IsaEntry *e = isaLookup(in.mnem);
     const std::vector<Operand> &o = in.ops;
     int d = e->delaySlots;

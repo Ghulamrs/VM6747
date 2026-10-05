@@ -77,7 +77,11 @@ private:
     int exitCode_ = 0;
     bool trace_ = false;
 
-    struct Pending { uint64_t at; int reg; uint32_t value; };
+    // A result in flight, with the instruction that issued it: two landing in one register in one cycle is the
+    // write conflict SPRUFE8 3.8.8 forbids - undefined on the part, a hardware exception on the C674x - and a fault here.
+    struct Pending { uint64_t at; int reg; uint32_t value; const Instr *by; };
+    const Instr *issuing_ = nullptr;
+    void checkConflict(const Pending &p, const std::vector<Pending> &others);
     std::vector<Pending> pending_;
     // A double-precision source is read in two phases - the low word at issue, the high word a
     // cycle later (SPRUFE8's E1 and E2 reads) - so such an instruction is held with its low words and completes a cycle on, with the high words as they are then.

@@ -21,7 +21,9 @@ counter, and the pipeline's one visible property: a result lands some cycles
 after its instruction issues — 4 delay slots for a load, 3 for a multiply,
 3/6/9 for single/double-precision arithmetic, 1 for a floating compare — and
 a branch takes effect five execute packets after it. A register read before
-its write lands returns the old value. That is the whole point: the NOPs in
+its write lands returns the old value. Two results landing in one register in one cycle - the write
+conflict SPRUFE8 3.8.8 forbids, a hardware exception on the C674x - stop the run with a fault naming both
+instructions (since 2026-10-05; TI's own Example 7-11 has one). That is the whole point: the NOPs in
 the emitted code are the compiler's claim about these latencies, and a
 missing one shows up here as a wrong answer, not as a suspicion. The first
 run found one (`MPY32` with no delay slots).
