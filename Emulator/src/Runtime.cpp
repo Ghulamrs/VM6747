@@ -484,20 +484,22 @@ bool Runtime::matches(Cpu &c, uint32_t obj, uint32_t thrownTi, uint32_t catchTi,
     if (catchTi == 0) { adjusted = obj; return true; }          // catch (...)
     // A pointer thrown - the type_info's vtable says so - is matched by [except.handle]/3: the
     // same pointee, a more qualified one, void, or a public base of a class pointee. What the
-    // handler receives is the pointer itself, adjusted to the base, which is what __cxa_begin_catch returns for a pointer on the real runtimes.
+    // handler receives is the exception object's address, the adjusted pointer written into it -
+    // TI's rts6740 does that where the Itanium runtimes return the value (C1, measured 2026-10-05).
     const uint32_t thrownKind = c.load32(c.load32(thrownTi)), catchKind = c.load32(c.load32(catchTi));
     if (thrownKind == 5 && catchKind == 5) {
         const uint32_t tFlags = c.load32(thrownTi + 8), cFlags = c.load32(catchTi + 8);
         if ((tFlags & ~cFlags) != 0) return false;             // const may be added, not dropped
         const uint32_t tPointee = c.load32(thrownTi + 12), cPointee = c.load32(catchTi + 12);
         const uint32_t value = c.load32(obj);
-        if (c.readString(c.load32(cPointee + 4)) == "v") { adjusted = value; return true; }
-        if (sameType(c, tPointee, cPointee)) { adjusted = value; return true; }
-        if (value == 0) { adjusted = 0; return publicBase(c, tPointee, cPointee, 0); }
+        adjusted = obj;
+        if (c.readString(c.load32(cPointee + 4)) == "v") return true;
+        if (sameType(c, tPointee, cPointee)) return true;
+        if (value == 0) return publicBase(c, tPointee, cPointee, 0);
         std::vector<Sub> subs;
         walk(c, tPointee, value, true, subs, 0);
         for (const Sub &s : subs)
-            if (s.pub && sameType(c, s.ti, cPointee)) { adjusted = s.addr; return true; }
+            if (s.pub && sameType(c, s.ti, cPointee)) { c.store32(obj, s.addr); return true; }
         return false;
     }
     if (thrownKind == 5 || catchKind == 5) return false;
