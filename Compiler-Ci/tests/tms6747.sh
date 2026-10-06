@@ -9,12 +9,27 @@
 # and models the pipeline's delay slots, which is how a missing NOP shows up
 # as a wrong answer here rather than as a suspicion in a code review. The
 # corpus is tests/cases, whole: everything the backend refuses is a FAIL.
+#
+# A second leg runs each case as a TI program - asm6x, then lnk6x against TI's runtime - on
+# vm6747sim, which runs the machine code, and holds it to the same reference. It sees what the
+# emulator cannot: the assembler's encoding and TI's own runtime. SIM=0 leaves it out, said aloud;
+# tests/tms6747-sim.txt names the cases it cannot run, why beside.
 set -u
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 CC1="${CC1:-$ROOT/c90.exe}"
 VM="${VM:-$ROOT/../Emulator/vm6747.exe}"
 SRC="$ROOT/tests/cases"
+# The second leg's tools: each named, else where the sibling checkouts keep it, else on PATH.
+SIM="${SIM:-1}"
+find_tool() {
+    for t in "$@"; do [ -n "$t" ] && [ -x "$t" ] && { echo "$t"; return; }; done
+}
+ASM6X=$(find_tool "${ASM6X:-}" "$ROOT/../../ASM6x/build/asm6x.exe" "$(command -v asm6x 2>/dev/null)")
+LNK6X=$(find_tool "${LNK6X:-}" "$ROOT/../../LNK6x/build/lnk6x.exe" "$(command -v lnk6x 2>/dev/null)")
+VMSIM=$(find_tool "${VMSIM:-}" "$ROOT/../../VM6747-sim/vm6747.exe" "$(command -v vm6747sim 2>/dev/null)")
+# TI's runtime is TI's and not in any repository: the exception-handling build of rts6740.
+TIRTS="${TIRTS:-${C6747_EHLIB:-$HOME/c6747-lib}}"
 OUT="$ROOT/tests/out-tms6747"
 
 if [ ! -x "$VM" ]; then
@@ -60,11 +75,49 @@ one() {
         echo "FAIL $name - both agree on $ours_rc, but the case expects $expect"
         echo fail > "$OUT/$name.verdict"; return
     fi
+    if [ "$SIM" = 1 ] && ! grep -q "^$name[[:space:]]" "$ROOT/tests/tms6747-sim.txt"; then
+        if ! { "$ASM6X" "$OUT/$name.s" -o "$OUT/$name.obj" &&
+               "$LNK6X" -mv6740 --abi=eabi -i "$TIRTS" "$OUT/link.cmd" "$OUT/$name.obj" \
+                   -l rts6740_elf_eh.lib -o "$OUT/$name.ti.out"; } > "$OUT/$name.ti.log" 2>&1 < /dev/null; then
+            echo "FAIL $name (vm6747sim) - asm6x or lnk6x refused it:"
+            sed 's/^/       /' "$OUT/$name.ti.log" | head -3
+            echo fail > "$OUT/$name.verdict"; return
+        fi
+        { ( ulimit -t 20; "$VMSIM" --run --main-status "$OUT/$name.ti.out" ) > "$OUT/$name.sim" 2>&1 < /dev/null; echo $? > "$OUT/$name.sim.rc"; } 2>/dev/null
+        sim_out=$(cat "$OUT/$name.sim"); sim_rc=$(cat "$OUT/$name.sim.rc")
+        if [ "$sim_out" != "$ref_out" ] || [ "$sim_rc" != "$ref_rc" ]; then
+            echo "FAIL $name (vm6747sim) - disagrees with $HOST"
+            echo "       sim: rc=$sim_rc out=[$(printf '%s' "$sim_out" | head -c 300)]"
+            echo "       ref: rc=$ref_rc out=[$(printf '%s' "$ref_out" | head -c 300)]"
+            echo fail > "$OUT/$name.verdict"; return
+        fi
+    fi
     echo pass > "$OUT/$name.verdict"
 }
 if [ "${1:-}" = --one ]; then one "$3" > "$OUT/$3.report" 2>&1; exit 0; fi
 
 rm -rf "$OUT" && mkdir -p "$OUT"
+if [ "$SIM" = 1 ]; then
+    for need in "asm6x:$ASM6X" "lnk6x:$LNK6X" "vm6747sim:$VMSIM"; do
+        [ -n "${need#*:}" ] || { echo "tms6747.sh: no ${need%%:*} - build it, name it, or SIM=0 to leave the vm6747sim leg out"; exit 1; }
+    done
+    [ -f "$TIRTS/rts6740_elf_eh.lib" ] || { echo "tms6747.sh: no rts6740_elf_eh.lib in $TIRTS - set TIRTS, or SIM=0"; exit 1; }
+    # RIDE's flat map, with room for a case's stack.
+    cat > "$OUT/link.cmd" <<'MAP'
+--rom_model
+--stack_size=0x100000
+--heap_size=0x100000
+MEMORY { RAM : origin = 0xC0000000, length = 0x04000000 }
+SECTIONS
+{
+    .text > RAM  .const > RAM  .data > RAM  .bss > RAM  .far > RAM  .fardata > RAM
+    .neardata > RAM  .rodata > RAM  .cinit > RAM  .init_array > RAM  .switch > RAM
+    .cio > RAM  .stack > RAM  .sysmem > RAM  .vm6747.eh > RAM
+}
+MAP
+else
+    echo "tms6747.sh: SIM=0 - the vm6747sim leg is left out; only the assembly is run, on vm6747"
+fi
 cases() { for src in "$SRC"/*.c; do n=$(basename "$src" .c); [ -n "$only" ] && [ "$n" != "$only" ] && continue; echo "$n"; done; }
 JOBS=${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}
 cases | xargs -P "$JOBS" -I{} sh "$0" --one "$only" {}
@@ -74,4 +127,5 @@ pass=$(count pass); fail=$(count fail); skip=$(count skip)
 
 echo
 echo "tms6747  PASS: $pass   FAIL: $fail   SKIP: $skip (need a 64-bit long or pointer - tests/tms6747-lp64.txt)"
+[ "$SIM" = 1 ] && echo "tms6747  every PASS also on vm6747sim (asm6x, lnk6x, TI's rts6740) but those in tests/tms6747-sim.txt"
 [ "$fail" -eq 0 ]

@@ -1,0 +1,7 @@
+# Cases the vm6747sim leg of tests/tms6747.sh cannot run, each with the reason beside it.
+file_binary          reads back a file it wrote: TI's runtime does that over CIO to the host, and vm6747sim carries CIO console output but not file I/O (G1)
+file_text            the same: file I/O over CIO, which vm6747sim does not carry (G1)
+hd_standard_headers  errno is still 0 after a failed fopen: TI's rts6740 does not set it there, and on vm6747sim every fopen fails (G1)
+arg_types            TI's rts6740 printf writes a null %p as "0" where the host writes "0x0"
+fp_nan_ordering      TI's rts6740 printf writes "+inf" where the host writes "inf" - cl6x's own builds print the same on TI's C6747 simulator
+fp_negate_zero       TI's rts6740 printf writes -0.0 as "0.0": the value's bits are 80000000 00000000, a negative zero, on vm6747sim; the printing drops the sign
