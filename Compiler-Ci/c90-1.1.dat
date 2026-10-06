@@ -1,7 +1,7 @@
 ©2026 G. R. Akhtar - ISO C 90
-Release seal, version 1.1, sealed 05-10-2026
+Release seal, version 1.1, sealed 06-10-2026
 Written by tools/seal; check it with `tools/seal check`.
-CRC32  size  file - 52 files, seal AE9A48FB
+CRC32  size  file - 52 files, seal 2DC77598
 ------------------------------------------------------------------
 65B6BFC3      2538  lib/assert.h
 978C1DCB      1245  lib/ctype.h
@@ -28,7 +28,7 @@ B34E4069      2602  src/Driver.h
 7DBE9C6A       483  src/Name.h
 BAD64C33    107000  src/Parser.cpp
 D838E7F7     11345  src/Parser.h
-C688369D     35786  src/Preprocessor.cpp
+B19FEBEF     36056  src/Preprocessor.cpp
 BCA01EF2      2886  src/Preprocessor.h
 5538DB98      3134  src/Source.cpp
 181237A8      1017  src/Source.h
@@ -56,4 +56,4 @@ E9EF76FA      2102  src/backend/X86_64Windows.cpp
 2465340E      1013  src/backend/X86_64Windows.h
 2D5FF95D      1133  src/main.cpp
 ------------------------------------------------------------------
-Sealed on 05-10-2026
+Sealed on 06-10-2026
