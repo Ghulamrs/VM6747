@@ -28,10 +28,10 @@ find_tool() {
 ASM6X=$(find_tool "${ASM6X:-}" "$ROOT/../../ASM6x/build/asm6x.exe" "$(command -v asm6x 2>/dev/null)")
 LNK6X=$(find_tool "${LNK6X:-}" "$ROOT/../../LNK6x/build/lnk6x.exe" "$(command -v lnk6x 2>/dev/null)")
 VMSIM=$(find_tool "${VMSIM:-}" "$ROOT/../../VM6747-sim/vm6747.exe" "$(command -v vm6747sim 2>/dev/null)")
-# TI's runtime is TI's and not in any repository: the exception-handling build of rts6740.
-TIRTS="${TIRTS:-${C6747_EHLIB:-$HOME/c6747-lib}}"
-# RTSLIB names the run-time library in TIRTS: TI's until RTS6x passes the suite (TIRTS=../RTS6x/build RTSLIB=rts6x.lib).
-RTSLIB="${RTSLIB:-rts6740_elf_eh.lib}"
+# The run-time library: RTS6x's, built beside VM6747, since it passed the suite whole (M5, 2026-10-07);
+# TI's exception-handling rts6740 as RTSLIB=rts6740_elf_eh.lib, TIRTS its directory (default ~/c6747-lib).
+RTSLIB="${RTSLIB:-rts6x.lib}"
+if [ "$RTSLIB" = rts6x.lib ]; then TIRTS="${TIRTS:-$ROOT/../../RTS6x/build}"; else TIRTS="${TIRTS:-${C6747_EHLIB:-$HOME/c6747-lib}}"; fi
 OUT="$ROOT/tests/out-tms6747"
 
 if [ ! -x "$VM" ]; then
@@ -77,7 +77,7 @@ one() {
         echo "FAIL $name - both agree on $ours_rc, but the case expects $expect"
         echo fail > "$OUT/$name.verdict"; return
     fi
-    if [ "$SIM" = 1 ] && ! grep -q "^$name[[:space:]]" "$ROOT/tests/tms6747-sim.txt"; then
+    if [ "$SIM" = 1 ] && ! { [ "$RTSLIB" != rts6x.lib ] && grep -q "^$name[[:space:]]" "$ROOT/tests/tms6747-sim.txt"; }; then
         if ! { "$ASM6X" "$OUT/$name.s" -o "$OUT/$name.obj" &&
                "$LNK6X" -mv6740 --abi=eabi -i "$TIRTS" "$OUT/link.cmd" "$OUT/$name.obj" \
                    -l "$RTSLIB" -o "$OUT/$name.ti.out"; } > "$OUT/$name.ti.log" 2>&1 < /dev/null; then
@@ -129,5 +129,8 @@ pass=$(count pass); fail=$(count fail); skip=$(count skip)
 
 echo
 echo "tms6747  PASS: $pass   FAIL: $fail   SKIP: $skip (need a 64-bit long or pointer - tests/tms6747-lp64.txt)"
-[ "$SIM" = 1 ] && echo "tms6747  every PASS also on vm6747sim (asm6x, lnk6x, $RTSLIB) but those in tests/tms6747-sim.txt"
+if [ "$SIM" = 1 ]; then
+    if [ "$RTSLIB" = rts6x.lib ]; then echo "tms6747  every PASS also on vm6747sim (asm6x, lnk6x, $RTSLIB)"
+    else echo "tms6747  every PASS also on vm6747sim (asm6x, lnk6x, $RTSLIB) but those in tests/tms6747-sim.txt"; fi
+fi
 [ "$fail" -eq 0 ]
