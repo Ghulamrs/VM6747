@@ -83,7 +83,7 @@ one() {
             sed 's/^/       /' "$OUT/$name.ti.log" | head -3
             echo fail > "$OUT/$name.verdict"; return
         fi
-        { ( ulimit -t 20; "$VMSIM" --run --main-status "$OUT/$name.ti.out" ) > "$OUT/$name.sim" 2>&1 < /dev/null; echo $? > "$OUT/$name.sim.rc"; } 2>/dev/null
+        { ( ulimit -t 20 2>/dev/null; "$VMSIM" --run --main-status "$OUT/$name.ti.out" ) > "$OUT/$name.sim" 2>&1 < /dev/null; echo $? > "$OUT/$name.sim.rc"; } 2>/dev/null
         sim_out=$(cat "$OUT/$name.sim"); sim_rc=$(cat "$OUT/$name.sim.rc")
         if [ "$sim_out" != "$ref_out" ] || [ "$sim_rc" != "$ref_rc" ]; then
             echo "FAIL $name (vm6747sim) - disagrees with $HOST"
