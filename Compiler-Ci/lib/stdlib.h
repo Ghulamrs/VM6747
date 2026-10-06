@@ -19,6 +19,7 @@ void free(void *);
 
 void exit(int);
 void abort(void);
+int atexit(void (*)(void));
 
 int atoi(const char *);
 long atol(const char *);

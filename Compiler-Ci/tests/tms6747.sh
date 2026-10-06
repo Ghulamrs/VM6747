@@ -30,6 +30,8 @@ LNK6X=$(find_tool "${LNK6X:-}" "$ROOT/../../LNK6x/build/lnk6x.exe" "$(command -v
 VMSIM=$(find_tool "${VMSIM:-}" "$ROOT/../../VM6747-sim/vm6747.exe" "$(command -v vm6747sim 2>/dev/null)")
 # TI's runtime is TI's and not in any repository: the exception-handling build of rts6740.
 TIRTS="${TIRTS:-${C6747_EHLIB:-$HOME/c6747-lib}}"
+# RTSLIB names the run-time library in TIRTS: TI's until RTS6x passes the suite (TIRTS=../RTS6x/build RTSLIB=rts6x.lib).
+RTSLIB="${RTSLIB:-rts6740_elf_eh.lib}"
 OUT="$ROOT/tests/out-tms6747"
 
 if [ ! -x "$VM" ]; then
@@ -78,7 +80,7 @@ one() {
     if [ "$SIM" = 1 ] && ! grep -q "^$name[[:space:]]" "$ROOT/tests/tms6747-sim.txt"; then
         if ! { "$ASM6X" "$OUT/$name.s" -o "$OUT/$name.obj" &&
                "$LNK6X" -mv6740 --abi=eabi -i "$TIRTS" "$OUT/link.cmd" "$OUT/$name.obj" \
-                   -l rts6740_elf_eh.lib -o "$OUT/$name.ti.out"; } > "$OUT/$name.ti.log" 2>&1 < /dev/null; then
+                   -l "$RTSLIB" -o "$OUT/$name.ti.out"; } > "$OUT/$name.ti.log" 2>&1 < /dev/null; then
             echo "FAIL $name (vm6747sim) - asm6x or lnk6x refused it:"
             sed 's/^/       /' "$OUT/$name.ti.log" | head -3
             echo fail > "$OUT/$name.verdict"; return
@@ -101,7 +103,7 @@ if [ "$SIM" = 1 ]; then
     for need in "asm6x:$ASM6X" "lnk6x:$LNK6X" "vm6747sim:$VMSIM"; do
         [ -n "${need#*:}" ] || { echo "tms6747.sh: no ${need%%:*} - build it, name it, or SIM=0 to leave the vm6747sim leg out"; exit 1; }
     done
-    [ -f "$TIRTS/rts6740_elf_eh.lib" ] || { echo "tms6747.sh: no rts6740_elf_eh.lib in $TIRTS - set TIRTS, or SIM=0"; exit 1; }
+    [ -f "$TIRTS/$RTSLIB" ] || { echo "tms6747.sh: no $RTSLIB in $TIRTS - set TIRTS and RTSLIB, or SIM=0"; exit 1; }
     # RIDE's flat map, with room for a case's stack.
     cat > "$OUT/link.cmd" <<'MAP'
 --rom_model
@@ -127,5 +129,5 @@ pass=$(count pass); fail=$(count fail); skip=$(count skip)
 
 echo
 echo "tms6747  PASS: $pass   FAIL: $fail   SKIP: $skip (need a 64-bit long or pointer - tests/tms6747-lp64.txt)"
-[ "$SIM" = 1 ] && echo "tms6747  every PASS also on vm6747sim (asm6x, lnk6x, TI's rts6740) but those in tests/tms6747-sim.txt"
+[ "$SIM" = 1 ] && echo "tms6747  every PASS also on vm6747sim (asm6x, lnk6x, $RTSLIB) but those in tests/tms6747-sim.txt"
 [ "$fail" -eq 0 ]
