@@ -12,6 +12,16 @@
 
 #include <stddef.h>
 
+// C90 7.10: the two exit statuses everywhere, and RAND_MAX as each platform's own library has it -
+// glibc's and Darwin's 2147483647, Microsoft's and the C6000's (RTS6x's, and TI's ABI) 32767.
+#define EXIT_SUCCESS 0
+#define EXIT_FAILURE 1
+#if defined(_WIN32) || defined(__TMS320C6X__)
+#define RAND_MAX 32767
+#else
+#define RAND_MAX 2147483647
+#endif
+
 void *malloc(size_t);
 void *calloc(size_t, size_t);
 void *realloc(void *, size_t);
@@ -34,8 +44,12 @@ long atol(const char *);
 // the caller owns. Declaring it the tidier way would make every correct
 // program that passes a char ** fail to compile here.
 //
-// strtol and strtoul are its neighbours and are still not here.
+// strtol and strtoul beside it, and atof and getenv, as C90 7.10.1 and 7.10.4.4 have them.
 double strtod(const char *, char **);
+long strtol(const char *, char **, int);
+unsigned long strtoul(const char *, char **, int);
+double atof(const char *);
+char *getenv(const char *);
 
 int abs(int);
 long labs(long);
