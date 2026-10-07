@@ -174,9 +174,15 @@ decodes it.
 cc1 abc.c -arch=x86_64-windows -masm=gnu -S -o abc.s
 ```
 
-writes the GNU spelling instead, which gcc and clang read. That is how
-`tests/windows.sh` cross-assembles Windows code on Linux, and how
-`tests/windows-native.sh` hands it to clang on Windows. `-masm=masm` is the
+writes the GNU spelling of a COFF object instead, which clang reads
+(`clang -target x86_64-pc-windows-msvc -c`, which is what c90 runs for it when
+it assembles), with `.seh_*` unwind data. With `-g` it carries CodeView, so
+`link.exe /debug` makes a PDB that cdb and WinDbg read. That is how
+`tests/windows-native.sh` hands Windows code to clang on Windows.
+
+`-masm=gnu-elf` writes the same instructions for an ELF object - no unwind data,
+DWARF under `-g` - which is how `tests/windows.sh` and `tests/debug.sh
+x86_64-windows` run the Microsoft convention on Linux. `-masm=masm` is the
 default and never needs typing.
 
 **This spelling carries no unwind data**, and cannot: GAS has no `.seh_*`
@@ -284,7 +290,7 @@ codegen: this binary operator is not supported yet by the arm64-darwin backend
 | `-S` | stop at assembly, one `.s` per input |
 | `-o NAME` | name the output |
 | `-arch NAME` | pick the architecture; the host by default |
-| `-masm=masm\|gnu` | assembly syntax for `x86_64-windows`; `masm` by default |
+| `-masm=masm\|gnu\|gnu-elf` | assembly syntax for `x86_64-windows`; `masm` by default |
 | `-D n[=v]`, `-U n` | define and undefine macros, including the target's own |
 | `-I dir` | add a directory to the `<...>` search path |
 | `-j n` | how many files compile at once; `-j 1` is serial |

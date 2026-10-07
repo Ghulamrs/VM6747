@@ -109,6 +109,7 @@ const Type *Parser::structOrUnionSpecifier(Kind kind) {
         if (peek().kind == TokenKind::End) src_.fail(pos, "unclosed '{'");
         StorageClass msc;
         const Type *base = specifiers(&msc);
+        const int baseEnum = lastEnum_;
         if (msc != StorageNone)
             src_.fail(peek().pos, "a storage class on a member is not supported yet");
         for (;;) {
@@ -216,6 +217,7 @@ const Type *Parser::structOrUnionSpecifier(Kind kind) {
             long long byteCursor = ((bitCursor > openEnd ? bitCursor : openEnd) + 7) / 8;
             long long at = (kind == Kind::Union) ? 0 : alignTo(byteCursor, a);
             members.push_back(Member{ d.name, d.type, static_cast<int>(at) });
+            members.back().enumType = enumOf(d.type, base, baseEnum);
             long long endBits = (at + d.type->size(target_)) * 8;
             if (kind == Kind::Union) { if (endBits > widestBits) widestBits = endBits; }
             else bitCursor = endBits;
@@ -241,11 +243,17 @@ const Type *Parser::structOrUnionSpecifier(Kind kind) {
 
 const Type *Parser::enumSpecifier() {
     std::size_t pos = peek().pos;
-    if (peek().kind == TokenKind::Ident) at_++;
+    std::string tag;
+    if (peek().kind == TokenKind::Ident) { tag = peek().text; at_++; }
 
-    if (!peek().is("{")) return types_.intType();
+    if (!peek().is("{")) {
+        auto known = enumTags_.find(tag);
+        lastEnum_ = known == enumTags_.end() ? -1 : known->second;
+        return types_.intType();
+    }
     at_++;
 
+    EnumType described{ tag, {} };
     long long next = 0;
     while (!peek().is("}")) {
         std::size_t npos = peek().pos;
@@ -255,11 +263,15 @@ const Type *Parser::enumSpecifier() {
             next = narrowTo(constantExpression("a constant"), types_.intType());
         enumIndex_[name] = enums_.size();
         enums_.push_back(EnumConst{ name, next });
+        described.values.push_back(std::make_pair(name, next));
         next = next + 1;
         if (!consume(",")) break;
     }
     expect("}");
     if (enums_.empty()) src_.fail(pos, "enum has no enumerators");
+    lastEnum_ = static_cast<int>(enumTypes_.size());
+    if (!tag.empty()) enumTags_[tag] = lastEnum_;
+    enumTypes_.push_back(described);
     return types_.intType();
 }
 
@@ -268,6 +280,7 @@ const Type *Parser::specifiers(StorageClass *storage, Qualifiers *quals) {
     *storage = StorageNone;
     Qualifiers discard;
     if (quals == nullptr) quals = &discard;
+    lastEnum_ = -1;
 
     for (;;) {
         if (consume("static"))  { *storage = StorageStatic; continue; }
@@ -284,7 +297,12 @@ const Type *Parser::specifiers(StorageClass *storage, Qualifiers *quals) {
     if (peek().is("union"))  { at_++; return structOrUnionSpecifier(Kind::Union); }
     if (peek().is("enum"))   { at_++; return enumSpecifier(); }
     if (peek().kind == TokenKind::Ident) {
-        if (const Type *t = findTypedef(peek().text)) { at_++; return t; }
+        if (const Type *t = findTypedef(peek().text)) {
+            auto named = typedefEnums_.find(peek().text);
+            lastEnum_ = named == typedefEnums_.end() ? -1 : named->second;
+            at_++;
+            return t;
+        }
     }
 
     int isVoid = 0, isChar = 0, isShort = 0, isInt = 0, isLong = 0;
@@ -2143,6 +2161,7 @@ StmtPtr Parser::declarationBody() {
     StorageClass sc;
     Qualifiers quals;
     const Type *base = specifiers(&sc, &quals);
+    const int baseEnum = lastEnum_;
 
     if (peek().is(";")) { at_++; return StmtPtr(new Block({})); }
 
@@ -2151,6 +2170,7 @@ StmtPtr Parser::declarationBody() {
             Declared td = declarator(base);
             typedefFunctionSuffix(td);
             defineTypedef(td);
+            typedefEnums_[td.name] = enumOf(td.type, base, baseEnum);
         } while (consume(","));
         expect(";");
         return StmtPtr(new Block({}));
@@ -2215,6 +2235,7 @@ StmtPtr Parser::declarationBody() {
                                  "to take one from");
             }
             declareStaticLocal(d.name, d.type, d.pos, symbol);
+            fnVars_.back().enumType = enumOf(d.type, base, baseEnum);
             locals_.back().isConst = d.objectIsConst(quals.isConst);
             current_->globals.push_back(Global{ symbol, d.type, std::move(pieces),
                                                 hasInit, true,
@@ -2236,6 +2257,7 @@ StmtPtr Parser::declarationBody() {
         }
 
         declare(d.name, d.type, d.pos);
+        fnVars_.back().enumType = enumOf(d.type, base, baseEnum);
         locals_.back().isConst = d.objectIsConst(quals.isConst);
         locals_.back().isRegister = (sc == StorageRegister);
 
@@ -2489,11 +2511,13 @@ StmtPtr Parser::block() {
             src_.fail(peek().pos, "unclosed '{'");
         body.push_back(atDeclarationStart() ? declaration() : statement());
     }
+    const std::size_t endPos = peek().pos;
     expect("}");
     if (!isBody) leaveBlock();
     leaveScope();
     Block *b = new Block(std::move(body));
     b->setScope(scope);
+    b->setEndPos(endPos);
 
     b->setPos(pos);
     return StmtPtr(b);
@@ -2598,6 +2622,7 @@ void Parser::topLevel(Program &program) {
     Qualifiers quals;
     std::size_t scPos = peek().pos;
     const Type *base = specifiers(&sc, &quals);
+    const int baseEnum = lastEnum_;
 
     if (peek().is(";")) { at_++; return; }
 
@@ -2613,6 +2638,7 @@ void Parser::topLevel(Program &program) {
             Declared td = declarator(base);
             typedefFunctionSuffix(td);
             defineTypedef(td);
+            typedefEnums_[td.name] = enumOf(td.type, base, baseEnum);
         } while (consume(","));
         expect(";");
         return;
@@ -2679,6 +2705,7 @@ void Parser::topLevel(Program &program) {
                         program.globals.push_back(Global{ d.name, d.type, pieces,
                                                           hasInit, sc == StorageStatic,
                                                           prev->isConst });
+                        program.globals.back().enumType = enumOf(d.type, base, baseEnum);
                     } else {
                         for (Global &g : program.globals)
                             if (g.name == d.name) {
@@ -2701,6 +2728,7 @@ void Parser::topLevel(Program &program) {
                 program.globals.push_back(Global{ d.name, d.type, std::move(pieces),
                                                   hasInit, sc == StorageStatic,
                                                   objectIsConst });
+            if (sc != StorageExtern) program.globals.back().enumType = enumOf(d.type, base, baseEnum);
             if (!consume(",")) break;
             d = declarator(base);
         }
@@ -2731,6 +2759,7 @@ void Parser::topLevel(Program &program) {
                 StorageClass psc;
                 Qualifiers pquals;
                 const Type *pt = specifiers(&psc, &pquals);
+                const int paramEnum = lastEnum_;
                 if (psc != StorageNone && psc != StorageRegister)
                     src_.fail(pscPos, "'register' is the only storage class a "
                                       "parameter may have");
@@ -2748,6 +2777,7 @@ void Parser::topLevel(Program &program) {
                     inParams_ = true;
                     off = declare(pd.name, pd.type, pd.pos);
                     inParams_ = false;
+                    fnVars_.back().enumType = enumOf(pd.type, pt, paramEnum);
                     locals_.back().isConst = pd.objectIsConst(pquals.isConst);
                     locals_.back().isRegister = (psc == StorageRegister);
                 }
@@ -2818,5 +2848,6 @@ Program Parser::parse() {
         topLevel(program);
     if (program.functions.empty())
         src_.fail(0, "the file defines no functions");
+    program.enums = enumTypes_;
     return program;
 }

@@ -15,6 +15,11 @@ void Walker::markLine(std::size_t pos) {
     notCode_ += emittedSize() - before;
 }
 
+void Walker::markClosingBrace(const Stmt &body) {
+    if (!marksClosingBrace()) return;
+    if (const Block *b = dynamic_cast<const Block *>(&body)) markLine(b->endPos());
+}
+
 void Walker::visit(const ExprStmt &n) { markLine(n); n.expr().accept(*this); }
 
 void Walker::resetBlocks(const std::vector<int> &parents) {
@@ -92,6 +97,7 @@ void Walker::visit(const While &n) {
     genTruth(n.cond());
     branchIfZero(label("end", id));
     n.body().accept(*this);
+    markClosingBrace(n.body());
     jump(label("begin", id));
     defineLabel(label("end", id));
     jumps_.pop_back();
@@ -113,6 +119,11 @@ void Walker::visit(const For &n) {
         branchIfZero(label("end", id));
     }
     n.body().accept(*this);
+    // cl's loop jumps back from the brace, so the brace gets an instruction of its own here.
+    if (lines_ != nullptr && marksClosingBrace() && dynamic_cast<const Block *>(&n.body()) != nullptr) {
+        markClosingBrace(n.body());
+        jump(label("step", id));
+    }
     defineLabel(label("step", id));
     if (n.step()) {
         markLine(n);

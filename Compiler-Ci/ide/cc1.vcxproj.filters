@@ -16,6 +16,7 @@
     <ClCompile Include="..\src\main.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="..\src\backend\Arm64Darwin.cpp"><Filter>Source Files\backend</Filter></ClCompile>
     <ClCompile Include="..\src\backend\Backend.cpp"><Filter>Source Files\backend</Filter></ClCompile>
+    <ClCompile Include="..\src\backend\CodeView.cpp"><Filter>Source Files\backend</Filter></ClCompile>
     <ClCompile Include="..\src\backend\Dwarf.cpp"><Filter>Source Files\backend</Filter></ClCompile>
     <ClCompile Include="..\src\backend\Masm.cpp"><Filter>Source Files\backend</Filter></ClCompile>
     <ClCompile Include="..\src\backend\Optimizer.cpp"><Filter>Source Files\backend</Filter></ClCompile>
@@ -36,6 +37,7 @@
     <ClInclude Include="..\src\Type.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="..\src\backend\Arm64Darwin.h"><Filter>Header Files\backend</Filter></ClInclude>
     <ClInclude Include="..\src\backend\Backend.h"><Filter>Header Files\backend</Filter></ClInclude>
+    <ClInclude Include="..\src\backend\CodeView.h"><Filter>Header Files\backend</Filter></ClInclude>
     <ClInclude Include="..\src\backend\Dwarf.h"><Filter>Header Files\backend</Filter></ClInclude>
     <ClInclude Include="..\src\backend\Masm.h"><Filter>Header Files\backend</Filter></ClInclude>
     <ClInclude Include="..\src\backend\Optimizer.h"><Filter>Header Files\backend</Filter></ClInclude>

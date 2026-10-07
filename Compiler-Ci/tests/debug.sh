@@ -11,8 +11,9 @@
 # It runs on both machines that can debug what they compile: the Mac drives
 # lldb over arm64-darwin, the Linux box drives gdb over x86_64-linux. The
 # two debuggers say different things and the greps below know the difference.
-# x86_64-windows is not here because -g is refused there - MASM carries no
-# line table - and that refusal is itself one of the checks.
+# x86_64-windows in MASM is not here because -g is refused there - MASM carries
+# no line table - and that refusal is itself one of the checks. Its GNU spelling
+# writes CodeView for cdb (M10 W3), which is M10's m10.py oracle, run on Windows.
 #
 # Each case carries what to ask about it:
 #   // stop: N        break at line N, run, and be stopped at line N
@@ -38,16 +39,16 @@ OUT="$ROOT/tests/out-debug"
 
 # An optional target. With none it is the host's own, which is the debugger's
 # native case. 'x86_64-windows' compiles this same corpus for the Microsoft
-# ABI in the GNU spelling and debugs that - which Linux can do for the reason
-# tests/windows.sh sets out at length: a Windows-convention program calling no
-# library is a self-contained blob, and every case here calls none. Checked,
+# ABI in the GNU spelling for ELF (-masm=gnu-elf) and debugs that - which Linux
+# can do for the reason tests/windows.sh sets out at length: a Windows-convention
+# program calling no library is a self-contained blob, and every case here calls none. Checked,
 # not assumed - a case that grew a printf would run under the wrong ABI and
 # fail here in a way that looks like a debug-information bug.
 ARCH="${1:-}"
 ARCHFLAGS=""
 WHAT=""
 if [ -n "$ARCH" ]; then
-    ARCHFLAGS="-arch $ARCH -masm=gnu"
+    ARCHFLAGS="-arch $ARCH -masm=gnu-elf"
     WHAT=", $ARCH"
     OUT="$OUT-$(echo "$ARCH" | tr -d ' ')"
     # Comments stripped first. This codebase's cases carry long explanatory
@@ -298,11 +299,20 @@ fi
 
 # ...and accepted in the spelling that can, which is the other half. A
 # refusal that never lifts is indistinguishable from one that is always right.
-if "$CC1" -g -S -arch x86_64-windows -masm=gnu "$SRC/lines.c" \
+if "$CC1" -g -S -arch x86_64-windows -masm=gnu-elf "$SRC/lines.c" \
         -o "$OUT/wgnu.s" 2>/dev/null && grep -q '\.debug_info' "$OUT/wgnu.s"; then
-    report ok "-g" "is accepted for x86_64-windows with -masm=gnu"
+    report ok "-g" "is accepted for x86_64-windows with -masm=gnu-elf"
 else
-    report no "-g" "wrote no DWARF for x86_64-windows with -masm=gnu"
+    report no "-g" "wrote no DWARF for x86_64-windows with -masm=gnu-elf"
+fi
+
+# The COFF spelling's is CodeView, which cdb reads: link.exe drops DWARF from a COFF object.
+if "$CC1" -g -S -arch x86_64-windows -masm=gnu "$SRC/lines.c" \
+        -o "$OUT/wcoff.s" 2>/dev/null && grep -q 'debug\$S' "$OUT/wcoff.s" &&
+        ! grep -q '\.debug_info' "$OUT/wcoff.s"; then
+    report ok "-g" "writes CodeView for x86_64-windows with -masm=gnu"
+else
+    report no "-g" "wrote no CodeView for x86_64-windows with -masm=gnu"
 fi
 
 # And nothing leaks into an ordinary compile.

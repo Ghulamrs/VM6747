@@ -50,8 +50,9 @@ bit-field on Windows, where `unsigned long` is 32 bits and refusing is right.
 Mac, since the Mac is the machine that can execute it. `x86_64-windows` writes
 **MASM** by default, which `ml64` assembles and `link.exe` links, so nothing in
 that path is borrowed from another toolchain; `-masm=gnu` writes the GNU
-spelling instead, which is what the suites that assemble with gcc and clang
-pass.
+spelling of a COFF object instead, which clang assembles, with unwind data and,
+under `-g`, CodeView for cdb (M10 W3); `-masm=gnu-elf` writes the same
+instructions for an ELF object, which is what the Linux suites assemble with gcc.
 
 Use `./build` rather than calling `make` directly. It puts the whole build
 inside a memory cgroup, so a compile that runs away is killed by itself instead
@@ -417,11 +418,6 @@ so this is not a strictly conforming C90 implementation. They are declined
 rather than pending: C23 deleted both, and trigraphs would silently change what
 existing correct programs mean — `printf("What??!")` would start printing
 `What|`. `tests/c90-probe.sh` reads 31 of 33, and these are the two.
-
-**Unwind data on the GNU Windows path.** `.pdata` and `.xdata` are emitted for
-`x86_64-windows` through MASM, which is the default. `-masm=gnu` writes none,
-because GAS built for ELF rejects `.seh_*` outright and that output is
-assembled on Linux by the cross-check suite.
 
 Everything else this section used to list has been written, and several of them
 were never as far away as it said. Initialisers for arrays and structs sat here

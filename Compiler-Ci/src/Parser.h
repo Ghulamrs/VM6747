@@ -136,6 +136,14 @@ private:
     // typedef stayed visible after the block closed. Both were wrong, and both were this missing vector.
     std::vector<std::size_t> typedefStarts_;
     std::vector<EnumConst> enums_;
+    // The enums as types, for the debugger only (Program::enums): by tag, by typedef
+    // name, and the one the last specifiers() named, or -1.
+    std::vector<EnumType> enumTypes_;
+    std::unordered_map<std::string, int> enumTags_, typedefEnums_;
+    int lastEnum_ = -1;
+    int enumOf(const Type *declared, const Type *base, int baseEnum) const {
+        return baseEnum >= 0 && declared == base ? baseEnum : -1;
+    }
     std::unordered_map<std::string, std::size_t> enumIndex_;
     int strings_ = 0;
     int loopDepth_ = 0;

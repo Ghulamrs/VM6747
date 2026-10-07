@@ -138,9 +138,12 @@ void Driver::usage(char *file) {
         "         lnk6x where CCS is (C90_TI names its C6000 compiler directory,\n"
         "         C90_TILIB one holding rts6740_elf_eh.lib)\n"
         "       -masm picks the assembly syntax for x86_64-windows: 'masm' for\n"
-        "         ml64, which is the default, or 'gnu' for the GNU spelling\n"
+        "         ml64, which is the default; 'gnu' for the GNU spelling of a COFF\n"
+        "         object, which clang assembles; 'gnu-elf' for the same code in\n"
+        "         an ELF object, as the Linux suites run the Microsoft convention\n"
         "       -g writes a line table, so a debugger can stop on a line of C\n"
-        "         and step through it; x86_64-linux and arm64-darwin only\n"
+        "         and step through it: DWARF, or CodeView for cdb with -masm=gnu\n"
+        "         on x86_64-windows; not in the MASM spelling\n"
         "       -time reports how long each phase took\n", program::kName, cc1Version(), file);
 }
 
@@ -296,6 +299,36 @@ const char *Driver::hostAssembler() {
     return (env != nullptr && env[0] != '\0') ? env : "ml64.exe";
 }
 
+// **clang for the GNU spelling, asked for the Microsoft target**: ml64 reads only MASM.
+// Visual Studio's own (the "C++ Clang tools" component) in any edition, then LLVM's, then
+// PATH. C90_CLANG names one; not C90_AS, which names the MASM assembler.
+const char *Driver::hostGnuAssembler() {
+    static std::string found;
+    static bool searched = false;
+    if (searched) return found.c_str();
+    searched = true;
+    const char *env = std::getenv(program::env("CLANG").c_str());
+    if (env != nullptr && env[0] != '\0') { found = env; return found.c_str(); }
+#ifdef _WIN32
+    std::vector<std::string> tries;
+    const std::string llvm = "\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe";
+    const char *vc = std::getenv("VCINSTALLDIR");
+    if (vc != nullptr && vc[0] != '\0') tries.push_back(std::string(vc) + "Tools\\Llvm\\x64\\bin\\clang.exe");
+    const std::string vs = askVswhere();
+    if (!vs.empty()) tries.push_back(vs + llvm);
+    static const char *const editions[] = { "Community", "Professional", "Enterprise", "BuildTools" };
+    for (const char *e : editions)
+        tries.push_back(std::string("C:\\Program Files\\Microsoft Visual Studio\\2022\\") + e + llvm);
+    tries.push_back("C:\\Program Files\\LLVM\\bin\\clang.exe");
+    char onPath[MAX_PATH];
+    if (SearchPathA(nullptr, "clang.exe", nullptr, MAX_PATH, onPath, nullptr) > 0) tries.push_back(onPath);
+    for (const std::string &t : tries)
+        if (std::ifstream(t.c_str()).good()) { found = t; return found.c_str(); }
+#endif
+    found = "clang";
+    return found.c_str();
+}
+
 const char *Driver::hostLinker() {
     const char *env = std::getenv(program::env("LD").c_str());
     return (env != nullptr && env[0] != '\0') ? env : "link.exe";
@@ -305,8 +338,6 @@ bool Driver::targetIsTi() const {
     return std::strcmp(backend_->name(), "tms6747") == 0;
 }
 
-// A file beside this program - RIDE lays asm6x.exe beside c90.exe - or
-// nothing, when argv[0] was a bare name found on PATH.
 // **A file name with `*` or `?` in it, expanded here**, as cl does: cmd hands the pattern through as
 // written, and a POSIX shell only when it was quoted. Sorted; a file already named is not taken twice.
 static bool expandPattern(const std::string &arg, std::vector<std::string> &into) {
@@ -352,6 +383,8 @@ static bool distinctOutputs(const char *program, const std::vector<std::string> 
     return true;
 }
 
+// A file beside this program - RIDE lays asm6x.exe beside c90.exe - or
+// nothing, when argv[0] was a bare name found on PATH.
 static std::string besideProgram(const std::string &program, const char *leaf) {
     std::size_t slash = program.find_last_of("/\\");
     if (slash == std::string::npos) return std::string();
@@ -485,6 +518,15 @@ std::vector<std::pair<std::string, std::string> > Driver::macrosFor() const {
     return macros;
 }
 
+// One assembly file to one object: clang for the GNU spelling, ml64 for MASM.
+std::string Driver::windowsAssemble(const std::string &source, const std::string &object) {
+    if (windowsAsmIsGnu())
+        return shellQuote(hostGnuAssembler()) + " -target x86_64-pc-windows-msvc -c " +
+               shellQuote(source) + " -o " + shellQuote(object);
+    return shellQuote(hostAssembler()) + " /nologo /c /Fo " + shellQuote(object) + " " +
+           shellQuote(source);
+}
+
 bool Driver::assembleObjects() {
     for (std::size_t i = 0; i < temporaries_.size(); i++) {
         std::string command;
@@ -493,9 +535,7 @@ bool Driver::assembleObjects() {
             command += " " + shellQuote(temporaries_[i]);
             command += " -o " + shellQuote(objects_[i]);
         } else if (hostIsWindows()) {
-            command = shellQuote(hostAssembler());
-            command += " /nologo /c /Fo " + shellQuote(objects_[i]);
-            command += " " + shellQuote(temporaries_[i]);
+            command = windowsAssemble(temporaries_[i], objects_[i]);
         } else {
             command = shellQuote(hostCompiler());
 
@@ -582,8 +622,7 @@ bool Driver::link() {
             std::size_t dot = t.rfind('.');
             std::string obj = (dot == std::string::npos ? t : t.substr(0, dot))
                               + ".obj";
-            std::string step = shellQuote(hostAssembler());
-            step += " /nologo /c /Fo " + shellQuote(obj) + " " + shellQuote(t);
+            const std::string step = windowsAssemble(t, obj);
             if (runTool(step) != 0) {
                 std::fprintf(stderr, "%s: the assembler failed - the command "
                                      "was:\n  %s\n", program_.c_str(),
@@ -597,6 +636,8 @@ bool Driver::link() {
 
         command = shellQuote(hostLinker());
         command += " /nologo /subsystem:console /out:" + shellQuote(linkTo_);
+        // -g's CodeView goes into a PDB beside the program, which is where cdb looks.
+        if (debug_) command += " /debug";
         for (const std::string &o : objects) command += " " + shellQuote(o);
 
         command += " libcmt.lib libucrt.lib libvcruntime.lib kernel32.lib"
@@ -680,13 +721,15 @@ bool Driver::parseArguments(int argc, char **argv) {
         } else if (std::strncmp(argv[i], "-masm=", 6) == 0) {
             const char *want = argv[i] + 6;
             if (std::strcmp(want, "gnu") == 0) {
-                setWindowsAsmSyntax(true);
+                setWindowsAsmSyntax(WindowsAsm::Gnu);
+            } else if (std::strcmp(want, "gnu-elf") == 0) {
+                setWindowsAsmSyntax(WindowsAsm::GnuElf);
             } else if (std::strcmp(want, "masm") == 0 ||
                        std::strcmp(want, "intel") == 0) {
-                setWindowsAsmSyntax(false);
+                setWindowsAsmSyntax(WindowsAsm::Masm);
             } else {
                 std::fprintf(stderr,
-                    "%s: -masm= takes 'masm' or 'gnu', not '%s'\n", argv[0], want);
+                    "%s: -masm= takes 'masm', 'gnu' or 'gnu-elf', not '%s'\n", argv[0], want);
                 return false;
             }
         } else if (std::strncmp(argv[i], "-arch", 5) == 0) {
@@ -784,9 +827,9 @@ bool Driver::parseArguments(int argc, char **argv) {
                      "%s: -g asks where each line of C went, and this compiler "
                      "writes no such thing for %s in the MASM spelling: MASM "
                      "carries no line table and ml64 builds none from it, and "
-                     "a native Windows debugger wants CodeView rather than "
-                     "DWARF. Add -masm=gnu, which does carry one, or compile "
-                     "without -g.\n",
+                     "a native Windows debugger wants CodeView. Add -masm=gnu, "
+                     "whose COFF spelling clang assembles with CodeView, or "
+                     "compile without -g.\n",
                      argv[0], backend_->name());
         return false;
     }

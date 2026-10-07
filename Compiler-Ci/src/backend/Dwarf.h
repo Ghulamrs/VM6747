@@ -23,6 +23,14 @@ struct DwarfFunction {
     const std::vector<Local> *locals;
 
     std::vector<DwarfBlock> blocks;
+
+    // For CodeView (CodeView.h): the symbol, the labels after the prologue and
+    // after the code, the bytes the prologue allocates, and whether `...` ends the parameters.
+    std::string symbol;
+    std::string prologEnd;
+    std::string codeEnd;
+    int frameSize = 0;
+    bool variadic = false;
 };
 
 struct DwarfGlobal {
@@ -30,6 +38,7 @@ struct DwarfGlobal {
     std::string symbol;
     const Type *type;
     bool external;
+    int enumType = -1;
 };
 
 struct DwarfSpelling {

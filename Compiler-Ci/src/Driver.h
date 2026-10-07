@@ -69,6 +69,8 @@ private:
     static const char *hostCompiler();
     static const char *hostAssembler();
     static const char *hostLinker();
+    static const char *hostGnuAssembler();
+    static std::string windowsAssemble(const std::string &source, const std::string &object);
     // **The tms6747 target is assembled and linked on any host**: by asm6x,
     // the project's own C6000 assembler, and by TI's lnk6x where CCS is.
     bool targetIsTi() const;

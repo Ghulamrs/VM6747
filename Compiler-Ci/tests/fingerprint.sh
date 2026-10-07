@@ -71,13 +71,14 @@ else echo "FATAL: no sha256 tool"; exit 1
 fi
 
 # Every spelling the compiler can write, named as it will appear in the
-# fingerprint. The Windows target twice, because MASM and the GNU form of the
-# same target are different text and a change can move one without the other.
+# fingerprint. The Windows target three times - MASM, GNU for COFF and GNU for
+# ELF are different text, and a change can move one without the others.
 # tms6747 since 2026-09-14: the one target the differential suites run only
 # on an emulator gets the text check the other three always had.
 SPELLINGS="x86_64-linux:
 x86_64-windows:
 x86_64-windows:-masm=gnu
+x86_64-windows:-masm=gnu-elf
 arm64-darwin:
 tms6747:"
 

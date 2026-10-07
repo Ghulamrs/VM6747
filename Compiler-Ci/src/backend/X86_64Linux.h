@@ -59,6 +59,10 @@ public:
 protected:
 
     virtual bool writesDwarf() const { return true; }
+    // The debug information -g writes, and the name a source file is given in it.
+    virtual void writeDebug(const std::vector<DwarfFunction> &fns,
+                            const std::vector<DwarfGlobal> &globals);
+    virtual std::string debugFileName(const std::string &name) const { return name; }
 
     std::string out_;
     // Measured after the IR has written out, so the count is of real text.
@@ -71,6 +75,8 @@ protected:
         a_ = &opt_;
     }
     Spelling *a_ = &gnu_;
+    // The program's enums, for a debug writer that names them (CodeView).
+    const std::vector<EnumType> *enums_ = nullptr;
     Optimizer opt_;
 
 private:
@@ -96,6 +102,12 @@ private:
     int varGp_ = 0, varFp_ = 48, varOverflow_ = 16;
 
     void emit(const Function &fn);
+    // The function's closing brace, the return that is its last statement if one is, and
+    // the call that return returns if it returns one: cl gives what follows each the brace's line.
+    std::size_t closingBrace_ = 0;
+    const Return *finalReturn_ = nullptr;
+    const Call *finalCall_ = nullptr;
+    void jumpToReturn(const Return &n);
     void finishChunk();
     std::string label(const char *kind, int id) const override;
     std::string userLabel(const std::string &name) const override;

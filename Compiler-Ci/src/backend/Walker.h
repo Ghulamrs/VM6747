@@ -41,6 +41,10 @@ protected:
     const Source *lineSource() const { return lines_; }
     const std::string &compDir() const { return compDir_; }
     virtual void emitLoc(int file, int line, int column) { (void)file; (void)line; (void)column; }
+    // Whether a closing brace has a line of its own - a loop's jump back, a function's
+    // epilogue - as cl /Zi gives it. CodeView's line tables only; DWARF's are as they were.
+    virtual bool marksClosingBrace() const { return false; }
+    void markClosingBrace(const Stmt &body);
 
     virtual void defineLabel(const std::string &l) = 0;
     virtual void jump(const std::string &l) = 0;

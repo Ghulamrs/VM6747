@@ -982,6 +982,7 @@ void X86_64Linux::visit(const Call &n) {
 
     if (n.callee() != nullptr) a_->ins("call", ind("%r11"));
     else                       a_->ins("call", lbl(n.name()));
+    if (&n == finalCall_) markLine(closingBrace_);
 
     int unwind = stackSlots + padSlots + shadowSlots;
     if (unwind > 0) {
@@ -1140,7 +1141,7 @@ void X86_64Linux::caseBranch(long long v, const std::string &l) {
 void X86_64Linux::visit(const Return &n) {
     markLine(n);
     if (!n.hasValue()) {
-        a_->ins("jmp", lbl(returnLabel_));
+        jumpToReturn(n);
         return;
     }
     n.value().accept(*this);
@@ -1149,7 +1150,7 @@ void X86_64Linux::visit(const Return &n) {
         a_->ins("mov", mem(-(sretSlot_), "%rbp"), reg(abi_.scratch));
         copyBlock(n.value().type()->size(target_));
         a_->ins("mov", mem(-(sretSlot_), "%rbp"), reg("%rax"));
-        a_->ins("jmp", lbl(returnLabel_));
+        jumpToReturn(n);
         return;
     }
 
@@ -1163,7 +1164,7 @@ void X86_64Linux::visit(const Return &n) {
             else if (size == 4) a_->ins("movl", mem("%rcx"), reg("%eax"));
             else if (size == 2) a_->ins("movzwl", mem("%rcx"), reg("%eax"));
             else                a_->ins("movzbl", mem("%rcx"), reg("%eax"));
-            a_->ins("jmp", lbl(returnLabel_));
+            jumpToReturn(n);
             return;
         }
 
@@ -1184,6 +1185,13 @@ void X86_64Linux::visit(const Return &n) {
             }
         }
     }
+    jumpToReturn(n);
+}
+
+// **The last statement's return jumps from the closing brace's line**, as cl's falls into
+// its epilogue; from its call's return address on when it returns a call, as cl's does.
+void X86_64Linux::jumpToReturn(const Return &n) {
+    if (&n == finalReturn_) markLine(closingBrace_);
     a_->ins("jmp", lbl(returnLabel_));
 }
 
@@ -1218,6 +1226,11 @@ void X86_64Linux::emit(const Function &fn) {
         d.external = !fn.isStatic();
         d.returns = fn.returns();
         d.locals = &fn.locals();
+        d.symbol = fn.name();
+        d.prologEnd = CoffSpelling::prologEnd(fn.name());
+        d.codeEnd = CoffSpelling::codeEnd(fn.name());
+        d.frameSize = fn.frameSize();
+        d.variadic = fn.isVariadic();
         dwarfFns_.push_back(d);
         resetBlocks(fn.blocks());
         a_->defLabel(d.begin);
@@ -1339,7 +1352,19 @@ void X86_64Linux::emit(const Function &fn) {
     varFp_ = 48 + sses * 16;
     varOverflow_ = abi_.positional ? 16 + ints * 8 : stackAt;
 
+    const Block *body = dynamic_cast<const Block *>(&fn.body());
+    closingBrace_ = body != nullptr ? body->endPos() : 0;
+    finalReturn_ = nullptr;
+    finalCall_ = nullptr;
+    if (marksClosingBrace() && body != nullptr && !body->body().empty())
+        finalReturn_ = dynamic_cast<const Return *>(body->body().back().get());
+    if (finalReturn_ != nullptr && finalReturn_->hasValue()) {
+        const Expr *value = &finalReturn_->value();
+        while (const Cast *c = dynamic_cast<const Cast *>(value)) value = &c->value();
+        finalCall_ = dynamic_cast<const Call *>(value);
+    }
     fn.body().accept(*this);
+    if (marksClosingBrace()) markLine(closingBrace_);
 
     if (sretSlot_ != 0)                     a_->ins("mov", mem(-(sretSlot_), "%rbp"), reg("%rax"));
     else if (isX87(fn.returns()))           a_->ins("fldz");
@@ -1434,7 +1459,13 @@ void X86_64Linux::emitData(const Program &program) {
     }
 }
 
+void X86_64Linux::writeDebug(const std::vector<DwarfFunction> &fns,
+                             const std::vector<DwarfGlobal> &globals) {
+    writeDwarf(out_, kElfDwarf, target_, lineSource()->files().front(), compDir(), fns, globals);
+}
+
 void X86_64Linux::run(const Program &program) {
+    enums_ = &program.enums;
 
     std::vector<std::string> defined;
     for (const Function &fn : program.functions) defined.push_back(fn.name());
@@ -1445,7 +1476,7 @@ void X86_64Linux::run(const Program &program) {
     if (const Source *src = lineSource()) {
         const std::vector<std::string> &names = src->files();
         for (std::size_t i = 0; i < names.size(); i++)
-            a_->fileEntry(static_cast<int>(i) + 1, names[i]);
+            a_->fileEntry(static_cast<int>(i) + 1, debugFileName(names[i]));
     }
 
     emitData(program);
@@ -1459,10 +1490,10 @@ void X86_64Linux::run(const Program &program) {
             dg.symbol = g.name;
             dg.type = g.type;
             dg.external = !g.isStatic;
+            dg.enumType = g.enumType;
             dwarfGlobals_.push_back(dg);
         }
-        writeDwarf(out_, kElfDwarf, target_, lineSource()->files().front(),
-                   compDir(), dwarfFns_, dwarfGlobals_);
+        writeDebug(dwarfFns_, dwarfGlobals_);
         finishChunk();
     }
 
