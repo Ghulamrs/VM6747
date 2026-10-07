@@ -37,6 +37,7 @@ struct DwarfGlobal {
     std::string symbol;
     const Type *type;
     bool external;
+    int enumType = -1;
 };
 
 struct DwarfSpelling {

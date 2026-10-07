@@ -1344,6 +1344,8 @@ void X86_64Linux::emit(const Function &fn) {
     varOverflow_ = abi_.positional ? 16 + ints * 8 : stackAt;
 
     fn.body().accept(*this);
+    if (marksClosingBrace())
+        if (const Block *body = dynamic_cast<const Block *>(&fn.body())) markLine(body->endPos());
 
     if (sretSlot_ != 0)                     a_->ins("mov", mem(-(sretSlot_), "%rbp"), reg("%rax"));
     else if (isX87(fn.returns()))           a_->ins("fldz");
@@ -1444,6 +1446,7 @@ void X86_64Linux::writeDebug(const std::vector<DwarfFunction> &fns,
 }
 
 void X86_64Linux::run(const Program &program) {
+    enums_ = &program.enums;
 
     std::vector<std::string> defined;
     for (const Function &fn : program.functions) defined.push_back(fn.name());
@@ -1468,6 +1471,7 @@ void X86_64Linux::run(const Program &program) {
             dg.symbol = g.name;
             dg.type = g.type;
             dg.external = !g.isStatic;
+            dg.enumType = g.enumType;
             dwarfGlobals_.push_back(dg);
         }
         writeDebug(dwarfFns_, dwarfGlobals_);

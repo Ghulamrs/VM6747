@@ -74,11 +74,12 @@ private:
     void writeDebug(const std::vector<DwarfFunction> &fns,
                     const std::vector<DwarfGlobal> &globals) override {
         writeCodeView(out_, coffTarget_, codeViewPath(compDir(), lineSource()->files().front() + ".obj"),
-                      fns, globals);
+                      fns, globals, *enums_);
     }
     std::string debugFileName(const std::string &name) const override {
         return codeViewPath(compDir(), name);
     }
+    bool marksClosingBrace() const override { return true; }
 
     const Target &coffTarget_;
     CoffSpelling coff_;

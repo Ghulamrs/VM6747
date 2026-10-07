@@ -17,8 +17,9 @@ const int kFrameFlags = (2 << 14) | (2 << 16);
 const unsigned kLfPointer = 0x1002, kLfProcedure = 0x1008, kLfArgList = 0x1201;
 const unsigned kLfFieldList = 0x1203, kLfBitField = 0x1205, kLfArray = 0x1503;
 const unsigned kLfStructure = 0x1505, kLfUnion = 0x1506, kLfMember = 0x150d;
-const unsigned kLfULong = 0x8004, kLfUQuad = 0x800a;
-const unsigned kTVoid = 0x03, kTUQuad = 0x23, kT64Pointer = 0x0600, kFirstType = 0x1000;
+const unsigned kLfEnum = 0x1507, kLfEnumerate = 0x1502;
+const unsigned kLfLong = 0x8003, kLfULong = 0x8004, kLfUQuad = 0x800a;
+const unsigned kTVoid = 0x03, kTInt4 = 0x74, kTUQuad = 0x23, kT64Pointer = 0x0600, kFirstType = 0x1000;
 
 // A 64-bit pointer (CV_PTR_64, 0x0c) of size 8; a declaration standing for a definition elsewhere.
 const unsigned kPointer64 = 0x0c | (8 << 13), kForwardRef = 0x80, kPublic = 3;
@@ -84,6 +85,12 @@ public:
         u32(static_cast<unsigned>(v & 0xffffffffULL));
         u32(static_cast<unsigned>(v >> 32));
     }
+    // A signed one: a negative value as LF_LONG, which holds any an enum constant can have.
+    void numeric(long long v) {
+        if (v >= 0) { numeric(static_cast<unsigned long long>(v)); return; }
+        u16(kLfLong);
+        u32(static_cast<unsigned>(v));
+    }
     void pad() {
         while (b_.size() % 4 != 0) u8(0xf0 | (4 - b_.size() % 4));
     }
@@ -103,7 +110,15 @@ private:
 // names that, so a struct that points at itself needs no record before its own.
 class Types {
 public:
-    explicit Types(const Target &target) : target_(target) {}
+    Types(const Target &target, const std::vector<EnumType> &enums)
+        : target_(target), enums_(enums), enumIndices_(enums.size(), 0) {}
+
+    // A declaration's type: the enum it named in place of int, where it named one.
+    unsigned declared(const Type *t, int enumType) {
+        if (enumType < 0 || static_cast<std::size_t>(enumType) >= enums_.size() || t->kind() != Kind::Int)
+            return index(t);
+        return enumIndex(enumType);
+    }
 
     unsigned index(const Type *t) {
         if (t == nullptr) return kTVoid;
@@ -113,22 +128,20 @@ public:
         unsigned n = 0;
         if (t->isPointer()) n = pointer(t->pointee());
         else if (t->isArray()) n = array(t);
-        else if (t->isFunction()) n = procedure(t->returns(), t->params(), t->isVariadicFn());
+        else if (t->isFunction()) n = function(t);
         else if (t->isStructOrUnion()) n = aggregate(t);
         done_[t] = n;
         return n;
     }
 
-    unsigned procedure(const Type *returns, const std::vector<const Type *> &params, bool variadic) {
-        std::vector<unsigned> args;
-        for (const Type *p : params) args.push_back(index(p));
+    unsigned procedure(unsigned returns, std::vector<unsigned> args, bool variadic) {
         if (variadic) args.push_back(0);
         Record list(kLfArgList);
         list.u32(static_cast<unsigned>(args.size()));
         for (unsigned a : args) list.u32(a);
         const unsigned listIndex = add(list);
         Record r(kLfProcedure);
-        r.u32(index(returns));
+        r.u32(returns);
         r.u8(0);
         r.u8(0);
         r.u16(static_cast<unsigned>(args.size()));
@@ -158,6 +171,8 @@ public:
 
 private:
     const Target &target_;
+    const std::vector<EnumType> &enums_;
+    std::vector<unsigned> enumIndices_;
     std::map<const Type *, unsigned> done_, forward_;
     std::vector<std::vector<unsigned char> > records_;
     std::vector<std::pair<std::string, unsigned> > tags_;
@@ -169,6 +184,35 @@ private:
 
     static std::string tagOf(const Type *t) {
         return t->tag().empty() ? std::string("<unnamed-tag>") : t->tag();
+    }
+
+    unsigned enumIndex(int n) {
+        if (enumIndices_[n] != 0) return enumIndices_[n];
+        const EnumType &e = enums_[n];
+        Record fields(kLfFieldList);
+        for (const std::pair<std::string, long long> &v : e.values) {
+            fields.u16(kLfEnumerate);
+            fields.u16(kPublic);
+            fields.numeric(v.second);
+            fields.text(v.first);
+            fields.pad();
+        }
+        const unsigned fieldList = add(fields);
+        Record r(kLfEnum);
+        r.u16(static_cast<unsigned>(e.values.size()));
+        r.u16(0);
+        r.u32(kTInt4);
+        r.u32(fieldList);
+        r.text(e.tag.empty() ? std::string("<unnamed-tag>") : e.tag);
+        enumIndices_[n] = add(r);
+        if (!e.tag.empty()) tags_.push_back(std::make_pair(e.tag, enumIndices_[n]));
+        return enumIndices_[n];
+    }
+
+    unsigned function(const Type *t) {
+        std::vector<unsigned> args;
+        for (const Type *p : t->params()) args.push_back(index(p));
+        return procedure(index(t->returns()), args, t->isVariadicFn());
     }
 
     unsigned pointer(const Type *to) {
@@ -198,7 +242,7 @@ private:
         r.u16(kForwardRef);
         r.u32(0);
         if (!isUnion) { r.u32(0); r.u32(0); }
-        r.numeric(0);
+        r.numeric(0ULL);
         r.text(tagOf(t));
         const unsigned n = add(r);
         forward_[t] = n;
@@ -226,7 +270,7 @@ private:
         for (const Member &m : ms) {
             if (m.name.empty()) { types.push_back(0); offsets.push_back(0); continue; }
             const int unit = m.isBitField() ? m.type->size(target_) : 1;
-            types.push_back(m.isBitField() ? bitField(m) : index(m.type));
+            types.push_back(m.isBitField() ? bitField(m) : declared(m.type, m.enumType));
             offsets.push_back(m.isBitField() ? (m.offset * 8 + m.bitOffset) / (unit * 8) * unit
                                              : m.offset);
         }
@@ -330,13 +374,13 @@ void writeData(Records &r, int kind, unsigned type, const std::string &symbol, c
 
 void writeLocal(Records &r, const Local &l, Types &types) {
     if (!l.staticName.empty()) {
-        writeData(r, kSLData32, types.index(l.type), l.staticName, l.name);
+        writeData(r, kSLData32, types.declared(l.type, l.enumType), l.staticName, l.name);
         return;
     }
     std::string &o = r.out();
     r.begin(kSRegRel32);
     num(o, "  .long", -static_cast<long long>(l.offset));
-    num(o, "  .long", types.index(l.type));
+    num(o, "  .long", types.declared(l.type, l.enumType));
     num(o, "  .short", kRegRbp);
     name(o, l.name);
     r.end();
@@ -380,10 +424,10 @@ void writeScope(Records &r, const DwarfFunction &f, int scope, Types &types) {
 }
 
 void writeFunction(Records &r, const DwarfFunction &f, int id, Types &types) {
-    std::vector<const Type *> params;
+    std::vector<unsigned> params;
     for (const Local &l : *f.locals)
-        if (l.isParam) params.push_back(l.type);
-    const unsigned type = types.procedure(f.returns, params, f.variadic);
+        if (l.isParam) params.push_back(types.declared(l.type, l.enumType));
+    const unsigned type = types.procedure(types.index(f.returns), params, f.variadic);
 
     std::string &o = r.out();
     r.openSubsection();
@@ -431,10 +475,11 @@ std::string codeViewPath(const std::string &compDir, const std::string &name) {
 
 void writeCodeView(std::string &out, const Target &target, const std::string &objectName,
                    const std::vector<DwarfFunction> &fns,
-                   const std::vector<DwarfGlobal> &globals) {
+                   const std::vector<DwarfGlobal> &globals,
+                   const std::vector<EnumType> &enums) {
     if (fns.empty()) return;
 
-    Types types(target);
+    Types types(target, enums);
     Records r(out);
     line(out, "  .section .debug$S,\"dr\"");
     line(out, "  .p2align 2");
@@ -444,7 +489,7 @@ void writeCodeView(std::string &out, const Target &target, const std::string &ob
 
     // The globals' types first, so the tags they define are known for S_UDT.
     std::vector<unsigned> globalTypes;
-    for (const DwarfGlobal &g : globals) globalTypes.push_back(types.index(g.type));
+    for (const DwarfGlobal &g : globals) globalTypes.push_back(types.declared(g.type, g.enumType));
     const bool any = !globals.empty() || !types.tags().empty();
     if (any) r.openSubsection();
     for (std::size_t i = 0; i < globals.size(); i++)

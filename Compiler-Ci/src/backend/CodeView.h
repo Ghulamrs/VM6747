@@ -14,8 +14,8 @@
 // then `.cv_linetable`; last S_GDATA32 or S_LDATA32 per global and S_UDT per tag.
 
 // .debug$T: LF_POINTER, LF_ARRAY, LF_STRUCTURE / LF_UNION over an LF_FIELDLIST of
-// LF_MEMBER (LF_BITFIELD for a bit-field), LF_PROCEDURE over LF_ARGLIST. Basic
-// types and pointers to them are CodeView's built-in indices and need no record.
+// LF_MEMBER (LF_BITFIELD for a bit-field), LF_ENUM over LF_ENUMERATEs, LF_PROCEDURE
+// over LF_ARGLIST. Basic types and pointers to them are built-in indices, with no record.
 
 // The line entries are the spelling's: CoffSpelling writes `.cv_file`, `.cv_func_id`
 // and `.cv_loc`. The design is cpp11's (Compiler-Cppi's CodeView.cpp, M10 W1 and W2);
@@ -29,7 +29,8 @@
 
 void writeCodeView(std::string &out, const Target &target, const std::string &objectName,
                    const std::vector<DwarfFunction> &fns,
-                   const std::vector<DwarfGlobal> &globals);
+                   const std::vector<DwarfGlobal> &globals,
+                   const std::vector<EnumType> &enums);
 
 // A source path as `.cv_file` wants it: absolute (cdb matches a breakpoint by it), backslashes doubled.
 std::string codeViewPath(const std::string &compDir, const std::string &name);

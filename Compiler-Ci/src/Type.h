@@ -33,6 +33,7 @@ struct Member {
     int offset;
     int width = 0;
     int bitOffset = 0;
+    int enumType = -1;
 
     bool isBitField() const { return width != 0; }
 };

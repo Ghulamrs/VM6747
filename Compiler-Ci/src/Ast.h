@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 class Num;
@@ -322,10 +323,14 @@ public:
 
     int scope() const { return scope_; }
     void setScope(int s) { scope_ = s; }
+    // Where the closing brace is: a function's epilogue has that line in CodeView.
+    std::size_t endPos() const { return endPos_; }
+    void setEndPos(std::size_t p) { endPos_ = p; }
     void accept(Visitor &v) const override { v.visit(*this); }
 private:
     std::vector<StmtPtr> body_;
     int scope_ = -1;
+    std::size_t endPos_ = 0;
 };
 
 class If final : public Stmt {
@@ -464,6 +469,8 @@ struct Local {
     std::string staticName;
 
     int scope = 0;
+    // The enum the declaration named, an index into Program::enums, or -1.
+    int enumType = -1;
 };
 
 class Function {
@@ -523,6 +530,7 @@ struct Global {
     bool isStatic;
 
     bool isConst;
+    int enumType = -1;
 };
 
 struct StringLit {
@@ -531,8 +539,17 @@ struct StringLit {
     int width;
 };
 
+// **An enum as a debugger names it**: its tag and constants. The type system knows
+// an enum only as int, and that is unchanged; this stands beside it for CodeView,
+// against a declaration whose type is the enum itself (Local, Member, Global::enumType).
+struct EnumType {
+    std::string tag;
+    std::vector<std::pair<std::string, long long> > values;
+};
+
 struct Program {
     std::vector<Function> functions;
     std::vector<Global> globals;
     std::vector<StringLit> strings;
+    std::vector<EnumType> enums;
 };

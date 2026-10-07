@@ -63,6 +63,8 @@ protected:
     virtual void writeDebug(const std::vector<DwarfFunction> &fns,
                             const std::vector<DwarfGlobal> &globals);
     virtual std::string debugFileName(const std::string &name) const { return name; }
+    // Whether the closing brace has a line of its own, the epilogue's, as cl /Zi gives it.
+    virtual bool marksClosingBrace() const { return false; }
 
     std::string out_;
     // Measured after the IR has written out, so the count is of real text.
@@ -75,6 +77,8 @@ protected:
         a_ = &opt_;
     }
     Spelling *a_ = &gnu_;
+    // The program's enums, for a debug writer that names them (CodeView).
+    const std::vector<EnumType> *enums_ = nullptr;
     Optimizer opt_;
 
 private:
