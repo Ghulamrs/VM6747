@@ -28,6 +28,7 @@ struct DwarfFunction {
     // after the code, the bytes the prologue allocates, and whether `...` ends the parameters.
     std::string symbol;
     std::string prologEnd;
+    std::string codeEnd;
     int frameSize = 0;
     bool variadic = false;
 };

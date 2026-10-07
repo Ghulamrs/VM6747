@@ -77,7 +77,8 @@ for src in "$SRC"/*.c; do
     winonly=$(sed -n 's|^// windows-only: *||p' "$src" | head -1)
     harness="$SRC/$name.S"
 
-    if ! "$CC1" -S -arch x86_64-windows -masm=gnu "$src" -o "$OUT/$name.s" 2> "$OUT/$name.cc1.err"; then
+    # gnu-elf: the Microsoft convention in an ELF object, which is what gcc here assembles.
+    if ! "$CC1" -S -arch x86_64-windows -masm=gnu-elf "$src" -o "$OUT/$name.s" 2> "$OUT/$name.cc1.err"; then
         echo "FAIL $name - cc1 refused it:"
         sed 's/^/       /' "$OUT/$name.cc1.err"
         fail=$((fail + 1))

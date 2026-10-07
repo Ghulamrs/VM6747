@@ -78,14 +78,14 @@ a primitive, where it is visibly a decision.
 **Three things vary per target and they are separate axes.** `Target` answers
 what the types measure; `Abi` answers how arguments travel; `Spelling` answers
 how an instruction is written down. One instruction stream serves both x86-64
-targets — `GnuSpelling` and `MasmSpelling` are the whole of what differs
-between them, which is why `-masm=gnu` and MASM produce the same program.
+targets — `GnuSpelling`, `CoffSpelling` and `MasmSpelling` are the whole of what
+differs between them, which is why `-masm=gnu`, `-masm=gnu-elf` and MASM produce
+the same program.
 
-**`backend/Dwarf.cpp`** writes the debug information for the targets that can
-carry it. `-g` is refused for `x86_64-windows` in the MASM spelling — ml64
-builds no line table, and a native Windows debugger wants CodeView rather than
-DWARF. The comment at the top of `backend/X86_64Windows.cpp` records what was
-measured about that, so it need not be measured again.
+**`backend/Dwarf.cpp`** writes the debug information for the ELF and Mach-O
+targets, **`backend/CodeView.cpp`** for `x86_64-windows` under `-masm=gnu`, where
+cdb reads it from the PDB link.exe makes. `-g` is refused in the MASM spelling —
+ml64 builds no line table. See the M10 W3 section below.
 
 ## The bug class this project produces
 
@@ -183,3 +183,51 @@ without the `break` it spun forever on `typedef long T;` where `T` was already a
 typedef. Stopping there is what lets the "typedefed twice" error be reached at
 all: it never was - 425 cases and not one of them redeclares a typedef, so the
 compiler hung instead of saying no, which is the worse of the two by a distance.
+
+## M10 W3, 2026-10-08: c90 under cdb
+
+**`-masm=gnu` on `x86_64-windows` is now the GNU spelling of a COFF object**, and
+the driver assembles it with clang (`-target x86_64-pc-windows-msvc`; Visual
+Studio's own, or `C90_CLANG`) rather than ml64, which reads only MASM and had
+been handed it. `CoffSpelling` (`backend/Spelling.h`) is the difference from the
+ELF spelling: `.section .rdata`, `.def` per function, `.balign`, and `.seh_*`
+round the one prologue every function has, so cdb can walk the stack - RBP is
+the frame register, which is why the pushes an expression makes need no unwind
+code. `link.exe` gets `/debug` under `-g`.
+
+**The old spelling is `-masm=gnu-elf`, byte for byte.** `tests/windows.sh` and
+`tests/debug.sh x86_64-windows` assemble the Microsoft convention with gcc for
+Linux and debug it with gdb, which wants ELF and DWARF; they now ask for that by
+name. `tests/fingerprint.txt` keeps the old digests under `-masm=gnu-elf` and has
+new ones for `-masm=gnu`. Measured: every case in `tests/` under `-masm=gnu-elf`
+is identical to what `-masm=gnu` wrote before, with and without `-g` and `-O2`.
+
+**`-g` there writes CodeView** (`backend/CodeView.cpp`), cpp11's design (its
+`CodeView.cpp`, M10 W1 and W2) in c90's own code: symbols in `.debug$S`, types in
+`.debug$T`; the header lists the records. Two things were found by comparing with
+cl /TC /Zi in cdb (`m10.py oracle` and `m10.py step`, `--compiler c90`), and the
+first made a difference to every function:
+
+- **cl gives a closing brace a line of its own.** A function's epilogue is the
+  brace's line, and so is the return address of a call that `return f();` makes
+  as the function's last statement; a loop jumps back from its body's brace.
+  Without those, a step out of a function skipped the brace and a frame above a
+  `return f();` named the wrong line. `Walker::marksClosingBrace` is true only
+  for the COFF code generator: the DWARF line tables are as they were, and a
+  `for` gets its one extra instruction (a jump to the step) only under `-g`.
+- **An enum is int to the type system, and stays so** - giving it a type of its
+  own would move every comparison of types by identity. The parser keeps each
+  enum's tag and constants beside it (`Program::enums`) and marks the
+  declarations whose type is the enum itself, which is what `LF_ENUM` needs for
+  `colour col = BLUE (0n6)`; a pointer to an enum still reads as `int *`.
+
+The end label CodeView measures a function by is `CoffSpelling`'s own: at `-O1`
+and up the walker's `.Lfunc.end.` label waits in the optimizer and, after the
+last function, is never written at all. The DWARF path still refers to it: `-g
+-O2` for x86_64-linux names `.Lfunc.end.main` and defines it nowhere, a fault left
+as it was here, since the ELF and Mach-O output was to stay byte for byte.
+
+`tests/m10/w3.c` is the gate case: at line 27 (innermost) and 33 (a nested
+block) `k` and `dv /t /V` name the same frames, lines, locals, types and values as
+cl's, and `m10.py step` walks the same lines over and into the calls. The same
+holds at the stop line of every case in `tests/debug/`.

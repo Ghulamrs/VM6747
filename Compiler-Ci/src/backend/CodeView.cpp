@@ -433,9 +433,9 @@ void writeFunction(Records &r, const DwarfFunction &f, int id, Types &types) {
     r.openSubsection();
     r.begin(f.external ? kSGProc32 : kSLProc32);
     line(o, "  .long 0, 0, 0");
-    line(o, "  .long " + f.end + "-" + f.symbol);
+    line(o, "  .long " + f.codeEnd + "-" + f.symbol);
     line(o, "  .long " + f.prologEnd + "-" + f.symbol);
-    line(o, "  .long " + f.end + "-" + f.symbol);
+    line(o, "  .long " + f.codeEnd + "-" + f.symbol);
     num(o, "  .long", type);
     line(o, "  .secrel32 " + f.symbol);
     line(o, "  .secidx " + f.symbol);
@@ -455,7 +455,7 @@ void writeFunction(Records &r, const DwarfFunction &f, int id, Types &types) {
     r.begin(kSEnd);
     r.end();
     r.closeSubsection();
-    line(o, "  .cv_linetable " + std::to_string(id) + ", " + f.symbol + ", " + f.end);
+    line(o, "  .cv_linetable " + std::to_string(id) + ", " + f.symbol + ", " + f.codeEnd);
 }
 
 }

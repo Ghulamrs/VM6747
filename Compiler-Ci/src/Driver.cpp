@@ -138,9 +138,12 @@ void Driver::usage(char *file) {
         "         lnk6x where CCS is (C90_TI names its C6000 compiler directory,\n"
         "         C90_TILIB one holding rts6740_elf_eh.lib)\n"
         "       -masm picks the assembly syntax for x86_64-windows: 'masm' for\n"
-        "         ml64, which is the default, or 'gnu' for the GNU spelling\n"
+        "         ml64, which is the default; 'gnu' for the GNU spelling of a COFF\n"
+        "         object, which clang assembles; 'gnu-elf' for the same code in\n"
+        "         an ELF object, as the Linux suites run the Microsoft convention\n"
         "       -g writes a line table, so a debugger can stop on a line of C\n"
-        "         and step through it; x86_64-linux and arm64-darwin only\n"
+        "         and step through it: DWARF, or CodeView for cdb with -masm=gnu\n"
+        "         on x86_64-windows; not in the MASM spelling\n"
         "       -time reports how long each phase took\n", program::kName, cc1Version(), file);
 }
 
@@ -718,13 +721,15 @@ bool Driver::parseArguments(int argc, char **argv) {
         } else if (std::strncmp(argv[i], "-masm=", 6) == 0) {
             const char *want = argv[i] + 6;
             if (std::strcmp(want, "gnu") == 0) {
-                setWindowsAsmSyntax(true);
+                setWindowsAsmSyntax(WindowsAsm::Gnu);
+            } else if (std::strcmp(want, "gnu-elf") == 0) {
+                setWindowsAsmSyntax(WindowsAsm::GnuElf);
             } else if (std::strcmp(want, "masm") == 0 ||
                        std::strcmp(want, "intel") == 0) {
-                setWindowsAsmSyntax(false);
+                setWindowsAsmSyntax(WindowsAsm::Masm);
             } else {
                 std::fprintf(stderr,
-                    "%s: -masm= takes 'masm' or 'gnu', not '%s'\n", argv[0], want);
+                    "%s: -masm= takes 'masm', 'gnu' or 'gnu-elf', not '%s'\n", argv[0], want);
                 return false;
             }
         } else if (std::strncmp(argv[i], "-arch", 5) == 0) {
@@ -822,9 +827,9 @@ bool Driver::parseArguments(int argc, char **argv) {
                      "%s: -g asks where each line of C went, and this compiler "
                      "writes no such thing for %s in the MASM spelling: MASM "
                      "carries no line table and ml64 builds none from it, and "
-                     "a native Windows debugger wants CodeView rather than "
-                     "DWARF. Add -masm=gnu, which does carry one, or compile "
-                     "without -g.\n",
+                     "a native Windows debugger wants CodeView. Add -masm=gnu, "
+                     "whose COFF spelling clang assembles with CodeView, or "
+                     "compile without -g.\n",
                      argv[0], backend_->name());
         return false;
     }

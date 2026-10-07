@@ -63,8 +63,6 @@ protected:
     virtual void writeDebug(const std::vector<DwarfFunction> &fns,
                             const std::vector<DwarfGlobal> &globals);
     virtual std::string debugFileName(const std::string &name) const { return name; }
-    // Whether the closing brace has a line of its own, the epilogue's, as cl /Zi gives it.
-    virtual bool marksClosingBrace() const { return false; }
 
     std::string out_;
     // Measured after the IR has written out, so the count is of real text.
@@ -104,6 +102,12 @@ private:
     int varGp_ = 0, varFp_ = 48, varOverflow_ = 16;
 
     void emit(const Function &fn);
+    // The function's closing brace, the return that is its last statement if one is, and
+    // the call that return returns if it returns one: cl gives what follows each the brace's line.
+    std::size_t closingBrace_ = 0;
+    const Return *finalReturn_ = nullptr;
+    const Call *finalCall_ = nullptr;
+    void jumpToReturn(const Return &n);
     void finishChunk();
     std::string label(const char *kind, int id) const override;
     std::string userLabel(const std::string &name) const override;

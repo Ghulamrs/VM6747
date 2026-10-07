@@ -47,8 +47,8 @@ static const Abi kMsAbi = {
 
 const Abi &X86_64WindowsBackend::abi() const { return kMsAbi; }
 
-static bool gnuSyntax_ = false;
-void setWindowsAsmSyntax(bool gnu) { gnuSyntax_ = gnu; }
+static WindowsAsm syntax_ = WindowsAsm::Masm;
+void setWindowsAsmSyntax(WindowsAsm syntax) { syntax_ = syntax; }
 
 static const char *const kWindowsMacros[] = {
     "__x86_64__=1", "__x86_64=1", "__amd64__=1", "__amd64=1",
@@ -56,9 +56,9 @@ static const char *const kWindowsMacros[] = {
 };
 const char *const *X86_64WindowsBackend::identityMacros() const { return kWindowsMacros; }
 
-bool X86_64WindowsBackend::emitsLineTable() const { return gnuSyntax_; }
+bool X86_64WindowsBackend::emitsLineTable() const { return syntax_ != WindowsAsm::Masm; }
 
-bool windowsAsmIsGnu() { return gnuSyntax_; }
+bool windowsAsmIsGnu() { return syntax_ != WindowsAsm::Masm; }
 
 namespace {
 
@@ -88,7 +88,9 @@ private:
 }
 
 std::unique_ptr<CodeGen> X86_64WindowsBackend::codegen(std::ostream &sink) const {
-    if (gnuSyntax_)
+    if (syntax_ == WindowsAsm::Gnu)
         return std::unique_ptr<CodeGen>(new CoffCodeGen(sink, target_, kMsAbi));
+    if (syntax_ == WindowsAsm::GnuElf)
+        return std::unique_ptr<CodeGen>(new X86_64Linux(sink, target_, kMsAbi));
     return std::unique_ptr<CodeGen>(new MasmCodeGen(sink, target_, kMsAbi));
 }

@@ -14,8 +14,11 @@ public:
     const char *name() const override { return "x86_64-windows"; }
 };
 
-void setWindowsAsmSyntax(bool gnu);
-// Whether -masm=gnu was asked for: clang assembles that spelling, ml64 the other.
+// -masm=: MASM for ml64; the GNU spelling of a COFF object, for clang; or the same
+// instructions in an ELF object, which is how the Linux suites run the Microsoft convention.
+enum class WindowsAsm { Masm, Gnu, GnuElf };
+void setWindowsAsmSyntax(WindowsAsm syntax);
+// Whether a GNU spelling was asked for: clang assembles it, ml64 only MASM.
 bool windowsAsmIsGnu();
 
 class X86_64WindowsBackend final : public Backend {

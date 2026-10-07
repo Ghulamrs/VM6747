@@ -178,8 +178,9 @@ public:
     void objectSize(const std::string &, int) override {}
     void align(int n) override;
 
-    // The label after a function's prologue, which S_GPROC32 calls its debug start.
+    // The labels after a function's prologue and after its code, which S_GPROC32 measures by.
     static std::string prologEnd(const std::string &name) { return ".Lprolog.end." + name; }
+    static std::string codeEnd(const std::string &name) { return ".Lcode.end." + name; }
 
 private:
     std::string function_;

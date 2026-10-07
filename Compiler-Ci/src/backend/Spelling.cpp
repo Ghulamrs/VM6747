@@ -153,7 +153,11 @@ void CoffSpelling::prologue(int frameSize) {
     defLabel(prologEnd(function_));
 }
 
-void CoffSpelling::functionEnd(const std::string &) { o_ += "  .seh_endproc\n"; }
+// The end label is the spelling's own: one the walker defines can wait in the optimizer past the last function.
+void CoffSpelling::functionEnd(const std::string &name) {
+    defLabel(codeEnd(name));
+    o_ += "  .seh_endproc\n";
+}
 
 // The name arrives absolute and escaped (codeViewPath); the checksum is optional and left out.
 void CoffSpelling::fileEntry(int n, const std::string &name) {
