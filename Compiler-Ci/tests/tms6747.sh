@@ -11,7 +11,7 @@
 # corpus is tests/cases, whole: everything the backend refuses is a FAIL.
 #
 # A second leg runs each case as a TI program - asm6x, then lnk6x against TI's runtime - on
-# vm6747sim, which runs the machine code, and holds it to the same reference. It sees what the
+# sim6747, which runs the machine code, and holds it to the same reference. It sees what the
 # emulator cannot: the assembler's encoding and TI's own runtime. SIM=0 leaves it out, said aloud;
 # tests/tms6747-sim.txt names the cases it cannot run, why beside.
 set -u
@@ -27,7 +27,7 @@ find_tool() {
 }
 ASM6X=$(find_tool "${ASM6X:-}" "$ROOT/../../ASM6x/build/asm6x.exe" "$(command -v asm6x 2>/dev/null)")
 LNK6X=$(find_tool "${LNK6X:-}" "$ROOT/../../LNK6x/build/lnk6x.exe" "$(command -v lnk6x 2>/dev/null)")
-VMSIM=$(find_tool "${VMSIM:-}" "$ROOT/../../VM6747-sim/vm6747.exe" "$(command -v vm6747sim 2>/dev/null)")
+SIM6747=$(find_tool "${SIM6747:-}" "$ROOT/../../SIM6747/sim6747.exe" "$(command -v sim6747 2>/dev/null)")
 # The run-time library: RTS6x's, built beside VM6747, since it passed the suite whole (M5, 2026-10-07);
 # TI's exception-handling rts6740 as RTSLIB=rts6740_elf_eh.lib, TIRTS its directory (default ~/c6747-lib).
 RTSLIB="${RTSLIB:-rts6x.lib}"
@@ -81,14 +81,14 @@ one() {
         if ! { "$ASM6X" "$OUT/$name.s" -o "$OUT/$name.obj" &&
                "$LNK6X" -mv6740 --abi=eabi -i "$TIRTS" "$OUT/link.cmd" "$OUT/$name.obj" \
                    -l "$RTSLIB" -o "$OUT/$name.ti.out"; } > "$OUT/$name.ti.log" 2>&1 < /dev/null; then
-            echo "FAIL $name (vm6747sim) - asm6x or lnk6x refused it:"
+            echo "FAIL $name (sim6747) - asm6x or lnk6x refused it:"
             sed 's/^/       /' "$OUT/$name.ti.log" | head -3
             echo fail > "$OUT/$name.verdict"; return
         fi
-        { ( ulimit -t 20 2>/dev/null; "$VMSIM" --run --main-status "$OUT/$name.ti.out" ) > "$OUT/$name.sim" 2>&1 < /dev/null; echo $? > "$OUT/$name.sim.rc"; } 2>/dev/null
+        { ( ulimit -t 20 2>/dev/null; "$SIM6747" --run --main-status "$OUT/$name.ti.out" ) > "$OUT/$name.sim" 2>&1 < /dev/null; echo $? > "$OUT/$name.sim.rc"; } 2>/dev/null
         sim_out=$(cat "$OUT/$name.sim"); sim_rc=$(cat "$OUT/$name.sim.rc")
         if [ "$sim_out" != "$ref_out" ] || [ "$sim_rc" != "$ref_rc" ]; then
-            echo "FAIL $name (vm6747sim) - disagrees with $HOST"
+            echo "FAIL $name (sim6747) - disagrees with $HOST"
             echo "       sim: rc=$sim_rc out=[$(printf '%s' "$sim_out" | head -c 300)]"
             echo "       ref: rc=$ref_rc out=[$(printf '%s' "$ref_out" | head -c 300)]"
             echo fail > "$OUT/$name.verdict"; return
@@ -100,8 +100,8 @@ if [ "${1:-}" = --one ]; then one "$3" > "$OUT/$3.report" 2>&1; exit 0; fi
 
 rm -rf "$OUT" && mkdir -p "$OUT"
 if [ "$SIM" = 1 ]; then
-    for need in "asm6x:$ASM6X" "lnk6x:$LNK6X" "vm6747sim:$VMSIM"; do
-        [ -n "${need#*:}" ] || { echo "tms6747.sh: no ${need%%:*} - build it, name it, or SIM=0 to leave the vm6747sim leg out"; exit 1; }
+    for need in "asm6x:$ASM6X" "lnk6x:$LNK6X" "sim6747:$SIM6747"; do
+        [ -n "${need#*:}" ] || { echo "tms6747.sh: no ${need%%:*} - build it, name it, or SIM=0 to leave the sim6747 leg out"; exit 1; }
     done
     [ -f "$TIRTS/$RTSLIB" ] || { echo "tms6747.sh: no $RTSLIB in $TIRTS - set TIRTS and RTSLIB, or SIM=0"; exit 1; }
     # RIDE's flat map, with room for a case's stack.
@@ -118,7 +118,7 @@ SECTIONS
 }
 MAP
 else
-    echo "tms6747.sh: SIM=0 - the vm6747sim leg is left out; only the assembly is run, on vm6747"
+    echo "tms6747.sh: SIM=0 - the sim6747 leg is left out; only the assembly is run, on vm6747"
 fi
 cases() { for src in "$SRC"/*.c; do n=$(basename "$src" .c); [ -n "$only" ] && [ "$n" != "$only" ] && continue; echo "$n"; done; }
 JOBS=${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}
@@ -130,7 +130,7 @@ pass=$(count pass); fail=$(count fail); skip=$(count skip)
 echo
 echo "tms6747  PASS: $pass   FAIL: $fail   SKIP: $skip (need a 64-bit long or pointer - tests/tms6747-lp64.txt)"
 if [ "$SIM" = 1 ]; then
-    if [ "$RTSLIB" = rts6x.lib ]; then echo "tms6747  every PASS also on vm6747sim (asm6x, lnk6x, $RTSLIB)"
-    else echo "tms6747  every PASS also on vm6747sim (asm6x, lnk6x, $RTSLIB) but those in tests/tms6747-sim.txt"; fi
+    if [ "$RTSLIB" = rts6x.lib ]; then echo "tms6747  every PASS also on sim6747 (asm6x, lnk6x, $RTSLIB)"
+    else echo "tms6747  every PASS also on sim6747 (asm6x, lnk6x, $RTSLIB) but those in tests/tms6747-sim.txt"; fi
 fi
 [ "$fail" -eq 0 ]
