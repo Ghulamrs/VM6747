@@ -1236,7 +1236,8 @@ void X86_64Linux::emit(const Function &fn) {
         a_->defLabel(d.begin);
     }
 
-    markLine(fn.pos());
+    // On Windows the entry is named by the `{` line, as cl names it - see openingBrace.
+    markLine(marksClosingBrace() ? openingBrace(fn.pos()) : fn.pos());
     a_->prologue(fn.frameSize());
 
     sretSlot_ = fn.sretSlot();
