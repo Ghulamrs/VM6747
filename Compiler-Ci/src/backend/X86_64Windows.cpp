@@ -1,6 +1,8 @@
 #include "X86_64Windows.h"
 #include "X86_64Linux.h"
 #include "Masm.h"
+#include "CodeView.h"
+#include "../Source.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -56,8 +58,36 @@ const char *const *X86_64WindowsBackend::identityMacros() const { return kWindow
 
 bool X86_64WindowsBackend::emitsLineTable() const { return gnuSyntax_; }
 
+bool windowsAsmIsGnu() { return gnuSyntax_; }
+
+namespace {
+
+// **The GNU spelling as a COFF object**, for clang: the instruction stream is the
+// Linux backend's, the sections and unwind data CoffSpelling's, and -g writes
+// CodeView, since link.exe drops DWARF from a COFF object and no Microsoft tool reads it.
+class CoffCodeGen final : public X86_64Linux {
+public:
+    CoffCodeGen(std::ostream &sink, const Target &target, const Abi &abi)
+        : X86_64Linux(sink, target, abi), coffTarget_(target), coff_(out_) { a_ = &coff_; }
+
+private:
+    void writeDebug(const std::vector<DwarfFunction> &fns,
+                    const std::vector<DwarfGlobal> &globals) override {
+        writeCodeView(out_, coffTarget_, codeViewPath(compDir(), lineSource()->files().front() + ".obj"),
+                      fns, globals);
+    }
+    std::string debugFileName(const std::string &name) const override {
+        return codeViewPath(compDir(), name);
+    }
+
+    const Target &coffTarget_;
+    CoffSpelling coff_;
+};
+
+}
+
 std::unique_ptr<CodeGen> X86_64WindowsBackend::codegen(std::ostream &sink) const {
     if (gnuSyntax_)
-        return std::unique_ptr<CodeGen>(new X86_64Linux(sink, target_, kMsAbi));
+        return std::unique_ptr<CodeGen>(new CoffCodeGen(sink, target_, kMsAbi));
     return std::unique_ptr<CodeGen>(new MasmCodeGen(sink, target_, kMsAbi));
 }

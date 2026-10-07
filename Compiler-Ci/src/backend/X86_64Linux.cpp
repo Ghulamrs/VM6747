@@ -1218,6 +1218,10 @@ void X86_64Linux::emit(const Function &fn) {
         d.external = !fn.isStatic();
         d.returns = fn.returns();
         d.locals = &fn.locals();
+        d.symbol = fn.name();
+        d.prologEnd = CoffSpelling::prologEnd(fn.name());
+        d.frameSize = fn.frameSize();
+        d.variadic = fn.isVariadic();
         dwarfFns_.push_back(d);
         resetBlocks(fn.blocks());
         a_->defLabel(d.begin);
@@ -1434,6 +1438,11 @@ void X86_64Linux::emitData(const Program &program) {
     }
 }
 
+void X86_64Linux::writeDebug(const std::vector<DwarfFunction> &fns,
+                             const std::vector<DwarfGlobal> &globals) {
+    writeDwarf(out_, kElfDwarf, target_, lineSource()->files().front(), compDir(), fns, globals);
+}
+
 void X86_64Linux::run(const Program &program) {
 
     std::vector<std::string> defined;
@@ -1445,7 +1454,7 @@ void X86_64Linux::run(const Program &program) {
     if (const Source *src = lineSource()) {
         const std::vector<std::string> &names = src->files();
         for (std::size_t i = 0; i < names.size(); i++)
-            a_->fileEntry(static_cast<int>(i) + 1, names[i]);
+            a_->fileEntry(static_cast<int>(i) + 1, debugFileName(names[i]));
     }
 
     emitData(program);
@@ -1461,8 +1470,7 @@ void X86_64Linux::run(const Program &program) {
             dg.external = !g.isStatic;
             dwarfGlobals_.push_back(dg);
         }
-        writeDwarf(out_, kElfDwarf, target_, lineSource()->files().front(),
-                   compDir(), dwarfFns_, dwarfGlobals_);
+        writeDebug(dwarfFns_, dwarfGlobals_);
         finishChunk();
     }
 

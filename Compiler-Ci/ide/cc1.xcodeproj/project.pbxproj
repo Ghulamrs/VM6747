@@ -15,6 +15,7 @@
 		2375206DA1BADDDD664A3BF2 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0622243F82CE24842E74D759 /* main.cpp */; };
 		CEA9F161EB296A691B9FAD8F /* Arm64Darwin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 201EE94DC01106B98E56A367 /* Arm64Darwin.cpp */; };
 		2B45FAC274DFDD7BB8B6D32A /* Backend.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 12856577CF3E39497DC00394 /* Backend.cpp */; };
+		3B9E54C39B30AE1A7AB99ABB /* CodeView.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 014B716F8D60978411FBC05E /* CodeView.cpp */; };
 		9B580F5362355E1FE8EE1106 /* Dwarf.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 44939D11634EA517FF5020E4 /* Dwarf.cpp */; };
 		D3E14047F25C331F429FE184 /* Masm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26553B240B204AB828F1E28D /* Masm.cpp */; };
 		B87269B3057FAF3398D61CB4 /* Optimizer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 63643181E795B125B2323F2B /* Optimizer.cpp */; };
@@ -35,6 +36,7 @@
 		0622243F82CE24842E74D759 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = "../src/main.cpp"; sourceTree = "<group>"; };
 		201EE94DC01106B98E56A367 /* Arm64Darwin.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Arm64Darwin.cpp; path = "../src/backend/Arm64Darwin.cpp"; sourceTree = "<group>"; };
 		12856577CF3E39497DC00394 /* Backend.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Backend.cpp; path = "../src/backend/Backend.cpp"; sourceTree = "<group>"; };
+		014B716F8D60978411FBC05E /* CodeView.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CodeView.cpp; path = "../src/backend/CodeView.cpp"; sourceTree = "<group>"; };
 		44939D11634EA517FF5020E4 /* Dwarf.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Dwarf.cpp; path = "../src/backend/Dwarf.cpp"; sourceTree = "<group>"; };
 		26553B240B204AB828F1E28D /* Masm.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Masm.cpp; path = "../src/backend/Masm.cpp"; sourceTree = "<group>"; };
 		63643181E795B125B2323F2B /* Optimizer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Optimizer.cpp; path = "../src/backend/Optimizer.cpp"; sourceTree = "<group>"; };
@@ -53,6 +55,7 @@
 		EFB2C2FE15E86CFA56F6C459 /* Type.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Type.h; path = "../src/Type.h"; sourceTree = "<group>"; };
 		343C1B79389BBF31FEC696F5 /* Arm64Darwin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Arm64Darwin.h; path = "../src/backend/Arm64Darwin.h"; sourceTree = "<group>"; };
 		53EFD8CC7CB03B67DADDA294 /* Backend.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Backend.h; path = "../src/backend/Backend.h"; sourceTree = "<group>"; };
+		B0E72217517AEE1C4F7940D4 /* CodeView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = CodeView.h; path = "../src/backend/CodeView.h"; sourceTree = "<group>"; };
 		4385E0CD8761F0F11B0131BB /* Dwarf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Dwarf.h; path = "../src/backend/Dwarf.h"; sourceTree = "<group>"; };
 		326B43087F9FF0969A1F8F79 /* Masm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Masm.h; path = "../src/backend/Masm.h"; sourceTree = "<group>"; };
 		DF4191205D95634ED0AAC884 /* Optimizer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Optimizer.h; path = "../src/backend/Optimizer.h"; sourceTree = "<group>"; };
@@ -111,6 +114,8 @@
 				343C1B79389BBF31FEC696F5 /* Arm64Darwin.h */,
 				12856577CF3E39497DC00394 /* Backend.cpp */,
 				53EFD8CC7CB03B67DADDA294 /* Backend.h */,
+				014B716F8D60978411FBC05E /* CodeView.cpp */,
+				B0E72217517AEE1C4F7940D4 /* CodeView.h */,
 				44939D11634EA517FF5020E4 /* Dwarf.cpp */,
 				4385E0CD8761F0F11B0131BB /* Dwarf.h */,
 				26553B240B204AB828F1E28D /* Masm.cpp */,
@@ -184,6 +189,7 @@
 				2375206DA1BADDDD664A3BF2 /* main.cpp in Sources */,
 				CEA9F161EB296A691B9FAD8F /* Arm64Darwin.cpp in Sources */,
 				2B45FAC274DFDD7BB8B6D32A /* Backend.cpp in Sources */,
+				3B9E54C39B30AE1A7AB99ABB /* CodeView.cpp in Sources */,
 				9B580F5362355E1FE8EE1106 /* Dwarf.cpp in Sources */,
 				D3E14047F25C331F429FE184 /* Masm.cpp in Sources */,
 				B87269B3057FAF3398D61CB4 /* Optimizer.cpp in Sources */,

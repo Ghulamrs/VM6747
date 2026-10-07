@@ -15,6 +15,8 @@ public:
 };
 
 void setWindowsAsmSyntax(bool gnu);
+// Whether -masm=gnu was asked for: clang assembles that spelling, ml64 the other.
+bool windowsAsmIsGnu();
 
 class X86_64WindowsBackend final : public Backend {
 public:

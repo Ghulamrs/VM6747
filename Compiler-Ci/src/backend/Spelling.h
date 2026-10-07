@@ -125,7 +125,7 @@ public:
     virtual void dataBytes(const std::string &bytes) = 0;
 };
 
-class GnuSpelling final : public Spelling {
+class GnuSpelling : public Spelling {
 public:
     explicit GnuSpelling(std::string &o) : o_(o) {}
 
@@ -152,7 +152,41 @@ public:
     void dataSym(const std::string &sym, long long off) override;
     void dataBytes(const std::string &bytes) override;
 
-private:
+protected:
     std::string &o_;
     void op(const Op &x);
+};
+
+// **The GNU spelling for a COFF object**, x86_64-windows under -masm=gnu, which
+// clang assembles (`-target x86_64-pc-windows-msvc`). It differs from the ELF
+// spelling in its sections, its symbol definitions and its unwind data.
+
+// Unwind data is `.seh_*` around the one prologue every function has, so a
+// debugger can walk the stack; under -g the line entries are CodeView's
+// (`.cv_file`, `.cv_func_id`, `.cv_loc`) - see CodeView.h.
+class CoffSpelling final : public GnuSpelling {
+public:
+    explicit CoffSpelling(std::string &o) : GnuSpelling(o) {}
+
+    void functionBegin(const std::string &name, bool exported) override;
+    void prologue(int frameSize) override;
+    void functionEnd(const std::string &name) override;
+    void fileEntry(int n, const std::string &name) override;
+    void location(int file, int line, int column) override;
+    void rodataSection() override;
+    void objectType(const std::string &) override {}
+    void objectSize(const std::string &, int) override {}
+    void align(int n) override;
+
+    // The label after a function's prologue, which S_GPROC32 calls its debug start.
+    static std::string prologEnd(const std::string &name) { return ".Lprolog.end." + name; }
+
+private:
+    std::string function_;
+    // Whether a `.cv_file` was written (so -g), and how many functions have a `.cv_func_id`.
+    bool codeView_ = false;
+    int cvFunctions_ = 0;
+    // The last `.cv_loc` and where it went, so one that no instruction follows can be replaced.
+    std::string lastLoc_;
+    std::size_t lastLocAt_ = 0;
 };

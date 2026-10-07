@@ -59,6 +59,10 @@ public:
 protected:
 
     virtual bool writesDwarf() const { return true; }
+    // The debug information -g writes, and the name a source file is given in it.
+    virtual void writeDebug(const std::vector<DwarfFunction> &fns,
+                            const std::vector<DwarfGlobal> &globals);
+    virtual std::string debugFileName(const std::string &name) const { return name; }
 
     std::string out_;
     // Measured after the IR has written out, so the count is of real text.
