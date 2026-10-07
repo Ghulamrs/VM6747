@@ -231,3 +231,14 @@ as it was here, since the ELF and Mach-O output was to stay byte for byte.
 block) `k` and `dv /t /V` name the same frames, lines, locals, types and values as
 cl's, and `m10.py step` walks the same lines over and into the calls. The same
 holds at the stop line of every case in `tests/debug/`.
+
+
+## M10: no second run of a line in the CodeView line table, 2026-10-08
+
+**A `for` whose body is on lines of its own had its line twice**: the step and the test are written
+after the body, and their entry named the `for` line again, so cdb answered `bp` on it with
+"Ambiguous symbol error" (cl writes the line once, its step coming before the body). A line that
+already had a run in the function gets no second: that code counts as the line before it, and the
+breakpoint binds. Measured with m10.py on a three-line loop: cl /Zi and ours both stop on it; c90
+steps 5, 6, 7, 5, 6, 7 as cl does, cpp11 5, 6, 5, 6 (it keeps no line for the closing brace).
+tests/m10 compares are unchanged; cases and emit golden unchanged.

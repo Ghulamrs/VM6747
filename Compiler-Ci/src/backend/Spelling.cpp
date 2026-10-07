@@ -180,8 +180,17 @@ static bool holdsInstruction(const std::string &text) {
 
 // **A line entry no instruction follows is replaced by the next**: at one address cdb
 // takes the first, so a breakpoint on a declaration stopped on the line before it.
+// **One entry per run of a line, as cl writes it**: a `for` gave four, and cdb refused `bp` on it as ambiguous.
 void CoffSpelling::location(int file, int line, int column) {
     if (!codeView_ || cvFunctions_ == 0) return;
+    if (cvFunctions_ == lastLocFn_ && file == lastLocFile_ && line == lastLocLine_) return;
+    // **No second run of a line**: a loop's step written after its body was a second run of the `for`
+    // line, and cdb refused `bp` on it as ambiguous; that code counts as the line before it.
+    if (cvFunctions_ != lastLocFn_) linesRun_.clear();
+    if (!linesRun_.insert(std::make_pair(file, line)).second) return;
+    lastLocFn_ = cvFunctions_;
+    lastLocFile_ = file;
+    lastLocLine_ = line;
     if (!lastLoc_.empty() && lastLocAt_ + lastLoc_.size() <= o_.size() &&
         o_.compare(lastLocAt_, lastLoc_.size(), lastLoc_) == 0 &&
         !holdsInstruction(o_.substr(lastLocAt_ + lastLoc_.size())))
