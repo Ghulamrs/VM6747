@@ -1,0 +1,61 @@
+©2026 G. R. Akhtar - ISO C 90
+Release seal, version 1.2, sealed 08-10-2026
+Written by tools/seal; check it with `tools/seal check`.
+CRC32  size  file - 54 files, seal 8D82BAA5
+------------------------------------------------------------------
+65B6BFC3      2538  lib/assert.h
+978C1DCB      1245  lib/ctype.h
+9ECB2F97      2128  lib/errno.h
+AA75EA0D      3457  lib/float.h
+FDFC6107      2808  lib/limits.h
+096851A2      2395  lib/locale.h
+42371D64      3166  lib/math.h
+4E74448F       731  lib/memory.h
+08691865      6029  lib/setjmp.h
+1BE93BD7      1653  lib/signal.h
+B8CC27C7      3079  lib/stdarg.h
+58B2FF54      2432  lib/stddef.h
+0229682D      6174  lib/stdio.h
+F4D14491      2432  lib/stdlib.h
+789D7D34      2214  lib/string.h
+D822292C      3007  lib/time.h
+8C8B02D6      1547  msvc/compat/unistd.h
+10B0A19F     16904  src/Ast.h
+974B807A     42509  src/Driver.cpp
+A5880F47      2739  src/Driver.h
+1424D482      8857  src/Lexer.cpp
+779AEACA       994  src/Lexer.h
+7DBE9C6A       483  src/Name.h
+38CF0D78    108472  src/Parser.cpp
+9E3BB9F6     11770  src/Parser.h
+B19FEBEF     36056  src/Preprocessor.cpp
+BCA01EF2      2886  src/Preprocessor.h
+5538DB98      3134  src/Source.cpp
+181237A8      1017  src/Source.h
+F8A291F9      8202  src/Type.cpp
+D72212CA      4319  src/Type.h
+E73FF197     35717  src/backend/Arm64Darwin.cpp
+D656912C      4102  src/backend/Arm64Darwin.h
+292E5E11      3681  src/backend/Backend.cpp
+69A1FBE7      1568  src/backend/Backend.h
+FB555466     18587  src/backend/CodeView.cpp
+E4C13E59      1925  src/backend/CodeView.h
+012CC373     15085  src/backend/Dwarf.cpp
+513ADC39      1373  src/backend/Dwarf.h
+D8D46D13     14573  src/backend/Masm.cpp
+178E3BDB      2141  src/backend/Masm.h
+FE043B76     62191  src/backend/Optimizer.cpp
+99800A52      7494  src/backend/Optimizer.h
+F0EC5E93      7152  src/backend/Spelling.cpp
+E9611B37      7200  src/backend/Spelling.h
+FD86C367     57516  src/backend/Tms6747.cpp
+C29D3444      6795  src/backend/Tms6747.h
+32902DD9      6110  src/backend/Walker.cpp
+43EF5CFD      2876  src/backend/Walker.h
+3D6D6234     54375  src/backend/X86_64Linux.cpp
+7BFA7B9F      5963  src/backend/X86_64Linux.h
+04CC56CA      3421  src/backend/X86_64Windows.cpp
+3C4167CA      1346  src/backend/X86_64Windows.h
+2D5FF95D      1133  src/main.cpp
+------------------------------------------------------------------
+Sealed on 08-10-2026

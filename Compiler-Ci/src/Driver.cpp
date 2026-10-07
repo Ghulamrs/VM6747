@@ -106,7 +106,7 @@ void Driver::standardIncludeDirectory(const std::string &argv0) {
 }
 
 // **1.1 is the first version this compiler has had a number for**, numbered with the group rather than on its own - see CLAUDE.md.
-const char *cc1Version() { return "1.1"; }
+const char *cc1Version() { return "1.2"; }
 
 // The line printed before each compile and by --version. `-nologo` omits it.
 const char *Driver::bannerLine() { return "©2026 G. R. Akhtar - ISO C 90"; }
