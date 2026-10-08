@@ -14,6 +14,14 @@ the addressing forms `*R`, `*+R(n)`, `*+R[n]`, `*R++(n)` and their kin —
 `main` is called with `argc` and `argv`, and the exit status is `main`'s
 return or `exit`'s argument. `-t` traces every instruction.
 
+**What an emulator pass does not prove** (review of 2026-10-08, V13). The emulator carries its
+own C library - a library call is answered on the host ("The C library, natively" below) - and
+its own exception runtime, which walks TI's tables itself ("Exceptions"). So a program that
+agrees here has said nothing about RTS6x, TI's `rts6740`, ASM6x's encoding or LNK6x's image:
+those are asked of sim6747, which runs the linked `.out` machine code with RTS6x, and of TI's own
+C6747 simulator. Since RIDE 5.1, RIDE's Run for tms6747 is sim6747 on that `.out`; this emulator
+is Build ▸ Emulate on vm6747.
+
 ## What it models
 
 **The C674x as the compilers see it.** The two register files, a program
