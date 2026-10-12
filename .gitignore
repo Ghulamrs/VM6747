@@ -4,3 +4,10 @@
 out-asm6x/
 out-tms6747/
 xcuserdata/
+vm6747.exe
+*.o
+*.d
+tests/out-*/
+
+# the emulator's objects (Makefile OBJDIR, msvc\build.cmd)
+build/

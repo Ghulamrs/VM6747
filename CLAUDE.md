@@ -1,10 +1,13 @@
 # VM6747
 
-The C6747 emulator and the notes above it. Until 2026-10-12 this repository
-also held the three compilers RIDE builds - `Compiler-Ci`, `Compiler-Si` and,
-as a submodule, `Compiler-Cppi` - and TriLab. They are gone from here: each
-compiler is its own repository, checked out beside this one, and TriLab is
-obsolete.
+The C6747 emulator, `vm6747.exe`, and the notes beside it. Until 2026-10-12
+this repository also held the three compilers RIDE builds - `Compiler-Ci`,
+`Compiler-Si` and, as a submodule, `Compiler-Cppi` - with TriLab and the
+2026-09-17 review's probes, and the emulator sat in `Emulator/`. The same day
+the compilers left for their own repositories beside this one, TriLab and the
+probes were removed, and `Emulator/` was moved up to be the repository itself:
+`src/`, `tests/`, `msvc/`, `tools/`, the Makefile and the two IDE projects are
+at the top now, objects in `build/` (ignored).
 
 ## Where the compilers live (since 2026-10-12)
 
@@ -16,13 +19,13 @@ obsolete.
 
 Their histories up to the removal are in this repository's log; from here on
 they are committed and pushed in their own repositories, and RIDE reads them
-there. `Emulator/tests/ti.sh` and `windows.sh` read their `tests/out-tms6747`
+there. `tests/ti.sh` and `tests/windows.sh` read their `tests/out-tms6747`
 from those directories.
 
-## The fourth repository: Emulator
-`VM6747/Emulator` (part of this repository since 2026-09-16) builds `vm6747.exe`,
-the emulator that runs what the i-compilers emit for tms6747; see its
-README.md and TMS6747.md. Same build conventions as the compilers.
+## The emulator
+`make` here builds `vm6747.exe` (`msvc\build.cmd` on Windows), the emulator
+that runs what the compilers emit for tms6747; see README.md and TMS6747.md.
+Same build conventions as the compilers.
 
 ## TMS6747 — the point of this line
 VM6747 exists to add a third codegen target, the TI **TMS320C6747** (C6000

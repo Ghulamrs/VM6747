@@ -19,12 +19,12 @@ VM="${VM:-$HERE/vm6747.exe}"
 mkdir -p "$WORK/xwin/c" "$WORK/xwin/cxx" "$WORK/xwin/shm" "$WORK/xwin/shmrt"
 # Only real case names: macOS leaves "name 2.s" duplicates beside the files
 # it rewrites, and those are noise, not cases.
-for f in "$HERE"/../../Compiler-Ci/tests/out-tms6747/*.s; do case "$(basename "$f")" in *" "*) ;; *) cp "$f" "$WORK/xwin/c/";; esac; done
-for f in "$HERE"/../../C++Optimize/tests/out-tms6747/*.s; do case "$(basename "$f")" in *" "*) ;; *) cp "$f" "$WORK/xwin/cxx/";; esac; done
+for f in "$HERE"/../Compiler-Ci/tests/out-tms6747/*.s; do case "$(basename "$f")" in *" "*) ;; *) cp "$f" "$WORK/xwin/c/";; esac; done
+for f in "$HERE"/../C++Optimize/tests/out-tms6747/*.s; do case "$(basename "$f")" in *" "*) ;; *) cp "$f" "$WORK/xwin/cxx/";; esac; done
 # The Shalimar programs run beside the runtime cpp11 compiled for the C6000,
 # a directory of .s the emulator takes whole - so it travels too.
-SHMRT="${SHMRT:-$HERE/../../RStudio/bin/lib/shmrt-tms6747}"   # where the one binary directory puts it
-for f in "$HERE"/../../Compiler-Si/tests/out-tms6747/*.s; do case "$(basename "$f")" in *" "*) ;; *) cp "$f" "$WORK/xwin/shm/";; esac; done
+SHMRT="${SHMRT:-$HERE/../RStudio/bin/lib/shmrt-tms6747}"   # where the one binary directory puts it
+for f in "$HERE"/../Compiler-Si/tests/out-tms6747/*.s; do case "$(basename "$f")" in *" "*) ;; *) cp "$f" "$WORK/xwin/shm/";; esac; done
 [ -d "$SHMRT" ] && cp "$SHMRT"/*.s "$WORK/xwin/shmrt/"
 cat > "$WORK/xwin/run.sh" <<'REMOTE_EOF'
 cd "$(dirname "$0")"
@@ -33,7 +33,9 @@ for d in c cxx; do for s in $d/*.s; do b=${s%.s}; "$VM" "$s" > "$b.out" 2>&1 < /
 rm -f shmrt/._* shm/._* c/._* cxx/._*
 for s in shm/*.s; do [ -f "$s" ] || continue; b=${s%.s}; "$VM" "$s" shmrt > "$b.out" 2>&1 < /dev/null; echo $? > "$b.rc"; done
 REMOTE_EOF
-( cd "$HERE/.." && tar czf "$WORK/emulator.tgz" --exclude='*.exe' --exclude='.git' --exclude='._*' Emulator )
+# The repository's root is the emulator since 2026-10-12; on the box it still unpacks as Emulator\.
+( cd "$HERE" && COPYFILE_DISABLE=1 tar czf "$WORK/emulator.tgz" -s '#^\./#Emulator/#' --exclude='*.exe' --exclude='._*' \
+    --exclude='tests/out-*' ./src ./msvc ./tests ./tools ./Makefile ./vm6747.vcxproj ./README.md )
 ( cd "$WORK" && COPYFILE_DISABLE=1 tar czf xwin.tgz --exclude "._*" xwin )
 ssh windows "if not exist C:\\Users\\GRA\\Documents\\VM6747 mkdir C:\\Users\\GRA\\Documents\\VM6747" || exit 1
 scp -q "$WORK/emulator.tgz" "$WORK/xwin.tgz" "windows:$REMOTE/" || exit 1
