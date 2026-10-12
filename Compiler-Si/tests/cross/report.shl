@@ -1,3 +1,0 @@
-fun <> = banner(n: int) {
-  ? "----" n
-}

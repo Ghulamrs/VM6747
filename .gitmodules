@@ -1,4 +1,0 @@
-[submodule "Compiler-Cppi"]
-	path = Compiler-Cppi
-	url = git@github.com:Ghulamrs/Compiler-Cpp-Optimize.git
-	branch = main

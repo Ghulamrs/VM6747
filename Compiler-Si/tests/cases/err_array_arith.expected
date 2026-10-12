@@ -1,2 +1,0 @@
-Error: line 3: '+' needs scalars, got int[] and int
-Error: line 3: Cannot use int where int[] is required

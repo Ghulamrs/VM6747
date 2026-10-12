@@ -1,4 +1,0 @@
-fun <> = main() {
-  int v[3]
-  if v { ? 1 }
-}

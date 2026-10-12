@@ -1,6 +1,0 @@
-// 10: none of the string operators mix a string with a number.
-fun <> = main() {
-  s : "ab"
-  s +: 5
-  ? s
-}

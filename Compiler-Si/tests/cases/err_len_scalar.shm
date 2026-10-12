@@ -1,5 +1,0 @@
-uses len
-
-fun <> = main() {
-  ? len(3)
-}

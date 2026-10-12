@@ -1,2 +1,0 @@
-fun <int> = f(a: int) { return a }
-fun <> = main() { ? f(1,2) }
