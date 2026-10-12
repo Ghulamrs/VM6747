@@ -11,11 +11,14 @@ at the top now, objects in `build/` (ignored).
 
 ## Where the compilers live (since 2026-10-12)
 
-| compiler | directory beside VM6747 | repository | executable |
+The workspace has three groups since 2026-10-13: this repository is `TI/VM6747`, beside
+`TI/SIM6747`, `TI/ASM6x`, `TI/LNK6x` and `TI/RTS6x`; the compilers are under `Compilers/`.
+
+| compiler | directory, from this repository | repository | executable |
 |---|---|---|---|
-| c90      | `../Compiler-Ci` | `git@github.com:Ghulamrs/Compiler-Ci.git`           | `c90.exe` |
-| shalimar | `../Compiler-Si` | `git@github.com:Ghulamrs/Compiler-Si.git`           | `shalimar.exe`, `lib/shmrt-*.a` |
-| cpp11    | `../C++Optimize` | `git@github.com:Ghulamrs/Compiler-Cpp-Optimize.git` | `cpp11.exe` |
+| c90      | `../../Compilers/Compiler-Ci` | `git@github.com:Ghulamrs/Compiler-Ci.git`           | `c90.exe` |
+| shalimar | `../../Compilers/Compiler-Si` | `git@github.com:Ghulamrs/Compiler-Si.git`           | `shalimar.exe`, `lib/shmrt-*.a` |
+| cpp11    | `../../Compilers/C++Optimize` | `git@github.com:Ghulamrs/Compiler-Cpp-Optimize.git` | `cpp11.exe` |
 
 Their histories up to the removal are in this repository's log; from here on
 they are committed and pushed in their own repositories, and RIDE reads them
