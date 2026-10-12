@@ -1,5 +1,5 @@
 ©2026 G. R. Akhtar - VM6747 (C6000 emulator) 1.0
-Release seal, version 1.0, sealed 12-10-2026
+Release seal, version 1.0, sealed 13-10-2026
 Written by tools/seal; check it with `tools/seal check`.
 CRC32  size  file - 10 files, seal 1E73EFB0
 ------------------------------------------------------------------
@@ -14,4 +14,4 @@ F57FAEF8     81724  src/Runtime.cpp
 A31E8B84      4565  src/Runtime.h
 5FE15A14      7646  src/main.cpp
 ------------------------------------------------------------------
-Sealed on 12-10-2026
+Sealed on 13-10-2026
