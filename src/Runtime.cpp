@@ -650,7 +650,7 @@ std::vector<std::string> Runtime::names() {
         "exit", "abort", "atexit", "close", "malloc", "calloc", "realloc", "free",
         "memcpy", "memmove", "memset", "memcmp", "memchr",
         "strlen", "strcpy", "strncpy", "strcat", "strncat", "strcmp", "strncmp", "strchr", "strrchr",
-        "strstr", "strpbrk", "strspn", "strcspn", "strtok", "strerror", "strdup",
+        "strstr", "strpbrk", "strspn", "strcspn", "strtok", "strerror", "strdup", "getenv",
         "atoi", "atol", "atof", "strtol", "strtoul", "strtod", "abs", "labs", "llabs", "rand", "srand",
         "qsort", "bsearch",
         "isalnum", "isalpha", "iscntrl", "isdigit", "isgraph", "islower", "isprint", "ispunct",
@@ -1090,6 +1090,13 @@ bool Runtime::call(const std::string &n, Cpu &c) {
         ret(c, start); return true;
     }
     if (n == "strerror") { static uint32_t msg = 0; if (msg == 0) { msg = allocate(c, 32); c.writeBytes(msg, "error\0", 6); } ret(c, msg); return true; }
+    // getenv answers from the host's environment: Shalimar's Debug runtime asks it for SHM_DEBUG.
+    if (n == "getenv") {
+        const char *v = std::getenv(c.readString(arg(c, 0)).c_str());
+        if (v == nullptr) { ret(c, 0); return true; }
+        uint32_t p = allocate(c, static_cast<uint32_t>(std::strlen(v)) + 1);
+        c.writeBytes(p, v, static_cast<uint32_t>(std::strlen(v)) + 1); ret(c, p); return true;
+    }
     if (n == "strdup") { std::string s = c.readString(arg(c, 0)); uint32_t p = allocate(c, static_cast<uint32_t>(s.size()) + 1); c.writeBytes(p, s.c_str(), static_cast<uint32_t>(s.size()) + 1); ret(c, p); return true; }
     // ---- conversions ----
     if (n == "atoi" || n == "atol") { ret(c, static_cast<uint32_t>(std::atoi(c.readString(arg(c, 0)).c_str()))); return true; }
