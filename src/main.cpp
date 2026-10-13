@@ -4,6 +4,7 @@
 
 #include "Asm.h"
 #include "Cpu.h"
+#include "DebugVm.h"
 #include "Runtime.h"
 
 #include <algorithm>
@@ -73,6 +74,7 @@ int main(int argc, char **argv) {
     bool trace = false;
     bool counts = false;
     bool profile = false;
+    bool debug = false;
     Layout layout;
     bool rest = false;
     for (int i = 1; i < argc; i++) {
@@ -82,14 +84,17 @@ int main(int argc, char **argv) {
         if (a == "-t") { trace = true; continue; }
         if (a == "-c") { counts = true; continue; }
         if (a == "-p") { profile = true; continue; }
+        if (a == "--debug") { debug = true; continue; }
         if (a == "-m" && i + 1 < argc) { layout.memoryBytes = static_cast<uint32_t>(std::atoi(argv[++i])) << 20; continue; }
         if (a == "-h" || a == "--help") {
-            std::printf("usage: vm6747 [-t] [-c] [-p] [-m megabytes] file.s ... [-- args]\n"
+            std::printf("usage: vm6747 [-t] [-c] [-p] [--debug] [-m megabytes] file.s ... [-- args]\n"
                         "  -c  on exit, a line on stderr: the cycles from main, as TI's simulator\n"
                         "      counts them (cycle.CPU: no memory stalls), and the packets and\n"
                         "      native library calls among them\n"
                         "  -p  on exit, the cycles from main charged to each function, and\n"
-                        "      native library calls by name: PROFILE lines on stderr\n");
+                        "      native library calls by name: PROFILE lines on stderr\n"
+                        "  --debug  a debugger session on stdin and stdout, in gdb's words: break FILE:LINE,\n"
+                        "      run, next, step, finish, continue, backtrace, print $A4, quit (src/Debug.h)\n");
             return 0;
         }
         if (a == "--version") {
@@ -156,7 +161,8 @@ int main(int argc, char **argv) {
     // handlers, which run before its C$$EXIT.
     const uint64_t cycle0 = cpu.cycle(), packets0 = cpu.packets(), natives0 = cpu.nativeCalls();
     if (profile) cpu.startProfile();
-    int status = cpu.run(m->second, trace);
+    int status = debug ? debugRun(cpu, prog, rt, m->second, files[0]) : cpu.run(m->second, trace);
+    if (debug) return status & 0xff;
     rt.runAtExit(cpu);
     status = cpu.exitCode();
     if (profile) {

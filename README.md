@@ -14,6 +14,19 @@ the addressing forms `*R`, `*+R(n)`, `*+R[n]`, `*R++(n)` and their kin —
 `main` is called with `argc` and `argv`, and the exit status is `main`'s
 return or `exit`'s argument. `-t` traces every instruction.
 
+**`--debug`: a debugger session, in gdb's words** (src/Debug.h, 2026-10-13). `vm6747 --debug file.s`
+reads commands on stdin and answers on stdout exactly as gdb would - `break FILE:LINE`, `run`, `continue`,
+`next`, `step`, `finish`, `backtrace`, `frame N`, `print $A4`, `set variable $A4 = 5`, `info registers`,
+`delete`, `echo`, `quit` - "Breakpoint 1, main () at t.c:6" then "6\t<the line>", "[Inferior 1 (process 1)
+exited with code 03]", so RIDE's Debug session drives it with the parser it has for gdb (RIDE's
+`DebuggerC6x`). The lines are the `.dwpsn` positions cpp11 -g writes (cl6x's own directive, carried onto
+each instruction by the assembler here); a function is any label that is not a compiler's local one; the
+call stack is kept by the shell - a frame when the program counter reaches a function's first packet,
+with B3 beside it, popped when it reaches that return address. What it cannot show is a variable: the
+assembly carries no types or locations, so `info locals` answers as gdb does without them. The program
+reads nothing from stdin, which carries the commands. `tests/debug.sh` is the transcript test; the same
+shell, copied, is sim6747's `--debug` and `--run --debug`.
+
 **What an emulator pass does not prove** (review of 2026-10-08, V13). The emulator carries its
 own C library - a library call is answered on the host ("The C library, natively" below) - and
 its own exception runtime, which walks TI's tables itself ("Exceptions"). So a program that
