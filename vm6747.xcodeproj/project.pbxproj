@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		2B9E1DFAB6ED494378226E0C /* src/Asm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C680C0CA1E15B35BF8C14FA /* src/Asm.cpp */; };
 		8490E3CCF0A6DA33229B310A /* src/Cpu.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9FEFFC0BA0939F7C2DFAD0EB /* src/Cpu.cpp */; };
+		6B41C401E3C32388A87E5CC2 /* src/Debug.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 94BAF9B5DC1232E52BEFBE2A /* src/Debug.cpp */; };
+		CCDDF0CF5B1B15EE3670EF61 /* src/DebugVm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4C48305BE6D7305C189619BF /* src/DebugVm.cpp */; };
 		E8A47C7A0359B9FD3095780D /* src/Isa.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 66D149B81355B40797CFB02C /* src/Isa.cpp */; };
 		D6BD5290468C316543216511 /* src/Runtime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 22E3AD51ABBBD62B8F5745F7 /* src/Runtime.cpp */; };
 		82FB134C2E04510C11E7152F /* src/main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8A83F6F86A02471D2FB64DFE /* src/main.cpp */; };
@@ -17,11 +19,15 @@
 /* Begin PBXFileReference section */
 		3C680C0CA1E15B35BF8C14FA /* src/Asm.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/Asm.cpp; sourceTree = "<group>"; };
 		9FEFFC0BA0939F7C2DFAD0EB /* src/Cpu.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/Cpu.cpp; sourceTree = "<group>"; };
+		94BAF9B5DC1232E52BEFBE2A /* src/Debug.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/Debug.cpp; sourceTree = "<group>"; };
+		4C48305BE6D7305C189619BF /* src/DebugVm.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/DebugVm.cpp; sourceTree = "<group>"; };
 		66D149B81355B40797CFB02C /* src/Isa.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/Isa.cpp; sourceTree = "<group>"; };
 		22E3AD51ABBBD62B8F5745F7 /* src/Runtime.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/Runtime.cpp; sourceTree = "<group>"; };
 		8A83F6F86A02471D2FB64DFE /* src/main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = src/main.cpp; sourceTree = "<group>"; };
 		651500FDF830153062544A51 /* src/Asm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/Asm.h; sourceTree = "<group>"; };
 		80542DD7204A3612610128FA /* src/Cpu.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/Cpu.h; sourceTree = "<group>"; };
+		9257C2E3D0BE1A81337EBA70 /* src/Debug.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/Debug.h; sourceTree = "<group>"; };
+		F02295BBA93885AA071F6A01 /* src/DebugVm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/DebugVm.h; sourceTree = "<group>"; };
 		5124500461D5919B0652A168 /* src/Isa.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/Isa.h; sourceTree = "<group>"; };
 		898AE8D4913E6A8356133E34 /* src/Program.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/Program.h; sourceTree = "<group>"; };
 		82E451770A24C82A80C6D328 /* src/Runtime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = src/Runtime.h; sourceTree = "<group>"; };
@@ -52,11 +58,15 @@
 			children = (
 				3C680C0CA1E15B35BF8C14FA /* src/Asm.cpp */,
 				9FEFFC0BA0939F7C2DFAD0EB /* src/Cpu.cpp */,
+				94BAF9B5DC1232E52BEFBE2A /* src/Debug.cpp */,
+				4C48305BE6D7305C189619BF /* src/DebugVm.cpp */,
 				66D149B81355B40797CFB02C /* src/Isa.cpp */,
 				22E3AD51ABBBD62B8F5745F7 /* src/Runtime.cpp */,
 				8A83F6F86A02471D2FB64DFE /* src/main.cpp */,
 				651500FDF830153062544A51 /* src/Asm.h */,
 				80542DD7204A3612610128FA /* src/Cpu.h */,
+				9257C2E3D0BE1A81337EBA70 /* src/Debug.h */,
+				F02295BBA93885AA071F6A01 /* src/DebugVm.h */,
 				5124500461D5919B0652A168 /* src/Isa.h */,
 				898AE8D4913E6A8356133E34 /* src/Program.h */,
 				82E451770A24C82A80C6D328 /* src/Runtime.h */,
@@ -143,6 +153,8 @@
 			files = (
 				2B9E1DFAB6ED494378226E0C /* src/Asm.cpp in Sources */,
 				8490E3CCF0A6DA33229B310A /* src/Cpu.cpp in Sources */,
+				6B41C401E3C32388A87E5CC2 /* src/Debug.cpp in Sources */,
+				CCDDF0CF5B1B15EE3670EF61 /* src/DebugVm.cpp in Sources */,
 				E8A47C7A0359B9FD3095780D /* src/Isa.cpp in Sources */,
 				D6BD5290468C316543216511 /* src/Runtime.cpp in Sources */,
 				82FB134C2E04510C11E7152F /* src/main.cpp in Sources */,
