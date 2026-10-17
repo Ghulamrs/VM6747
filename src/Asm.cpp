@@ -435,6 +435,8 @@ struct Assembler {
                     Sym s; s.section = -1; s.offset = static_cast<uint32_t>(v); s.defined = true;
                     u.locals[name] = s;
                 } else if (m == ".end" || m == ".file" || m == ".dwpsn" || m == ".clink" || m == ".nocmp" || m == ".symdepend" ||
+                           // -g's .dwtag records (cpp11 1.9): the variables, for a debugger this one does not read yet
+                           m == ".dwtag" || m == ".dwendtag" || m == ".dwattr" ||
                            m == ".compiler_opts" || m == ".retain" ||
                            m == ".ident" || m == ".p2align" || m == ".size" || m == ".type" ||
                            m == ".battr" || m == ".elfsym" || m == ".hidden" || m == ".gmember" || m == ".endgroup") {
